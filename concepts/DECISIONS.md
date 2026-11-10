@@ -34,7 +34,23 @@
 | Frostmaw | brute | 7800 | x1.8 | 0.34s | ice | fire | Emberwing |
 | Stormwing | wyvern | 10500 | x2.1 | 0.30s | thunder | ice | Frostmaw |
 
-Later monsters also attack faster and dodge more often. New attacks: rush (Tuskhide, Frostmaw), triple bite, and lightning bolts (Stormwing). Each monster is weak to the element of the one before it, except the Fernwing (fire) and the Frostmaw (fire).
+Later monsters also attack faster and dodge more often. Each monster is weak to the element of the one before it, except the Fernwing (fire) and the Frostmaw (fire).
+
+### What makes each monster its own fight (v0.9.0)
+
+Every monster has a signature mechanic, at least three moves no other monster uses, and its own idle animation. A one-line tip names the signature as the hunt opens.
+
+| Monster | Signature | Its moves | Idle |
+|---|---|---|---|
+| Fernwing | **Poison.** A spit that lands poisons the hunter for 6s (1.5% of full health per tick). A potion cures it | bite, double bite, tail sweep, poison spit (one or two arcing globs), glide dive | alert, head bobbing |
+| Tuskhide | **Armored hide.** Hits do x0.6 until it is winded after its own attack, or staggered, when they do x1.4. Counters and weak-point hits ignore the hide | tusk gore (one or two), rush, rearing stomp with an aftershock, boulder toss | head low, pawing sand |
+| Emberwing | **Burn.** Its fire sets the hunter alight for 6s (2% per tick). Each roll takes 3s off, so two rolls put it out | bite, overhead tail slam, flame breath, fireball volley, flame dive | swaying, mouth flaring, dripping embers |
+| Frostmaw | **Freeze.** Frost breath encases the hunter for 2.4s. Each tap takes 0.35s off. A 6s immunity follows | maul (two or three bites), shoulder charge, frost breath, falling icicles, leap | slow breathing, misting |
+| Stormwing | **Charge.** A meter fills over 12.5s. Overcharged, it attacks 20% faster and hits 25% harder. A stun or part break empties it, a counter takes 35 off, and any of them ends an overcharge with a stagger | bite, tail sweep, wing clap shockwave, lightning bolts, hovering barrage, thunder dive | hovering on beating wings, sparking |
+
+Poison and burn never land the killing blow: they stop at 1 health.
+
+Moves are data: each names its animation (`pose`), the status it leaves, and what appears at the hit. Thrown projectiles are drawn in flight and timed to land on the hit, so the closing ring still tells the truth.
 
 ### Weapon types
 

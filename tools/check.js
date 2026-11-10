@@ -23,6 +23,8 @@ const shots=process.argv[2];
       }
       if(S.qte&&S.qte.t>S.qteTime*.55&&qdec!==S.qte){qdec=S.qte;if(Math.random()<skill){const pp=MH.partPos(S.qte.part,MH.mPose());MH.qteTap(pp.x,pp.y);}}
       if(counters&&h.counter>0&&h.state!=='counter')MH.actCounter();
+      if(h.state==='frozen')MH.actTap('head');
+      if(h.burn>0&&skill>.5&&h.st>70&&h.state==='idle'&&m.state!=='attack')MH.actDodge(-1);
       if(h.hp<h.max*.5&&h.potions>0&&h.state==='idle'&&m.state!=='attack')MH.actPotion();
       else if(h.state==='idle')MH.actTap('head');
       MH.update(1/60);t+=1/60;
@@ -74,10 +76,30 @@ const shots=process.argv[2];
   ok(await p.evaluate(()=>{MH.SAVE.bag={};MH.SAVE.lv={};const b=MH.lvOf('fern_gs');MH.upgradeTap('fern_gs');return MH.lvOf('fern_gs')===0&&MH.upCost('fern_ch')===null;}),'no upgrade without materials, and charms have no levels');
   ok(await p.evaluate(()=>{const taken=ar=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:ar,charm:null});let n=0;for(let k=0;k<12;k++){MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}
       const A=MH.ATTACKS[m.atk];n+=S.stats.taken/Math.round(A.dmg*1.5);}return n/12;};const a=taken('ember_ar'),b=taken('frost_ar');return Math.abs(a-.75)<.06&&Math.abs(b-1)<.01;}),'armor takes 25% less from its own monster\'s element');
+  // every monster has its own moves, and the signature mechanics work
+  ok(await p.evaluate(()=>{const seen={};for(const id of MH.HUNTS)for(const pool of MH.MONSTERS[id].pools)for(const a of pool){if(!MH.ATTACKS[a])return false;(seen[a]=seen[a]||new Set()).add(id);}
+    const own=id=>new Set(MH.MONSTERS[id].pools.flat().filter(a=>seen[a].size===1));return MH.HUNTS.every(id=>own(id).size>=3)&&MH.HUNTS.every(id=>MH.MONSTERS[id].sig&&MH.MONSTERS[id].tip);}),'every monster has at least three moves no other monster uses, and a signature');
+  ok(await p.evaluate(()=>{for(const id of MH.HUNTS)for(const a of new Set(MH.MONSTERS[id].pools.flat())){MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:null});MH.newHunt(id);const S=MH.S,m=S.m;S.h.hp=S.h.max=1e6;m.evadeCd=1e9;m.qteT=1e9;
+      const pool=MH.MONSTERS[id].pools;MH.MONSTERS[id].pools=[[a],[a],[a]];m.wait=0;let t=0,hit=false,moved=false;const p0=JSON.stringify(MH.mPose());
+      while(t<6&&!(m.state==='recover')){MH.update(1/60);t+=1/60;if(m.state==='attack'&&JSON.stringify(MH.mPose())!==p0)moved=true;}MH.MONSTERS[id].pools=pool;
+      if(m.state!=='recover'||!moved||S.stats.taken<=0)return id+':'+a;}return true;}),'every move of every monster animates, lands its hits and ends');
+  ok(await p.evaluate(()=>{MH.newHunt('fern');const S=MH.S,h=S.h;S.m.wait=99;MH.applyStatus('poison');const hp0=h.hp;for(let i=0;i<120;i++)MH.update(1/60);const lost=hp0-h.hp;
+    h.state='idle';MH.actPotion();for(let i=0;i<60;i++)MH.update(1/60);const cured=h.poison===0;h.hp=3;MH.applyStatus('poison');for(let i=0;i<600;i++)MH.update(1/60);return lost>=4&&lost<=8&&cured&&h.hp===1&&h.state!=='dead';}),'poison drains health, a potion cures it, and it cannot land the killing blow');
+  ok(await p.evaluate(()=>{MH.newHunt('ember');const S=MH.S,h=S.h;S.m.wait=99;MH.applyStatus('burn');const hp0=h.hp;for(let i=0;i<60;i++)MH.update(1/60);const lost=hp0-h.hp;
+    MH.actDodge(-1);for(let i=0;i<40;i++)MH.update(1/60);const half=h.burn>0;MH.actDodge(-1);for(let i=0;i<40;i++)MH.update(1/60);return lost>=2&&half&&h.burn===0;}),'burning drains health and two rolls put it out');
+  ok(await p.evaluate(()=>{MH.newHunt('frost');const S=MH.S,h=S.h;S.m.wait=99;MH.applyStatus('freeze');const fr=h.state==='frozen';MH.actDodge(-1);const still=h.state==='frozen';let taps=1;
+    while(h.state==='frozen'&&taps<20){MH.actTap('head');MH.update(1/60);taps++;}MH.applyStatus('freeze');return fr&&still&&taps>=5&&taps<=8&&h.state!=='frozen';}),'being frozen locks the hunter until enough taps break the ice, then gives a breather');
+  ok(await p.evaluate(()=>{const hit=st=>{MH.newHunt('tusk');const S=MH.S,m=S.m;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;m.state=st;m.rec=99;m.atk='gore';m.staggerDur=99;let n=0;for(let k=0;k<30;k++){S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<10;i++)MH.update(1/60);n+=S.stats.dealt;}return n/30;};
+    const up=hit('idle'),open=hit('recover');return Math.abs(open/up-1.4/.6)<.15;}),'the Tuskhide takes glancing blows until it is winded, then far more');
+  ok(await p.evaluate(()=>{MH.newHunt('storm');const S=MH.S,m=S.m;m.wait=1e9;m.qteT=1e9;m.evadeCd=1e9;S.h.inv=1e9;for(let i=0;i<60*5;i++)MH.update(1/60);const half=m.charge>30&&m.charge<50&&!m.over;
+    S.h.counter=1;MH.actCounter();for(let i=0;i<30;i++)MH.update(1/60);const drained=m.charge<20;m.wait=1e9;for(let i=0;i<60*14;i++)MH.update(1/60);const over=m.over;
+    S.h.state='idle';S.h.counter=1;MH.actCounter();for(let i=0;i<30;i++)MH.update(1/60);return half&&drained&&over&&!m.over&&m.charge<5&&m.state==='stagger';}),'the Stormwing builds charge, a counter drains it, and overcharge is knocked out by a counter');
+  ok(await p.evaluate(()=>{MH.newHunt('storm');const m=MH.S.m;m.over=true;m.wait=0;m.qteT=1e9;MH.update(1/60);const fast=m.hits[0];MH.newHunt('storm');const n=MH.S.m;n.wait=0;n.qteT=1e9;let slow=0;for(let k=0;k<40&&!slow;k++){MH.newHunt('storm');MH.S.m.wait=0;MH.update(1/60);if(MH.S.m.atk===m.atk)slow=MH.S.m.hits[0];}
+    return slow&&Math.abs(fast/slow-.8)<.01;}),'an overcharged Stormwing attacks faster');
   // perks and weapon rules, checked directly
   ok(await p.evaluate(()=>{MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'ember_gs',armor:'ember_ar',charm:'relic_weak'});const g=MH.gearStats();return g.elem==='fire'&&Math.abs(g.atk-1.925)<1e-6&&g.perks.might&&g.perks.weakspot&&g.hp===200;}),'gear adds up: element, attack with Might, health, perks');
-  ok(await p.evaluate(()=>{const hit=(w,mon)=>{MH.SAVE.eq.weapon=w;MH.SAVE.eq.armor='leather';MH.SAVE.eq.charm=null;MH.newHunt(mon);const S=MH.S;S.m.evadeCd=99;let n=0;for(let k=0;k<40;k++){S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<8;i++)MH.update(1/60);n+=S.stats.dealt;S.m.hp=S.m.max;S.m.phase=0;S.m.roarDue=false;}return n/40;};
-    MH.SAVE.lv={};const a=hit('ember_gs','frost'),b=hit('ember_gs','tusk');return a/b>1.2&&a/b<1.3;}),'a weapon does 25% more to a monster weak to its element');
+  ok(await p.evaluate(()=>{const hit=(w,mon)=>{MH.SAVE.eq.weapon=w;MH.SAVE.eq.armor='leather';MH.SAVE.eq.charm=null;MH.newHunt(mon);const S=MH.S;S.m.evadeCd=99;let n=0;for(let k=0;k<40;k++){S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<16;i++)MH.update(1/60);n+=S.stats.dealt;S.m.hp=S.m.max;S.m.phase=0;S.m.roarDue=false;S.m.wait=1e9;S.m.state='idle';S.h.inv=1e9;}return n/40;};
+    MH.SAVE.lv={};const a=hit('ember_gs','frost'),b=hit('ember_gs','storm');return a/b>1.2&&a/b<1.3;}),'a weapon does 25% more to a monster weak to its element');
   ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_ln',armor:'leather',charm:null});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=99;m.wait=0;m.qteT=99;MH.update(1/60);
     Object.assign(MH.IN,{down:true,swiped:false,downAt:-9});let t=0;while(m.state==='attack'&&m.hi===0&&t<3){S.h.state='guard';S.h.t=1;MH.update(1/60);t+=1/60;}MH.IN.down=false;
     return S.stats.guards===1&&S.stats.taken>0&&S.stats.taken<=4&&S.h.st<100&&S.h.state!=='hurt';}),'a lance guard blocks a hit for chip damage and stamina');
@@ -86,7 +108,7 @@ const shots=process.argv[2];
     return S.h.counter>0&&S.stats.taken===0;}),'a guard raised just in time is perfect and opens a counter');
   ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:'frost_ch'});MH.newHunt('fern');return MH.S.h.potions===3;}),'Herbalist adds a potion');
   await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:null});});
-  const tu=await p.evaluate(()=>{MH.manual=true;MH.newHunt('fern');const S=MH.S;S.h.hp=S.h.max=1e9;S.m.hp=S.m.max=1e9;let t=0;while(S.mode==='hunt'&&t<400){MH.update(1/30);t+=1/30;}return S.fail;});
+  const tu=await p.evaluate(()=>{MH.manual=true;MH.newHunt('fern');const S=MH.S;S.h.inv=1e9;S.m.hp=S.m.max=1e9;let t=0;while(S.mode==='hunt'&&t<400){MH.update(1/30);t+=1/30;}return S.fail;});
   ok(tu==='TIME UP','the hunt ends when time runs out');
 
   // screenshots of the fights
@@ -94,12 +116,22 @@ const shots=process.argv[2];
   if(shots){
     const scene=async(mon,eq,cond,name,max)=>{await p.evaluate(({mon,eq})=>{MH.manual=true;Object.assign(MH.SAVE.eq,eq);MH.newHunt(mon);MH.S.h.hp=MH.S.h.max=1e6;MH.S.m.hp=MH.S.m.max*.6;},{mon,eq});await until(cond,max||200);await shot(name);};
     await scene('fern',set('iron','db'),"S.qte&&S.qte.t>.2",'fern-circle');
-    await scene('tusk',set('fern','hm'),"S.m.state==='attack'&&S.m.atk==='rush'&&S.m.hits[0]-S.m.t<.25",'tusk-rush');
-    await scene('ember',set('tusk','gs'),"S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",'ember-fire');
-    await scene('frost',set('ember','ln'),"S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",'frost-breath');
-    await p.evaluate(()=>{MH.S.h.state='guard';MH.S.h.t=1;});await shot('frost-guard');
-    await scene('storm',set('frost','db'),"S.m.state==='attack'&&S.m.atk==='bolt'&&S.m.t>S.m.hits[0]+.02",'storm-bolt');
-    await scene('storm',set('storm','gs'),"S.m.state==='stagger'&&S.m.t>.3",'storm-stagger',400);
+    const mid=id=>"S.m.state==='attack'&&S.m.atk==='"+id+"'&&S.m.hits[0]-S.m.t<.2&&S.m.hits[0]-S.m.t>.05";
+    await scene('fern',set('iron','gs'),mid('spit'),'fern-spit');
+    await scene('tusk',set('fern','hm'),mid('stomp'),'tusk-stomp');
+    await scene('tusk',set('fern','hm'),mid('gore'),'tusk-gore');
+    await scene('tusk',set('fern','hm'),mid('rock'),'tusk-rock');
+    await scene('tusk',set('fern','hm'),"S.m.state==='recover'&&S.m.t>.2",'tusk-open');
+    await scene('ember',set('tusk','gs'),mid('slam'),'ember-slam');
+    await scene('ember',set('tusk','gs'),mid('volley'),'ember-volley');
+    await p.evaluate(()=>{MH.S.h.hp=MH.S.h.max=300;MH.S.m.wait=99;MH.applyStatus('burn');for(let i=0;i<30;i++)MH.update(1/60);});await shot('ember-burning');
+    await scene('frost',set('ember','ln'),"S.m.state==='attack'&&S.m.atk==='frost'&&S.m.t>S.m.hits[0]-.05",'frost-breath');
+    await p.evaluate(()=>{MH.S.h.state='idle';MH.S.h.freezeImm=0;MH.applyStatus('freeze');for(let i=0;i<6;i++)MH.update(1/60);});await shot('frost-frozen');
+    await scene('frost',set('ember','ln'),mid('icicle'),'frost-icicle');
+    await scene('storm',set('frost','db'),mid('clap'),'storm-clap');
+    await scene('storm',set('frost','db'),"S.m.state==='attack'&&S.m.atk==='hover'&&S.m.t>S.m.hits[1]+.02",'storm-hover',400);
+    await p.evaluate(()=>{MH.newHunt('storm');MH.S.m.charge=99.5;MH.S.m.wait=99;for(let i=0;i<40;i++)MH.update(1/60);});await shot('storm-overcharged');
+    await p.evaluate(()=>{MH.newHunt('storm');for(let i=0;i<50;i++)MH.update(1/60);});await shot('storm-intro');
   }
 
   // ── camp, on a fresh save, with real taps ──

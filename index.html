@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.8.0';
+const VER='0.9.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -47,35 +47,69 @@ const QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
 const PARTS=['head','wings','tail'];
 const EVADE_DUR=1;
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
+// pose: the animation it plays. status: what a landed hit leaves on the hunter. fx: what appears at the hit. proj: colour of a thrown projectile.
 const ATTACKS={
-  bite:  {wind:.8,  hits:[0],     after:.3,  rec:.9,  dmg:14},
-  tail:  {wind:1.15,hits:[0],     after:.35, rec:1.0, dmg:18},
-  dbl:   {wind:.75, hits:[0,.55], after:.3,  rec:1.1, dmg:13},
-  fire:  {wind:1.3, hits:[0,.5],  after:.35, rec:1.2, dmg:12},
-  tri:   {wind:.7,  hits:[0,.45,.9], after:.3, rec:1.3, dmg:9},
-  rush:  {wind:1.25,hits:[0],     after:.35, rec:1.5, dmg:20, heavy:true},
-  bolt:  {wind:.95, hits:[0,.42,.84], after:.3, rec:1.2, dmg:9},
-  dive:  {wind:1.7, hits:[0],     after:.3,  rec:1.7, dmg:30, heavy:true},
+  // shared basics
+  bite:  {pose:'lunge', wind:.8,  hits:[0],        after:.3,  rec:.9,  dmg:14},
+  dbl:   {pose:'lunge', wind:.75, hits:[0,.55],    after:.3,  rec:1.1, dmg:13},
+  sweep: {pose:'sweep', wind:1.15,hits:[0],        after:.35, rec:1.0, dmg:18},
+  // Fernwing
+  spit:  {pose:'spit',  wind:.95, hits:[0],        after:.3,  rec:.9,  dmg:10, status:'poison', proj:'#7ad84a'},
+  spit2: {pose:'spit',  wind:.9,  hits:[0,.6],     after:.3,  rec:1.1, dmg:9,  status:'poison', proj:'#7ad84a'},
+  glide: {pose:'dive',  wind:1.7, hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true},
+  // Tuskhide
+  gore:  {pose:'gore',  wind:.85, hits:[0],        after:.35, rec:1.0, dmg:15},
+  gore2: {pose:'gore',  wind:.8,  hits:[0,.6],     after:.35, rec:1.2, dmg:13},
+  rush:  {pose:'rush',  wind:1.25,hits:[0],        after:.35, rec:1.7, dmg:20, heavy:true},
+  stomp: {pose:'stomp', wind:1.1, hits:[0,.55],    after:.35, rec:1.3, dmg:12, fx:'ring'},
+  rock:  {pose:'spit',  wind:1.2, hits:[0],        after:.3,  rec:1.1, dmg:22, heavy:true, proj:'#8a6a48', big:true},
+  // Emberwing
+  slam:  {pose:'slam',  wind:1.0, hits:[0],        after:.4,  rec:1.0, dmg:20},
+  flame: {pose:'breath',wind:1.3, hits:[0,.5],     after:.35, rec:1.2, dmg:12, status:'burn'},
+  volley:{pose:'spit',  wind:.9,  hits:[0,.4,.8],  after:.3,  rec:1.2, dmg:9,  status:'burn', proj:'#ff9a2e'},
+  fdive: {pose:'dive',  wind:1.7, hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true, status:'burn', fx:'blast'},
+  // Frostmaw
+  maul:  {pose:'lunge', wind:.75, hits:[0,.5],     after:.3,  rec:1.1, dmg:13},
+  maul3: {pose:'lunge', wind:.7,  hits:[0,.45,.9], after:.3,  rec:1.3, dmg:9},
+  charge:{pose:'rush',  wind:1.15,hits:[0],        after:.35, rec:1.5, dmg:20, heavy:true},
+  frost: {pose:'breath',wind:1.3, hits:[0,.5],     after:.35, rec:1.2, dmg:10, status:'freeze'},
+  icicle:{pose:'skycall',wind:1.0,hits:[0,.42,.84],after:.3,  rec:1.2, dmg:10, fx:'icicle'},
+  leap:  {pose:'dive',  wind:1.6, hits:[0],        after:.3,  rec:1.7, dmg:28, heavy:true, fx:'ring'},
+  // Stormwing
+  clap:  {pose:'clap',  wind:1.0, hits:[0],        after:.35, rec:1.0, dmg:18, fx:'ring'},
+  bolt:  {pose:'skycall',wind:.95,hits:[0,.42,.84],after:.3,  rec:1.2, dmg:9,  fx:'bolt'},
+  hover: {pose:'hover', wind:1.2, hits:[0,.35,.7,1.05],after:.4,rec:1.4,dmg:8, fx:'bolt'},
+  tdive: {pose:'dive',  wind:1.6, hits:[0],        after:.3,  rec:1.6, dmg:28, heavy:true, fx:'bolt'},
 };
+// ── Statuses the hunter can pick up ──
+const POISON={time:6,tick:.6,dmg:.015}, BURN={time:6,tick:.5,dmg:.02,roll:3}, FREEZE={time:2.4,tap:.35,immune:6};
+// ── Signature mechanics ──
+const ARMOR=[.6,1.4];                    // Tuskhide: damage while its hide is up, and while it is winded
+const CHARGE={rate:8,speed:.8,dmg:1.25,counter:35};   // Stormwing: charge per second, and what overcharge does
 // ── Monsters. speed: wind-up multiplier per phase. qteTime: seconds a weak-point circle takes to close.
 //    evadeCd: seconds between its dodges per phase. pre: prefix of its material ids. weak: element that hurts it more.
 const ELEM={nature:['NATURE','#4cd964'],earth:['EARTH','#d9a05a'],fire:['FIRE','#ff7a2e'],ice:['ICE','#7fd6ff'],thunder:['THUNDER','#ffe14d']};
 const MONSTERS={
   fern:{name:'FERNWING',short:'FERN',rig:'wyvern',kind:0,biome:0,stars:1,elem:'nature',weak:'fire',pre:'',
     hp:3100,dmg:1,speed:[1,.88,.78],qteTime:.5,evadeCd:[3.4,2.6,1.9],stunMax:100,blood:'#3f9e8a',breath:['#ff9a2e','#ffd34d','#e2483d'],
-    pools:[['bite','bite','bite','tail','tail'],['bite','tail','dbl','dbl','fire','fire'],['tail','dbl','fire','fire','dive','dive']]},
+    sig:'poison',tip:'POISON SPIT: A POTION CURES IT',
+    pools:[['bite','bite','sweep','spit'],['bite','sweep','dbl','spit','spit2'],['sweep','dbl','spit2','spit2','glide','glide']]},
   tusk:{name:'TUSKHIDE',short:'TUSK',rig:'brute',kind:0,biome:2,stars:2,needs:'fern',elem:'earth',weak:'nature',pre:'t_',
-    hp:4800,dmg:1.25,speed:[.95,.85,.76],qteTime:.45,evadeCd:[4,3,2.4],stunMax:115,blood:'#b08a5a',breath:['#e0c89a','#f2dca0','#c9955a'],
-    pools:[['bite','bite','tail','rush'],['bite','tail','dbl','rush','rush'],['tail','dbl','dbl','rush','dive','dive']]},
+    hp:4300,dmg:1.25,speed:[.95,.85,.76],qteTime:.45,evadeCd:[4,3,2.4],stunMax:115,blood:'#b08a5a',breath:['#e0c89a','#f2dca0','#c9955a'],
+    sig:'armor',tip:'ARMORED: STRIKE WHEN IT TIRES',
+    pools:[['gore','gore','rush','stomp'],['gore','gore2','rush','stomp','rock'],['gore2','rush','rush','stomp','rock','rock']]},
   ember:{name:'EMBERWING',short:'EMBER',rig:'wyvern',kind:1,biome:1,stars:3,needs:'tusk',elem:'fire',weak:'earth',pre:'e_',
     hp:5800,dmg:1.5,speed:[.9,.8,.7],qteTime:.38,evadeCd:[3,2.2,1.6],stunMax:130,blood:'#b8402e',breath:['#ff9a2e','#ffd34d','#e2483d'],
-    pools:[['bite','tail','tail','dbl','dbl'],['tail','dbl','tri','tri','fire','fire'],['tri','tri','fire','fire','dive','dive','dbl']]},
+    sig:'burn',tip:'ON FIRE? ROLL TO PUT IT OUT',
+    pools:[['bite','slam','slam','flame'],['slam','flame','flame','volley','dbl'],['slam','flame','volley','volley','fdive','fdive']]},
   frost:{name:'FROSTMAW',short:'FROST',rig:'brute',kind:1,biome:3,stars:4,needs:'ember',elem:'ice',weak:'fire',pre:'f_',
-    hp:7800,dmg:1.8,speed:[.86,.76,.66],qteTime:.34,evadeCd:[3,2.2,1.6],stunMax:150,blood:'#9fd8f0',breath:['#bfeaff','#ffffff','#7fd6ff'],
-    pools:[['bite','tail','dbl','rush'],['dbl','tri','fire','rush','rush'],['tri','fire','fire','rush','dive','dive']]},
+    hp:7600,dmg:1.8,speed:[.86,.76,.66],qteTime:.34,evadeCd:[3,2.2,1.6],stunMax:150,blood:'#9fd8f0',breath:['#bfeaff','#ffffff','#7fd6ff'],
+    sig:'freeze',tip:'FROZEN? TAP TO BREAK FREE',
+    pools:[['maul','maul','charge','icicle'],['maul','charge','frost','icicle','icicle'],['maul3','frost','frost','charge','leap','icicle']]},
   storm:{name:'STORMWING',short:'STORM',rig:'wyvern',kind:2,biome:4,stars:5,needs:'frost',elem:'thunder',weak:'ice',pre:'s_',
-    hp:10500,dmg:2.1,speed:[.82,.72,.62],qteTime:.3,evadeCd:[2.6,1.9,1.4],stunMax:170,blood:'#6a6ad8',breath:['#ffe14d','#ffffff','#a8a8ff'],
-    pools:[['bite','tail','dbl','bolt'],['dbl','tri','fire','bolt','bolt'],['tri','fire','bolt','bolt','dive','dive']]},
+    hp:10000,dmg:2.1,speed:[.82,.72,.62],qteTime:.3,evadeCd:[2.6,1.9,1.4],stunMax:170,blood:'#6a6ad8',breath:['#ffe14d','#ffffff','#a8a8ff'],
+    sig:'charge',tip:'CHARGES UP: STUN OR COUNTER',
+    pools:[['bite','sweep','clap','bolt'],['sweep','clap','bolt','bolt','hover'],['clap','bolt','hover','hover','tdive','tdive','dbl']]},
 };
 const HUNTS=['fern','tusk','ember','frost','storm'];
 for(const id of HUNTS){const D=MONSTERS[id],q=D.pre;D.id=id;D.mat={scale:q+'scale',claw:q+'claw',head:q+'horn',wings:q+'wing',tail:q+'spike'};
@@ -406,9 +440,9 @@ const unlocked=id=>!MONSTERS[id].needs||(SAVE.wins[MONSTERS[id].needs]||0)>0||(S
 function newHunt(id){
   const D=S.def=MONSTERS[id||(S.def&&S.def.id)||'fern'], gs=gearStats(); BG=bgFor(D.biome);
   S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits;
-  S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0;
-  S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,flurry:false,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS+(gs.perks.herbal?1:0),buff:0,counter:0,target:'body',hitDone:false,drank:false};
-  S.m={hp:D.hp,max:D.hp,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:D.stunMax,stunned:false,evadeCd:4,
+  S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0; HUD_T=D.sig==='charge'?27:21;
+  S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,flurry:false,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS+(gs.perks.herbal?1:0),buff:0,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,counter:0,target:'body',hitDone:false,drank:false};
+  S.m={hp:D.hp,max:D.hp,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:D.stunMax,stunned:false,evadeCd:4,charge:0,over:false,
        parts:{head:{hits:0,broken:false},wings:{hits:0,broken:false},tail:{hits:0,broken:false}},qteT:QTE_FIRST,qteLast:PARTS[(Math.random()*3)|0]};
   S.qte=null;
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
@@ -417,7 +451,7 @@ function newHunt(id){
 }
 
 // ── Layout (depends on LH) ──
-const HUD_T=21, HUD_B=26;
+const HUD_B=26; let HUD_T=21;             // the top HUD grows a row for a monster with its own meter
 const L={}; function layout(){
   L.gy=LH-HUD_B;             // top of the bottom HUD
   L.ground=L.gy-clamp(Math.round(LH*.42),80,120);   // horizon: the fight sits mid-screen, with thumb room below
@@ -431,32 +465,56 @@ const L={}; function layout(){
 // ═══════════════════════════════════════════════════
 //  MONSTER
 // ═══════════════════════════════════════════════════
-function mAir(){const m=S.m;if(m.state!=='attack'||m.atk!=='dive')return false;const h=m.hits[0];return m.t>h*.3&&m.t<h-.06;}
+const aPose=()=>ATTACKS[S.m.atk].pose;
+function mAir(){const m=S.m;if(m.state!=='attack'||aPose()!=='dive')return false;const h=m.hits[0];return m.t>h*.3&&m.t<h-.06;}
 // Pose and position offset for the current state
 function mPose(){
-  const m=S.m, p={hx:0,hy:0,jaw:0,wing:0,tail:0,glow:0,ox:0,oy:0};
-  const idle=Math.sin(S.clock*2.4);
-  p.hy=idle>.3?1:0; p.tail=idle<-.3?-2:0;
-  if(m.state==='idle'&&mWary()){p.wing=1;p.hx=2;p.hy=2;p.oy=2;p.tail=-4;}        // wary: wings up, it will dodge the next hit
+  const m=S.m, D=S.def, c=S.clock, p={hx:0,hy:0,jaw:0,wing:0,tail:0,glow:0,ox:0,oy:0};
+  if(m.state==='idle'||m.state==='evade'){                                       // each monster carries itself differently
+    if(D.id==='fern'){const i=Math.sin(c*2.4);p.hy=i>.3?1:0;p.tail=i<-.3?-2:0;}                                          // alert, head bobbing
+    else if(D.id==='tusk'){const i=Math.sin(c*1.6);p.hy=3+(i>.7?2:0);p.hx=i>.7?-1:0;p.tail=Math.sin(c*5)>.8?-4:0;}       // head low, pawing the sand
+    else if(D.id==='ember'){const i=Math.sin(c*1.8);p.hx=Math.round(i*2);p.hy=i>0?-1:0;p.jaw=Math.sin(c*.9)>.75?2:0;p.glow=p.jaw?2:0;p.tail=Math.round(Math.sin(c*3)*2);}   // swaying, mouth flaring
+    else if(D.id==='frost'){const i=Math.sin(c*1.2);p.oy=i>0?1:0;p.hy=i>0?2:1;p.jaw=i>.85?1:0;}                          // slow, heavy breathing
+    else{p.oy=-4+Math.round(Math.sin(c*2.5)*2);p.wing=Math.sin(c*5)>0?0:2;p.tail=Math.round(Math.sin(c*4)*2);p.hy=-1;}   // hovering on beating wings
+  }
+  if(m.state==='idle'&&mWary()){p.wing=1;p.hx=2;p.hy=2;p.oy=2;p.tail=-4;p.jaw=0;}  // wary: wings up or spines bristling, it will dodge the next hit
   else if(m.state==='evade'){const u=Math.sin(Math.PI*clamp(m.t/EVADE_DUR,0,1));p.ox=Math.round(16*u);p.oy=-Math.round(12*u);p.wing=Math.floor(m.t*8)%2?1:2;p.hx=2;}
   if(m.state==='attack'){
-    const t=m.t,h0=m.hits[0],a=m.atk;
-    if(a==='bite'||a==='dbl'||a==='tri'){
-      let k=-1;for(let i=0;i<m.hits.length;i++)if(t>=m.hits[i]-.07&&t<m.hits[i]+.2)k=i;
-      if(k>=0){p.hx=-8;p.hy=3;p.jaw=1;p.ox=-14;}
-      else{const nx=m.hits[Math.min(m.hi,m.hits.length-1)],prev=m.hi?m.hits[m.hi-1]+.2:0,u=ease((t-prev)/Math.max(.01,nx-.07-prev));
-        p.hx=Math.round(6*u);p.hy=-Math.round(3*u);p.jaw=3;p.ox=Math.round(3*u);}
-    }else if(a==='tail'){
-      if(t<h0-.08){const u=ease(t/(h0-.08));p.tail=-Math.round(12*u);p.ox=Math.round(5*u);p.hx=3;p.wing=1;}
+    const t=m.t,h0=m.hits[0],a=aPose(),hits=m.hits;
+    let near=-1;for(let i=0;i<hits.length;i++)if(t>=hits[i]-.07&&t<hits[i]+.2)near=i;      // inside a strike window
+    const nx=hits[Math.min(m.hi,hits.length-1)],prev=m.hi?hits[m.hi-1]+.2:0,u=ease((t-prev)/Math.max(.01,nx-.07-prev));   // 0..1 through the current wind-up
+    if(a==='lunge'){
+      if(near>=0){p.hx=-8;p.hy=3;p.jaw=1;p.ox=-14;}
+      else{p.hx=Math.round(6*u);p.hy=-Math.round(3*u);p.jaw=3;p.ox=Math.round(3*u);}
+    }else if(a==='gore'){                                                       // head drops low, then tusks rip upward
+      if(near>=0){p.hx=-9;p.hy=-7;p.jaw=2;p.ox=-12;}
+      else{p.hx=Math.round(4*u);p.hy=Math.round(9*u);p.ox=Math.round(4*u);p.oy=Math.round(2*u);}
+    }else if(a==='sweep'){
+      if(t<h0-.08){const v=ease(t/(h0-.08));p.tail=-Math.round(12*v);p.ox=Math.round(5*v);p.hx=3;p.wing=1;}
       else if(t<h0+.25){p.tail=6;p.ox=-10;p.hx=-3;p.hy=3;}
-    }else if(a==='fire'){
-      if(t<h0-.08){const u=t/(h0-.08);p.hx=Math.round(4*ease(u));p.hy=-Math.round(7*ease(u));p.jaw=1;p.glow=1+Math.min(2,Math.floor(u*3));}
-      else if(t<m.hits[1]+.2){p.hx=-6;p.hy=4;p.jaw=3;p.glow=3;}
-    }else if(a==='rush'){
-      if(t<h0-.1){const u=ease(t/(h0-.1));p.ox=Math.round(9*u);p.hx=2;p.hy=3;p.oy=2;p.wing=1;}
-      else{p.ox=-30;p.hx=-6;p.hy=2;p.jaw=1;}
-    }else if(a==='bolt'){
+    }else if(a==='slam'){                                                       // tail raised high overhead, then hammered down
+      if(t<h0-.1){const v=ease(t/(h0-.1));p.tail=-Math.round(18*v);p.hx=-2;p.hy=Math.round(3*v);p.ox=Math.round(4*v);}
+      else if(t<h0+.3){p.tail=8;p.ox=-12;p.hy=5;p.oy=2;}
+    }else if(a==='breath'){
+      if(t<h0-.08){const v=t/(h0-.08);p.hx=Math.round(4*ease(v));p.hy=-Math.round(7*ease(v));p.jaw=1;p.glow=1+Math.min(2,Math.floor(v*3));}
+      else if(t<hits[1]+.2){p.hx=-6;p.hy=4;p.jaw=3;p.glow=3;}
+    }else if(a==='spit'){                                                       // cheeks fill, then the head snaps forward to launch
+      let snap=false;for(const h of hits)if(t>=h-PROJ_TIME&&t<h-PROJ_TIME+.18)snap=true;
+      if(snap){p.hx=-6;p.hy=2;p.jaw=3;p.glow=3;}else if(t<hits[hits.length-1]-PROJ_TIME){p.hx=5;p.hy=-5;p.jaw=1;p.glow=2;}
+    }else if(a==='stomp'){                                                      // rears up, then slams down
+      if(near>=0&&t>=hits[near]){p.hy=6;p.hx=-2;p.oy=2;p.jaw=1;}
+      else{p.hy=-Math.round(11*u);p.hx=Math.round(4*u);p.oy=-Math.round(6*u);p.jaw=2;p.wing=1;}
+    }else if(a==='clap'){                                                       // wings beat up, then clap together
+      if(t<h0-.06){p.wing=Math.floor(t*9)%2?1:0;p.oy=-Math.round(4*ease(t/h0));p.hy=-3;}
+      else if(t<h0+.3){p.wing=2;p.ox=-6;p.hy=2;p.jaw=2;}
+    }else if(a==='skycall'){
       p.hx=-2;p.hy=-7;p.jaw=2;p.wing=(Math.floor(t*12)%2)?1:0;p.glow=2;
+    }else if(a==='hover'){                                                      // climbs and rains bolts from above
+      const last=hits[hits.length-1],v=t<last+.2?ease(t/(h0*.6)):1-ease((t-last-.2)/.25);
+      p.oy=-Math.round(26*v);p.wing=(Math.floor(t*10)%2)?1:2;p.hy=4;p.jaw=2;p.glow=2;
+    }else if(a==='rush'){
+      if(t<h0-.1){const v=ease(t/(h0-.1));p.ox=Math.round(9*v);p.hx=2;p.hy=3;p.oy=2;p.wing=1;}
+      else{p.ox=-30;p.hx=-6;p.hy=2;p.jaw=1;}
     }else if(a==='dive'){
       const up=h0*.3;
       if(t<up){p.wing=(Math.floor(t*10)%2)?1:2;p.oy=-Math.round(4*t/up);p.hy=-2;}
@@ -465,14 +523,17 @@ function mPose(){
       else{p.wing=2;p.ox=-24;p.hy=4;p.jaw=2;}
     }
   }else if(m.state==='recover'){
-    if(m.atk==='dive')p.ox=-Math.round(24*(1-ease(m.t/m.rec*1.6)));
-    if(m.atk==='rush')p.ox=-Math.round(30*(1-ease(m.t/m.rec*1.6)));
+    const a=aPose();
+    if(a==='dive')p.ox=-Math.round(24*(1-ease(m.t/m.rec*1.6)));
+    if(a==='rush')p.ox=-Math.round(30*(1-ease(m.t/m.rec*1.6)));
     p.hy=3;p.jaw=1;                                                             // panting: the opening
+    if(D.sig==='armor'){p.hy=7;p.jaw=2;p.oy=2;p.wing=2;}                         // the Tuskhide sags, winded
   }else if(m.state==='stagger'){if(!m.stunned&&m.staggerDur<1){p.hx=5;p.hy=-2;p.jaw=2;p.ox=4;return p;}p.hx=-2;p.hy=9;p.jaw=2;p.wing=2;p.tail=4;p.oy=3;}
   else if(m.state==='roar'){p.hx=-3;p.hy=-8;p.jaw=3;p.wing=1;p.ox=Math.round(Math.sin(S.clock*60));}
   else if(m.state==='dead'){const u=ease(m.t/.8);p.hx=-2;p.hy=Math.round(11*u);p.jaw=2;p.wing=2;p.tail=Math.round(6*u);p.oy=Math.round(5*u);}
   return p;
 }
+const PROJ_TIME=.4;                      // seconds a spat projectile is in the air
 const rigPt=(v,p)=>({x:L.mx+MS_OX+v[0]+p.ox,y:L.my+MS_OY+v[1]+p.oy});
 function mHeadPos(p){return rigPt(RIGS[S.def.rig].head(p),p);}
 function partPos(part,p){return rigPt((RIGS[S.def.rig].pos[part]||RIGS[S.def.rig].pos.body)(p),p);}
@@ -485,37 +546,59 @@ const mWary=()=>{const m=S.m;return m.state==='idle'&&m.evadeCd<=0&&!m.roarDue;}
 function mStartAttack(){
   const m=S.m, pool=S.def.pools[m.phase]; let id;
   do{id=pool[(Math.random()*pool.length)|0];}while(id===m.last&&Math.random()<.7);
-  const A=ATTACKS[id], sp=S.def.speed[m.phase], w=A.wind*sp;
+  const A=ATTACKS[id], sp=S.def.speed[m.phase]*(m.over?CHARGE.speed:1), w=A.wind*sp;
   m.state='attack';m.t=0;m.atk=id;m.last=id;m.hi=0;m.hits=A.hits.map(o=>w+o);m.dur=m.hits[m.hits.length-1]+A.after;m.rec=A.rec;
   sfx('warn');
 }
 function mStagger(d,stun){const m=S.m;if(m.state==='stagger'&&m.staggerDur-m.t>d)return;m.state='stagger';m.t=0;m.staggerDur=d;m.stunned=!!stun;}
+// Stormwing: knock its charge out. all=false only drains some.
+function mDischarge(amount){
+  const m=S.m; if(S.def.sig!=='charge'||m.state==='dead')return;
+  if(m.over){m.over=false;m.charge=0;const hp=mHeadPos(mPose());addNum(hp.x+10,hp.y-26,'DISCHARGED!','#7fd6ff',1.3);sfx('brk');mStagger(1.2);
+    for(let k=0;k<16;k++)S.pt.push({x:hp.x+rnd(0,40),y:hp.y+rnd(0,30),vx:rnd(-90,90),vy:rnd(-90,30),life:rnd(.3,.6),col:k%2?'#ffe14d':'#ffffff',g:0});}
+  else m.charge=amount?Math.max(0,m.charge-amount):0;
+}
 function mUpdate(dt){
-  const m=S.m; m.t+=dt; if(m.flash>0)m.flash-=dt; if(m.evadeCd>0&&m.state!=='stagger')m.evadeCd-=dt;
+  const m=S.m,D=S.def; m.t+=dt; if(m.flash>0)m.flash-=dt; if(m.evadeCd>0&&m.state!=='stagger')m.evadeCd-=dt;
   if(m.state==='dead')return;
+  if(D.sig==='charge'&&!m.over&&m.state!=='stagger'&&S.h.state!=='dead'&&(m.charge+=CHARGE.rate*dt)>=100){m.charge=100;m.over=true;S.shake=.5;sfx('roar');
+    const hp=mHeadPos(mPose());addNum(hp.x+10,hp.y-26,'OVERCHARGED!','#ffe14d',1.4);}
   if(m.state==='idle'){
     if(m.roarDue){m.roarDue=false;m.state='roar';m.t=0;S.shake=.9;sfx('roar');buzz(200);
       addNum(W/2,L.ground-14,m.phase===2?'ENRAGED!':'ANGRY!','#ff6a4d',1.4);}
     else if((m.wait-=dt)<=0&&S.h.state!=='dead')mStartAttack();
   }else if(m.state==='attack'){
     while(m.hi<m.hits.length&&m.t>=m.hits[m.hi]){mHit(m.hi);m.hi++;if(m.state!=='attack')return;}
-    if(m.atk==='fire'&&m.t>m.hits[0]-.08&&m.t<m.hits[1]+.15){                  // flame stream
-      const pz=mPose(),mo=rigPt(RIGS[S.def.rig].mouth(pz),pz);for(let i=0;i<3;i++)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-120,-70),vy:rnd(0,50),life:rnd(.25,.5),col:S.def.breath[i],g:-40});
+    if(aPose()==='breath'&&m.t>m.hits[0]-.08&&m.t<m.hits[1]+.15){               // breath stream
+      const pz=mPose(),mo=rigPt(RIGS[D.rig].mouth(pz),pz);for(let i=0;i<3;i++)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-120,-70),vy:rnd(0,50),life:rnd(.25,.5),col:D.breath[i],g:-40});
     }
-    if(m.t>=m.dur){m.state='recover';m.t=0;}
-  }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*S.def.speed[m.phase];}}
+    if(m.t>=m.dur){m.state='recover';m.t=0;
+      if(D.sig==='armor'){const b=partPos('body',mPose());addNum(b.x,b.y-22,'OPEN!','#4cd964',1);}}
+  }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*D.speed[m.phase];}}
   else if(m.state==='stagger'){if(m.t>=m.staggerDur){m.state='idle';m.wait=.5;m.stunned=false;}}
   else if(m.state==='evade'){if(m.t>=EVADE_DUR){m.state='idle';m.wait=m.phase?.15:.4;}}
   else if(m.state==='roar'){if(m.t>=1.2){m.state='idle';m.wait=.35;}}
 }
+// A status lands on the hunter
+function applyStatus(st){
+  const h=S.h; if(!st||h.state==='dead')return; const hc={x:L.hx+18,y:L.hFeet-18};
+  if(st==='poison'){if(h.poison<=0)addNum(hc.x+6,hc.y-30,'POISONED','#7ad84a',1);h.poison=POISON.time;}
+  else if(st==='burn'){if(h.burn<=0)addNum(hc.x+6,hc.y-30,'ON FIRE! ROLL!','#ff9a2e',1.2);h.burn=BURN.time;}
+  else if(st==='freeze'&&h.freezeImm<=0){h.state='frozen';h.t=0;h.frozen=FREEZE.time;h.freezeImm=FREEZE.immune;h.charge=0;h.lvl=0;h.buf=0;addNum(hc.x+6,hc.y-30,'FROZEN! TAP!','#7fd6ff',1.2);sfx('brk');}
+}
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
-  const m=S.m,h=S.h,A=ATTACKS[m.atk]; let dmg=A.dmg; if(m.atk==='tail'&&m.parts.tail.broken)dmg=10; dmg=Math.round(dmg*S.def.dmg);
-  const hc={x:L.hx+18+hunterX(),y:L.hFeet-18};
-  if(m.atk==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:BIOMES[S.def.biome].speck,g:260});sfx('heavy');buzz(60);}
-  if(m.atk==='tail')for(let k=0;k<12;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-40,0),life:rnd(.2,.5),col:'#d9c88e',g:150});
-  if(m.atk==='rush'){S.shake=.4;for(let k=0;k<12;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,6),vx:rnd(-90,-20),vy:rnd(-50,0),life:rnd(.2,.5),col:'#d9c88e',g:150});}
-  if(m.atk==='bolt'){S.fx.push({kind:'bolt',x:hc.x,y:L.hFeet,t:0});S.shake=Math.max(S.shake,.25);sfx('heavy');}
+  const m=S.m,h=S.h,A=ATTACKS[m.atk],a=A.pose; let dmg=A.dmg; if((a==='sweep'||a==='slam')&&m.parts.tail.broken)dmg*=.6;
+  dmg=Math.round(dmg*S.def.dmg*(m.over?CHARGE.dmg:1));
+  const hc={x:L.hx+18+hunterX(),y:L.hFeet-18}, dust=(n,col)=>{for(let k=0;k<n;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-50,0),life:rnd(.2,.5),col,g:150});};
+  if(a==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:BIOMES[S.def.biome].speck,g:260});sfx('heavy');buzz(60);}
+  if(a==='sweep'||a==='rush')dust(12,'#d9c88e');
+  if(a==='rush'||a==='slam'||a==='stomp'||a==='clap'){S.shake=Math.max(S.shake,.4);sfx('heavy');}
+  if(a==='slam')dust(16,BIOMES[S.def.biome].speck);
+  if(a==='spit')for(let k=0;k<(A.big?14:8);k++)S.pt.push({x:hc.x,y:L.hFeet-4,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.2,.5),col:A.proj,g:260});
+  if(A.fx==='ring')S.fx.push({kind:'ring',x:L.mx+MS_OX+30,y:L.mFeet+2,t:0,life:.4});
+  if(A.fx==='bolt'||A.fx==='icicle'){S.fx.push({kind:A.fx,x:hc.x,y:L.hFeet,t:0});S.shake=Math.max(S.shake,.25);sfx('heavy');}
+  if(A.fx==='blast'){S.fx.push({kind:'ring',x:hc.x+10,y:L.hFeet,t:0,life:.4,col:'#ff9a2e'});for(let k=0;k<20;k++)S.pt.push({x:hc.x+rnd(-6,30),y:L.hFeet,vx:rnd(-70,70),vy:rnd(-130,-30),life:rnd(.3,.7),col:k%2?'#ff9a2e':'#ffd34d',g:200});}
   if(h.state==='dead'||h.state==='win'||h.state==='counter')return;
   const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
     for(let k=0;k<10;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-50,50),vy:rnd(-70,-10),life:.5,col:'#ffe14d',g:60});};
@@ -536,10 +619,11 @@ function mHit(i){
   }
   if(h.g.resist===S.def.elem)dmg=Math.max(1,Math.round(dmg*RESIST));
   if(P.guardian&&Math.random()<.25){dmg=Math.ceil(dmg/2);addNum(hc.x+10,hc.y-28,'GUARDIAN','#4cc9ff',.9);}
-  h.hp-=dmg;S.stats.taken+=dmg;h.state='hurt';h.t=0;h.charge=0;h.lvl=0;h.buf=0;h.buff=0;
+  h.hp-=dmg;S.stats.taken+=dmg;h.state='hurt';h.t=0;h.charge=0;h.lvl=0;h.buf=0;h.buff=0;h.frozen=0;
   S.shake=Math.max(S.shake,.35);S.stop=.06;addNum(hc.x+4,hc.y-18,''+dmg,'#ff6a4d',.9);sfx('hurt');buzz(80);
   for(let k=0;k<8;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-80,10),vy:rnd(-80,-10),life:.4,col:'#e2483d',g:220});
-  if(h.hp<=0){h.hp=0;h.state='dead';S.endT=0;S.fail='YOU FAINTED';sfx('lose');}
+  if(h.hp<=0){h.hp=0;h.state='dead';S.endT=0;S.fail='YOU FAINTED';sfx('lose');return;}
+  applyStatus(A.status);
 }
 
 // ═══════════════════════════════════════════════════
@@ -554,7 +638,7 @@ function hunterX(){const h=S.h;
   return 0;
 }
 function addNum(x,y,txt,col,life){S.nums.push({x,y,txt,col,t:0,life:life||.8});}
-function dealDamage(base,part,heavy,stun){
+function dealDamage(base,part,heavy,stun,pierce){
   const m=S.m,h=S.h; if(m.state==='dead')return;
   const pose=mPose();
   if(mAir()){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
@@ -568,16 +652,18 @@ function dealDamage(base,part,heavy,stun){
   const P=h.g.perks, weak=h.g.elem&&h.g.elem===S.def.weak, crit=P.keenedge&&Math.random()<CRIT[0];
   let mult=1; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=P.weakspot?1.4:1.15; if(weak)mult*=ELEM_BONUS; if(crit)mult*=CRIT[1];
   if(stun&&P.bludgeon)stun*=1.4;
+  const hide=S.def.sig==='armor'&&!pierce, open=m.state==='recover'||m.state==='stagger'; if(hide)mult*=ARMOR[open?1:0];   // Tuskhide: glancing blows until it is winded
   const dmg=Math.round(base*h.atk*mult*rnd(.92,1.08)), pp=partPos(part,pose);
   m.hp-=dmg;S.stats.dealt+=dmg;m.flash=.09;S.stop=Math.max(S.stop,heavy?.1:Math.min(.05,base*.0022));   // hitstop scales with the hit, so fast weapons do not lose more time to itS.shake=Math.max(S.shake,heavy?.4:.12);
-  addNum(pp.x+rnd(-6,6),pp.y-10,dmg+(crit?'!':''),crit?'#ff9a4d':weak?ELEM[h.g.elem][1]:heavy||mult>1.2?'#ffe14d':'#fff3a0',heavy||crit?1:.7);
+  addNum(pp.x+rnd(-6,6),pp.y-10,dmg+(crit?'!':''),hide&&!open?'#8a93b0':crit?'#ff9a4d':weak?ELEM[h.g.elem][1]:heavy||mult>1.2?'#ffe14d':'#fff3a0',heavy||crit?1:.7);
+  if(hide&&!open)for(let k=0;k<3;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-90,-20),life:.25,col:'#f2dca0',g:200});
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:heavy,flip:h.combo===1});
   for(let k=0;k<(heavy?12:5);k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-70,70),vy:rnd(-90,-10),life:rnd(.2,.5),col:k%2?'#fff':S.def.blood,g:240});
   sfx(heavy?'heavy':'hit');buzz(heavy?40:10);
   if(m.hp<=0){m.hp=0;m.state='dead';m.t=0;S.slow=1.2;S.endT=0;h.state='win';h.t=0;S.shake=.7;return;}
   if(stun&&!m.stunned&&(m.stun+=stun)>=m.stunMax){                               // stun meter full: the monster goes down
     m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);
-    addNum(pp.x,pp.y-30,'STUNNED!','#ffe14d',1.4);sfx('brk');buzz(150);S.shake=.7;S.stop=.14;
+    addNum(pp.x,pp.y-30,'STUNNED!','#ffe14d',1.4);sfx('brk');buzz(150);S.shake=.7;S.stop=.14;mDischarge();
   }
   const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
@@ -597,7 +683,7 @@ function qteUpdate(dt){
 }
 // A tap at (x,y): does it land on the open weak point?
 function qteTap(x,y){
-  const q=S.qte,h=S.h,m=S.m; if(!q||h.state==='dead'||h.state==='win'||h.state==='hurt')return false;
+  const q=S.qte,h=S.h,m=S.m; if(!q||h.state==='dead'||h.state==='win'||h.state==='hurt'||h.state==='frozen')return false;
   const pp=partPos(q.part,mPose()); if((x-pp.x)**2+(y-pp.y)**2>QTE_R*QTE_R)return false;
   S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);S.stats.qteHit++;
   const P=m.parts[q.part];P.hits++;
@@ -609,10 +695,10 @@ function qteTap(x,y){
   if(P.hits>=S.qteHits){
     P.broken=true;addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');buzz(120);S.shake=.6;S.stop=.14;
     for(let k=0;k<14;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-130,-30),life:rnd(.4,.8),col:'#e8e2cc',g:300});
-    if(m.hp>0)mStagger(2);
+    if(m.hp>0){mStagger(2);mDischarge();}
   }
   if(m.hp<=0){m.hp=0;m.state='dead';m.t=0;S.slow=1.2;S.endT=0;h.state='win';h.t=0;S.shake=.7;return true;}
-  if(q.part==='head'&&!m.stunned&&(m.stun+=QTE_STUN*(h.g.perks.bludgeon?1.4:1))>=m.stunMax){m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);addNum(pp.x,pp.y-34,'STUNNED!','#ffe14d',1.4);}
+  if(q.part==='head'&&!m.stunned&&(m.stun+=QTE_STUN*(h.g.perks.bludgeon?1.4:1))>=m.stunMax){m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);addNum(pp.x,pp.y-34,'STUNNED!','#ffe14d',1.4);mDischarge();}
   const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
   return true;
@@ -622,6 +708,14 @@ function hUpdate(dt){
   const h=S.h, W=h.g.W, P=h.g.perks, held=IN.down&&!IN.swiped; h.t+=dt;
   if(h.inv>0)h.inv-=dt; if(h.buff>0)h.buff-=dt; if(h.counter>0)h.counter-=dt; if(h.comboT>0)h.comboT-=dt; if(h.buf>0)h.buf-=dt;
   if(h.stDelay>0)h.stDelay-=dt; else h.st=Math.min(100,h.st+32*dt);
+  if(h.freezeImm>0)h.freezeImm-=dt;
+  if((h.poison>0||h.burn>0)&&h.state!=='dead'&&h.state!=='win'){                 // damage over time; it never lands the killing blow
+    h.poison=Math.max(0,h.poison-dt);h.burn=Math.max(0,h.burn-dt);
+    if((h.dotT+=dt)>=(h.burn>0?BURN.tick:POISON.tick)){h.dotT=0;const d=Math.max(1,Math.round(h.max*((h.burn>0?BURN.dmg:0)+(h.poison>0?POISON.dmg:0))));
+      if(h.hp>1){const t=Math.min(d,h.hp-1);h.hp-=t;S.stats.taken+=t;S.stats.dot=(S.stats.dot||0)+t;addNum(L.hx+10+rnd(0,16),L.hFeet-30,''+t,h.burn>0?'#ff9a2e':'#7ad84a',.6);}}
+    if(Math.random()<.25)S.pt.push({x:L.hx+12+rnd(0,12)+hunterX(),y:L.hFeet-rnd(8,30),vx:rnd(-8,8),vy:rnd(-40,-15),life:.4,col:h.burn>0?(Math.random()<.5?'#ff9a2e':'#ffd34d'):'#7ad84a',g:-20});
+  }
+  if(h.state==='frozen'){if((h.frozen-=dt)<=0){h.state='idle';h.inv=.5;iceBurst();}return;}
   if(h.state==='atk'){
     if(!h.hitDone&&h.t>=W.hit[h.combo]){h.hitDone=true;dealDamage(W.dmg[h.combo]*(h.flurry?FLURRY_BONUS:1),h.target,false,h.target==='head'?W.stunTap:W.stunAll);}
     if(h.state==='atk'&&W.hold==='guard'&&held&&h.hitDone&&S.clock-IN.downAt>.14){h.state='guard';h.t=0;}          // the lance can raise its shield mid-combo
@@ -635,13 +729,14 @@ function hUpdate(dt){
     if(!h.hitDone&&h.t>=.14){h.hitDone=true;dealDamage(W.heavy[h.lvl],h.target,true,h.target==='head'?STUN_HEAVY[h.lvl]*W.stunHeavy:W.stunAll*h.lvl);}
     if(h.t>=.5&&h.state==='heavy'){h.state='idle';h.lvl=0;}
   }else if(h.state==='counter'){
-    if(!h.hitDone&&h.t>=.16){h.hitDone=true;const m=S.m;dealDamage(W.counter*(P.riposte?1.4:1),'head',true,W.cstun);
+    if(!h.hitDone&&h.t>=.16){h.hitDone=true;const m=S.m;dealDamage(W.counter*(P.riposte?1.4:1),'head',true,W.cstun,true);mDischarge(CHARGE.counter);
       if(m.state==='attack'||m.state==='recover')mStagger(.8);}                  // the counter knocks it out of its attack
     if(h.t>=.5&&h.state==='counter'){h.state='idle';h.inv=.3;}
   }else if(h.state==='dodge'){if(h.t>=DODGE_DUR)h.state='idle';}
   else if(h.state==='hurt'){if(h.t>=.45){h.state='idle';h.inv=.7;}}
   else if(h.state==='drink'){
-    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;const heal=Math.round(h.max*POTION_HEAL*(P.herbal?1.5:1));h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');}
+    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;const heal=Math.round(h.max*POTION_HEAL*(P.herbal?1.5:1));h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');
+      if(h.poison>0){h.poison=0;addNum(L.hx+18,L.hFeet-44,'CURED','#7ad84a',.9);}}
     if(h.t>=.9)h.state='idle';
   }
   if(h.state==='idle'){
@@ -651,24 +746,28 @@ function hUpdate(dt){
     else if(held&&S.clock-IN.downAt>.22){h.state='charge';h.t=0;h.charge=0;h.lvl=0;h.target=IN.part;}
   }
 }
+function iceBurst(){for(let k=0;k<12;k++)S.pt.push({x:L.hx+18,y:L.hFeet-16,vx:rnd(-80,80),vy:rnd(-110,-10),life:rnd(.3,.6),col:k%2?'#bfeaff':'#ffffff',g:260});sfx('brk');}
 function hRelease(){const h=S.h;if(h.state!=='charge')return;
   if(h.lvl>0){h.state='heavy';h.t=0;h.hitDone=false;h.combo=2;sfx('swing');}else{h.state='idle';h.charge=0;}}
 // ── Player actions ──
 function actTap(part){const h=S.h;
+  if(h.state==='frozen'){h.frozen-=FREEZE.tap;S.shake=Math.max(S.shake,.1);sfx('hit');S.pt.push({x:L.hx+18+rnd(-8,8),y:L.hFeet-rnd(4,30),vx:rnd(-50,50),vy:rnd(-60,-10),life:.3,col:'#bfeaff',g:200});return;}   // struggle free
   if(h.state==='idle')hStartAtk(part);
   else if(h.state==='atk'||h.state==='dodge'||h.state==='heavy'){h.buf=.3;h.bufPart=part;}}
 function actCounter(){const h=S.h;
-  if(h.counter<=0||h.state==='hurt'||h.state==='dead'||h.state==='win')return false;
+  if(h.counter<=0||h.state==='frozen'||h.state==='hurt'||h.state==='dead'||h.state==='win')return false;
   h.counter=0;h.state='counter';h.t=0;h.hitDone=false;h.charge=0;h.lvl=0;h.buf=0;h.combo=2;S.slow=0;S.stats.counters++;sfx('perfect');return true;}
 function actDodge(dir){const h=S.h;
+  if(h.state==='frozen'){actTap();return;}
   if(h.state==='hurt'||h.state==='dead'||h.state==='win'||h.state==='dodge'||h.state==='counter')return;
   if(h.state==='drink'&&h.drank)return;
   const cost=h.g.W.dodge*(h.g.perks.tireless?.6:1);
   if(h.st<cost){addNum(L.hx+18,L.hFeet-34,'TIRED','#f5c542',.5);return;}
-  h.st-=cost;h.stDelay=.6;h.state='dodge';h.t=0;h.dir=dir;h.charge=0;h.lvl=0;h.buf=0;sfx('dodge');}
+  h.st-=cost;h.stDelay=.6;h.state='dodge';h.t=0;h.dir=dir;h.charge=0;h.lvl=0;h.buf=0;sfx('dodge');
+  if(h.burn>0&&(h.burn-=BURN.roll)<=0){h.burn=0;addNum(L.hx+18,L.hFeet-40,'PUT OUT','#c8d0e8',.8);}}   // rolling smothers the flames
 function actPotion(){const h=S.h;
   if(!(h.state==='idle'||h.state==='atk'||h.state==='charge'||h.state==='guard'))return;
-  if(h.potions<=0||h.hp>=h.max){sfx('miss');return;}
+  if(h.potions<=0||(h.hp>=h.max&&h.poison<=0)){sfx('miss');return;}
   h.state='drink';h.t=0;h.drank=false;h.charge=0;h.lvl=0;h.buf=0;}
 
 // ═══════════════════════════════════════════════════
@@ -757,7 +856,7 @@ function update(dt){
   const h=S.h,m=S.m, over=h.state==='dead'||m.state==='dead';
   if(!over){S.timeLeft-=dt;if(S.timeLeft<=0){S.timeLeft=0;h.state='dead';S.fail='TIME UP';S.endT=0;sfx('lose');}}
   hUpdate(dt); mUpdate(dt); qteUpdate(dt);
-  for(const f of S.fx)f.t+=dt; S.fx=S.fx.filter(f=>f.t<.22);
+  for(const f of S.fx)f.t+=dt; S.fx=S.fx.filter(f=>f.t<(f.life||.22));
   for(const p of S.pt){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.g*dt;} S.pt=S.pt.filter(p=>p.life>0);
   for(const n of S.nums){n.t+=dt;} S.nums=S.nums.filter(n=>n.t<n.life);
   if(h.state==='dead'||m.state==='dead'){
@@ -833,6 +932,12 @@ function drawWorld(){
   }
   const hp=mHeadPos(p);
   if(m.state==='stagger'){for(let i=0;i<(m.stunned?5:3);i++){const a=S.clock*5+i*2.1;g.fillStyle='#ffe14d';g.fillRect(Math.round(hp.x+4+Math.cos(a)*9),Math.round(hp.y-10+Math.sin(a)*3),2,2);}}
+  // idle life: dust, embers, mist and sparks
+  if(!dead&&!MH.manual){const mo=rigPt(RIGS[S.def.rig].mouth(p),p),id=S.def.id,r=Math.random();
+    if(id==='tusk'&&r<.06&&m.state==='idle')S.pt.push({x:L.mx+MS_OX+rnd(18,30)+p.ox,y:L.mFeet,vx:rnd(-40,-10),vy:rnd(-25,-5),life:.4,col:'#f2dca0',g:60});
+    if(id==='ember'&&r<.12)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-12,4),vy:rnd(10,30),life:.5,col:r<.06?'#ff9a2e':'#ffd34d',g:40});
+    if(id==='frost'&&r<.1)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-30,-10),vy:rnd(-12,2),life:.6,col:'#e8f8ff',g:-10});
+    if(id==='storm'&&r<(m.over?.6:m.charge/250)){const b=partPos('body',p);S.pt.push({x:b.x+rnd(-26,30),y:b.y+rnd(-22,20),vx:rnd(-30,30),vy:rnd(-30,30),life:.15,col:m.over?'#ffffff':'#ffe14d',g:0});}}
   if(m.phase===2&&!dead&&Math.random()<.3)S.pt.push({x:hp.x-6,y:hp.y+4,vx:rnd(-20,0),vy:rnd(-30,-10),life:.4,col:'#c8d0e8',g:-20});
   if(m.state==='roar'){for(let i=0;i<3;i++)ring(hp.x-4,hp.y+4,6+((m.t*40+i*9)%28),'#e8f0fc');}
   if(S.qte){const q=S.qte,pp=partPos(q.part,p),u=q.t/S.qteTime,r=lerp(20,6,u),bl=Math.floor(S.clock*16)%2;       // weak point: a red circle shrinking onto the part
@@ -846,13 +951,21 @@ function drawWorld(){
       g.fillStyle=OUTLINE;g.fillRect(bx-3,by-1,7,12);g.fillStyle=col;g.fillRect(bx-2,by,5,10);g.fillStyle='#fff';g.fillRect(bx,by+1,1,5);g.fillRect(bx,by+7,1,2);}
     for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.9){const now=d<PERFECT_WIN;ring(hcx,hcy,9+d*30,now?'#ffffff':col);if(now)ring(hcx,hcy,10+d*30,'#ff4030');}}
     ring(hcx,hcy,9,'rgba(255,255,255,.55)');
-    if(m.atk==='dive'&&mAir())shadow(hcx+14,L.hFeet+1,Math.round(lerp(4,26,m.t/m.hits[0])),4);
+    if(aPose()==='dive'&&mAir())shadow(hcx+14,L.hFeet+1,Math.round(lerp(4,26,m.t/m.hits[0])),4);
+    const A=ATTACKS[m.atk];
+    if(A.pose==='spit'){const mo=rigPt(RIGS[S.def.rig].mouth(p),p);                 // projectiles in the air, timed to land on the hit
+      for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<0||d>PROJ_TIME)continue;const u=1-d/PROJ_TIME,x=lerp(mo.x,hcx,u),y=lerp(mo.y,L.hFeet-10,u)-Math.sin(Math.PI*u)*22,r=A.big?3:2;
+        g.fillStyle=OUTLINE;g.fillRect(Math.round(x)-r-1,Math.round(y)-r-1,r*2+2,r*2+2);g.fillStyle=A.proj;g.fillRect(Math.round(x)-r,Math.round(y)-r,r*2,r*2);g.fillStyle='rgba(255,255,255,.6)';g.fillRect(Math.round(x)-r,Math.round(y)-r,r,1);
+        if(!A.big)S.pt.push({x,y,vx:rnd(-10,10),vy:rnd(-10,10),life:.2,col:A.proj,g:0});}}
+    if(A.fx==='icicle')for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.3&&d>0){const y=lerp(L.hFeet-8,HUD_T,d/.3);g.fillStyle='#e8f8ff';g.fillRect(hcx-1,y-10,3,10);g.fillStyle='#6cc4f0';g.fillRect(hcx,y-8,1,10);}}
   }
   // hunter
   const hxo=hunterX();
   shadow(L.hx+18+hxo,L.hFeet+1,9,2);
   if(!(h.inv>0&&Math.floor(S.clock*20)%2)){
     g.drawImage(hunterSpr(hunterPose()),L.hx+hxo,L.hy);
+    if(h.state==='frozen'){const x=L.hx+6,y=L.hy+4,bl=Math.floor(S.clock*6)%2;g.fillStyle='rgba(160,220,255,.55)';g.fillRect(x,y,24,36);g.fillStyle='#e8f8ff';g.fillRect(x,y,24,1);g.fillRect(x,y,1,36);g.fillRect(x+4,y+5,1,9);g.fillRect(x+17,y+14,1,12);
+      g.fillStyle='#6cc4f0';g.fillRect(x+23,y,1,36);g.fillRect(x,y+35,24,1);text('TAP!',x+12,y-8+bl,'#ffffff',{al:1,out:OUTLINE});}
   }
   if(h.state==='charge'){for(let i=0;i<3;i++){g.fillStyle=OUTLINE;g.fillRect(L.hx+10+i*6,L.hy-5,5,4);g.fillStyle=i<h.lvl?['#ffe14d','#ff9a2e','#ffffff'][i]:'#2b2f45';g.fillRect(L.hx+11+i*6,L.hy-4,3,2);}
     if(h.lvl<3){const a=h.lvl?CHARGE_AT[h.lvl-1]:0,f=(h.charge-a)/(CHARGE_AT[h.lvl]-a);g.fillStyle='#fff';g.fillRect(L.hx+10,L.hy,Math.round(17*clamp(f,0,1)),1);}}
@@ -863,6 +976,8 @@ function drawWorld(){
     g.fillStyle=OUTLINE;g.fillRect(c.x+4,c.y+13,c.w-8,3);g.fillStyle='#ffe14d';g.fillRect(c.x+4,c.y+13,Math.round((c.w-8)*f),3);}
   // slashes
   for(const f of S.fx){const u=f.t/.22,n=f.big?16:10,d=f.flip?-1:1;
+    if(f.kind==='ring'){const r=6+(f.t/f.life)*46;ring(f.x,f.y,r,f.col||'#ffffff');ring(f.x,f.y,r-2,f.col||'#c8d0e8');continue;}
+    if(f.kind==='icicle'){g.fillStyle=u<.5?'#ffffff':'#bfeaff';g.fillRect(f.x-3,f.y-26,7,26);g.fillStyle='#6cc4f0';g.fillRect(f.x-1,f.y-22,3,22);for(let k=0;k<2;k++)S.pt.push({x:f.x,y:f.y-4,vx:rnd(-70,70),vy:rnd(-80,-10),life:.3,col:'#e8f8ff',g:240});continue;}
     if(f.kind==='bolt'){let x=f.x;for(let y=f.y;y>HUD_T;y-=4){const nx=x+((hash2(y,f.x|0,3)*7)|0)-3;g.fillStyle=u<.5?'#ffffff':'#ffe14d';g.fillRect(Math.min(x,nx)-1,y-4,Math.abs(nx-x)+3,4);x=nx;}continue;}
     for(let i=0;i<n;i++){const k=i/n-.5+u*.3;g.fillStyle=u<.5?'#fff':'#fff3a0';g.fillRect(Math.round(f.x+k*n*1.4),Math.round(f.y+d*k*n*1.6),f.big?3:2,1);}}
   for(const q of S.pt){g.fillStyle=q.col;g.fillRect(Math.round(q.x),Math.round(q.y),q.life>.25?2:1,q.life>.25?2:1);}
@@ -889,6 +1004,10 @@ function drawHud(){
   // bottom
   g.fillStyle=OUTLINE;g.fillRect(0,L.gy,W,HUD_B);
   text('HP',4,L.gy+4,'#8a93b0');bar(14,L.gy+4,62,5,h.hp/h.max,h.hp<h.max*.3?'#e2483d':'#4cd964','#2b2f45');
+  if(S.def.sig==='charge'){text('CHRG',3,20,m.over?'#ffe14d':'#c8d0e8');g.fillStyle='#000';g.fillRect(21,20,W-24,4);g.fillStyle='#2b2f45';g.fillRect(22,21,W-26,2);
+    g.fillStyle=m.over?(Math.floor(S.clock*12)%2?'#ffffff':'#ffe14d'):'#7fd6ff';g.fillRect(22,21,Math.round((W-26)*m.charge/100),2);}
+  if(S.clock<3.2&&S.mode==='hunt'){const w=textW(S.def.tip)+8;g.fillStyle='rgba(12,14,26,.8)';g.fillRect((W-w)/2,HUD_T+4,w,11);text(S.def.tip,W/2,HUD_T+7,'#ffe14d',{al:1});}   // the monster's signature, as the hunt opens
+  if(h.burn>0)text('ON FIRE',64,L.gy+14,Math.floor(S.clock*8)%2?'#ff9a2e':'#ffd34d');else if(h.poison>0)text('POISON',64,L.gy+14,'#7ad84a');else if(h.state==='frozen')text('FROZEN',64,L.gy+14,'#7fd6ff');
   text('ST',4,L.gy+14,'#8a93b0');bar(14,L.gy+15,46,3,h.st/100,h.st<h.g.W.dodge?'#8a6a20':'#f5c542','#2b2f45');
   const b=L.potion;g.fillStyle=h.potions>0?'#c8d0e8':'#3a4060';g.fillRect(b.x,b.y,b.w,b.h);g.fillStyle='#1c2134';g.fillRect(b.x+1,b.y+1,b.w-2,b.h-2);
   const fx=b.x+4,fy=b.y+3;g.fillStyle='#c8d0e8';g.fillRect(fx+2,fy,4,3);g.fillRect(fx,fy+3,8,10);g.fillStyle=h.potions>0?'#e2483d':'#3a4060';g.fillRect(fx+1,fy+6,6,6);g.fillStyle='#6b4a2e';g.fillRect(fx+2,fy-1,4,2);
@@ -1005,7 +1124,7 @@ function frame(now){
   draw();requestAnimationFrame(frame);
 }
 // test hooks
-Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,actCounter,qteTap,mPose,partPos,ATTACKS,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,actCounter,qteTap,mPose,partPos,ATTACKS,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);

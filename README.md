@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.8.0).** Five monsters, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
+**Current state: prototype (v0.9.0).** Five monsters, each with its own moves, animations and signature mechanic, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
