@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.5.0';
+const VER='0.5.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -34,7 +34,7 @@ const DODGE_DUR=.42, DODGE_IFR=.36, DODGE_COST=25, PERFECT_WIN=.2;
 const COUNTER_WIN=1.4, COUNTER_DMG=120, COUNTER_STUN=40;   // a perfect dodge opens a counter
 const STUN_MAX=100, STUN_GROW=40, STUN_TIME=4, STUN_HEAVY=[0,8,16,30], STUN_TAP=2;   // head hits fill the stun meter
 // Weak points: a red circle shrinks on a part; tap it in time. Three hits break the part.
-const QTE_TIME=.8, QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_HITS=3, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
+const QTE_TIME=.5, QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_HITS=3, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
 const PARTS=['head','wings','tail'];
 const EVADE_CD=[3.4,2.6,1.9], EVADE_DUR=1;   // seconds between the monster's dodges, per phase
 const PHASE_SPEED=[1,.88,.78];

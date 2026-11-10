@@ -21,7 +21,7 @@ const shots=process.argv[2]; // optional folder for screenshots
         if(decided!==m.hi+':'+m.atk+':'+m.hits[0]){decided=m.hi+':'+m.atk+':'+m.hits[0];will=Math.random()<skill;}
         if(will&&d<.15&&d>0&&h.state!=='dodge'&&h.state!=='counter')MH.actDodge(-1);
       }
-      if(S.qte&&S.qte.t>.35&&qdec!==S.qte){qdec=S.qte;if(Math.random()<skill){const pp=MH.partPos(S.qte.part,MH.mPose());MH.qteTap(pp.x,pp.y);}}
+      if(S.qte&&S.qte.t>.25&&qdec!==S.qte){qdec=S.qte;if(Math.random()<skill){const pp=MH.partPos(S.qte.part,MH.mPose());MH.qteTap(pp.x,pp.y);}}
       if(counters&&h.counter>0&&h.state!=='counter'){MH.actCounter();}
       if(h.hp<50&&h.potions>0&&h.state==='idle'&&m.state!=='attack')MH.actPotion();
       else if(h.state==='idle'){
@@ -52,7 +52,7 @@ const shots=process.argv[2]; // optional folder for screenshots
     await until("S.fx.length>0&&S.m.state!=='attack'");await p.waitForTimeout(60);await p.screenshot({path:shots+'/hit.png'});
     await p.evaluate(()=>{MH.S.m.hp=2300;});await until("S.m.state==='roar'&&S.m.t>.3");await p.waitForTimeout(60);await p.screenshot({path:shots+'/roar.png'});
     await until("S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/fire.png'});
-    await until("S.qte&&S.qte.t>.3",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/qte.png'});
+    await until("S.qte&&S.qte.t>.2",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/qte.png'});
     await until("S.m.state==='stagger'&&S.m.t>.3",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/stagger.png'});
     await p.evaluate(()=>{MH.S.m.hp=1100;MH.S.h.hp=60;});
     await until("S.m.state==='attack'&&S.m.atk==='dive'&&S.m.t>S.m.hits[0]-.5",200);await p.waitForTimeout(60);await p.screenshot({path:shots+'/dive.png'});
