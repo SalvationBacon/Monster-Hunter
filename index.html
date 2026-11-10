@@ -20,19 +20,20 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.3.0';
+const VER='0.4.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
 // ── Tuning ──
 const HUNT_TIME=150;                     // soft limit, seconds
-const M_HP=3400, HEAD_HP=450, TAIL_HP=380;
+const M_HP=3100, HEAD_HP=450, TAIL_HP=380;
 const H_HP=100, POTIONS=2, POTION_HEAL=40;
 const TAP_DMG=[12,14,22], TAP_DUR=[.26,.26,.4], TAP_HIT=[.09,.09,.16];
 const HEAVY_DMG=[0,40,85,150], CHARGE_AT=[.45,1.0,1.7];
 const DODGE_DUR=.42, DODGE_IFR=.36, DODGE_COST=25, PERFECT_WIN=.2;
 const COUNTER_WIN=1.4, COUNTER_DMG=120, COUNTER_STUN=40;   // a perfect dodge opens a counter
 const STUN_MAX=100, STUN_GROW=40, STUN_TIME=4, STUN_HEAVY=[0,8,16,30], STUN_TAP=2;   // head hits fill the stun meter
+const EVADE_CD=[5,3.6,2.6], EVADE_DUR=.45;   // seconds between the monster's dodges, per phase
 const PHASE_SPEED=[1,.88,.78];
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
 const ATTACKS={
@@ -227,10 +228,10 @@ function saveBag(b){try{localStorage.setItem(BAG_KEY,JSON.stringify(b));}catch(e
 function newHunt(){
   S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0;
   S.h={hp:H_HP,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS,buff:0,counter:0,target:'body',hitDone:false,drank:false};
-  S.m={hp:M_HP,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:STUN_MAX,stunned:false,
+  S.m={hp:M_HP,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:STUN_MAX,stunned:false,evadeCd:6,
        parts:{head:{hp:HEAD_HP,broken:false},tail:{hp:TAIL_HP,broken:false}}};
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
-  S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0};
+  S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0};
   S.loot=null; S.fail='';
 }
 
@@ -255,6 +256,8 @@ function mPose(){
   const m=S.m, p={hx:0,hy:0,jaw:0,wing:0,tail:0,glow:0,ox:0,oy:0};
   const idle=Math.sin(S.clock*2.4);
   p.hy=idle>.3?1:0; p.tail=idle<-.3?-2:0;
+  if(m.state==='idle'&&mWary()){p.wing=1;p.hx=2;p.hy=2;p.oy=2;p.tail=-4;}        // wary: wings up, it will dodge the next hit
+  else if(m.state==='evade'){const u=Math.sin(Math.PI*clamp(m.t/EVADE_DUR,0,1));p.ox=Math.round(14*u);p.oy=-Math.round(8*u);p.wing=m.t<EVADE_DUR/2?2:1;p.hx=2;}
   if(m.state==='attack'){
     const t=m.t,h0=m.hits[0],a=m.atk;
     if(a==='bite'||a==='dbl'){
@@ -295,6 +298,7 @@ function partPos(part,p){
   if(part==='tail')return{x:L.mx+MS_OX+66+p.ox,y:L.my+MS_OY+40+p.tail+p.oy};
   return{x:L.mx+MS_OX+36+p.ox,y:L.my+MS_OY+30+p.oy};
 }
+const mWary=()=>{const m=S.m;return m.state==='idle'&&m.evadeCd<=0&&!m.roarDue;};
 function mStartAttack(){
   const m=S.m, pool=POOLS[m.phase]; let id;
   do{id=pool[(Math.random()*pool.length)|0];}while(id===m.last&&Math.random()<.7);
@@ -304,7 +308,7 @@ function mStartAttack(){
 }
 function mStagger(d,stun){const m=S.m;if(m.state==='stagger'&&m.staggerDur-m.t>d)return;m.state='stagger';m.t=0;m.staggerDur=d;m.stunned=!!stun;}
 function mUpdate(dt){
-  const m=S.m; m.t+=dt; if(m.flash>0)m.flash-=dt;
+  const m=S.m; m.t+=dt; if(m.flash>0)m.flash-=dt; if(m.evadeCd>0&&m.state!=='stagger')m.evadeCd-=dt;
   if(m.state==='dead')return;
   if(m.state==='idle'){
     if(m.roarDue){m.roarDue=false;m.state='roar';m.t=0;S.shake=.9;sfx('roar');buzz(200);
@@ -318,6 +322,7 @@ function mUpdate(dt){
     if(m.t>=m.dur){m.state='recover';m.t=0;}
   }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*PHASE_SPEED[m.phase];}}
   else if(m.state==='stagger'){if(m.t>=m.staggerDur){m.state='idle';m.wait=.5;m.stunned=false;}}
+  else if(m.state==='evade'){if(m.t>=EVADE_DUR){m.state='idle';m.wait=m.phase?.15:.4;}}
   else if(m.state==='roar'){if(m.t>=1.2){m.state='idle';m.wait=.35;}}
 }
 // One of the monster's hits lands (or is dodged)
@@ -357,6 +362,13 @@ function dealDamage(base,part,heavy,stun){
   const m=S.m,h=S.h; if(m.state==='dead')return;
   const pose=mPose();
   if(mAir()){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
+  if(mWary()){                                                                   // it hops back and the hit misses
+    m.state='evade';m.t=0;m.evadeCd=EVADE_CD[m.phase];S.stats.evaded++;const hp=mHeadPos(pose);
+    addNum(hp.x+6,hp.y-14,'DODGED!','#c8d0e8',.8);sfx('dodge');
+    for(let k=0;k<8;k++)S.pt.push({x:L.mx+MS_OX+rnd(26,46),y:L.mFeet,vx:rnd(-50,10),vy:rnd(-40,-5),life:rnd(.2,.4),col:'#d9c88e',g:150});
+    return;
+  }
+  if(m.state==='evade'&&m.t<.32){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
   let mult=1; if(h.buff>0)mult*=1.5; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=1.15;
   const dmg=Math.round(base*mult*rnd(.92,1.08)), pp=partPos(part,pose);
   m.hp-=dmg;S.stats.dealt+=dmg;m.flash=.09;S.stop=Math.max(S.stop,heavy?.1:.035);S.shake=Math.max(S.shake,heavy?.4:.12);
@@ -612,15 +624,16 @@ function drawTitle(){
   text('FERNWING',W/2,14,'#ffe14d',{al:1,s:2,out:OUTLINE});
   text('HUNT',W/2,28,'#fff',{al:1,s:2,out:OUTLINE});
   text('FIGHT PROTOTYPE V'+VER,W/2,43,'#8a93b0',{al:1});
-  const y=52;panel(8,y,W-16,92);
+  const y=50;panel(8,y,W-16,102);
   const rows=[['TAP','ATTACK'],['HOLD','CHARGE UP'],['SWIPE','DODGE'],['SWIPE UP','POTION']];
   rows.forEach((r,i)=>{text(r[0],14,y+6+i*10,'#ffb020');text(r[1],W-14,y+6+i*10,'#e8f0fc',{al:2});});
   text('DODGE AS THE RING CLOSES',W/2,y+47,'#c8d0e8',{al:1});
   text('PERFECT DODGE: COUNTER!',W/2,y+54,'#ffe14d',{al:1});
   text('HIT THE HEAD TO STUN IT',W/2,y+64,'#c8d0e8',{al:1});
-  text('BREAK HEAD AND TAIL',W/2,y+74,'#c8d0e8',{al:1});
-  text('FOR EXTRA LOOT',W/2,y+81,'#c8d0e8',{al:1});
-  if(Math.floor(S.t*2)%2)text('TAP TO HUNT',W/2,y+102,'#fff',{al:1,out:OUTLINE});
+  text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
+  text('BREAK HEAD AND TAIL',W/2,y+84,'#c8d0e8',{al:1});
+  text('FOR EXTRA LOOT',W/2,y+91,'#c8d0e8',{al:1});
+  if(Math.floor(S.t*2)%2)text('TAP TO HUNT',W/2,y+112,'#fff',{al:1,out:OUTLINE});
 }
 function drawLoot(){
   const R=S.loot; g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,0,W,LH);

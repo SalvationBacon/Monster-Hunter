@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: fight prototype (v0.3.0).** One hunt of about a minute against one monster, the Fernwing, to test how combat feels.
+**Current state: fight prototype (v0.4.0).** One hunt of about a minute against one monster, the Fernwing, to test how combat feels.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies.

@@ -35,9 +35,9 @@ const shots=process.argv[2]; // optional folder for screenshots
   for(const [name,skill] of [['skilled',.95],['average',.7],['casual',.45],['never dodges',0]]){
     const runs=[];for(let i=0;i<6;i++)runs.push(await bot(skill,skill>.5));
     const wins=runs.filter(r=>r.mode==='loot'),avg=a=>a.length?Math.round(a.reduce((s,v)=>s+v,0)/a.length):0;
-    console.log(`     ${name}: ${wins.length}/6 wins, avg win time ${avg(wins.map(r=>r.time))}s, avg damage taken ${avg(runs.map(r=>r.stats.taken))}, potions left ${avg(runs.map(r=>r.potions))}, counters ${avg(runs.map(r=>r.stats.counters))}, stuns ${avg(runs.map(r=>r.stats.stuns))}`);
+    console.log(`     ${name}: ${wins.length}/6 wins, avg win time ${avg(wins.map(r=>r.time))}s, avg damage taken ${avg(runs.map(r=>r.stats.taken))}, potions left ${avg(runs.map(r=>r.potions))}, counters ${avg(runs.map(r=>r.stats.counters))}, stuns ${avg(runs.map(r=>r.stats.stuns))}, monster dodges ${avg(runs.map(r=>r.stats.evaded))}`);
     if(name==='skilled'){ok(wins.length===6,'a skilled bot always wins');const t=avg(wins.map(r=>r.time));ok(t>35&&t<60,'skilled hunt takes about a minute ('+t+'s)');
-      ok(wins.every(r=>r.head&&r.tail),'both parts break when targeted');ok(wins.every(r=>r.stats.counters>0&&r.stats.stuns>0),'perfect dodges allow counters, and counters stun the monster');ok(wins.every(r=>r.loot.some(d=>d.id==='horn')&&r.loot.some(d=>d.id==='spike')),'broken parts drop their loot');}
+      ok(wins.every(r=>r.head&&r.tail),'both parts break when targeted');ok(wins.every(r=>r.stats.counters>0&&r.stats.stuns>0),'perfect dodges allow counters, and counters stun the monster');ok(wins.every(r=>r.stats.evaded>0),'the monster dodges some hits');ok(wins.every(r=>r.loot.some(d=>d.id==='horn')&&r.loot.some(d=>d.id==='spike')),'broken parts drop their loot');}
     if(name==='never dodges')ok(wins.length<=1,'never dodging loses the hunt');
   }
   // time limit
@@ -58,11 +58,17 @@ const shots=process.argv[2]; // optional folder for screenshots
     await p.evaluate(()=>{MH.S.m.hp=10;});await until("S.mode==='loot'",60);await p.evaluate(()=>{MH.S.t=5;});await p.waitForTimeout(60);await p.screenshot({path:shots+'/loot.png'});
   }
 
+  const ev=await p.evaluate(()=>{MH.manual=true;MH.newHunt();const S=MH.S,m=S.m;m.evadeCd=0;m.wait=10;for(let i=0;i<5;i++)MH.update(1/60);return 1;});
+  await p.waitForTimeout(80);if(shots)await p.screenshot({path:shots+'/wary.png'});
+  const ev2=await p.evaluate(()=>{const S=MH.S;MH.actTap('head');for(let i=0;i<10;i++)MH.update(1/60);const a={st:S.m.state,d:S.stats.dealt};for(let i=0;i<60;i++)MH.update(1/60);MH.actTap('head');for(let i=0;i<20;i++)MH.update(1/60);a.d2=S.stats.dealt;return a;});
+  if(shots){await p.waitForTimeout(80);}
+  ok(ev2.st==='evade'&&ev2.d===0,'a wary monster dodges the next hit');ok(ev2.d2>0,'and can be hit again straight after');
   // real touch input on a live clock
   await p.reload();await p.waitForTimeout(200);
   await p.touchscreen.tap(195,400);await p.waitForTimeout(100);
   ok(await p.evaluate(()=>MH.S.mode==='hunt'),'a tap on the title starts the hunt');
   const head=await p.evaluate(()=>{const r=document.getElementById('c').getBoundingClientRect(),pp=MH.partPos('head',MH.mPose());return{x:r.left+pp.x/128*r.width,y:r.top+pp.y/MH.LH*r.height,r:{l:r.left,t:r.top,w:r.width,h:r.height}};});
+  await p.evaluate(()=>{MH.S.m.evadeCd=9;});
   await p.touchscreen.tap(head.x,head.y);await p.waitForTimeout(250);
   ok(await p.evaluate(()=>MH.S.stats.dealt>0&&MH.S.m.parts.head.hp<450&&MH.S.m.stun>0),'a tap on the head damages the head');
   const cdp=await p.context().newCDPSession(p);
@@ -71,7 +77,7 @@ const shots=process.argv[2]; // optional folder for screenshots
   await touch('touchStart',200,500);await touch('touchMove',150,500);await touch('touchMove',110,502);await p.waitForTimeout(50);
   ok(await p.evaluate(()=>MH.S.h.state==='dodge'),'a swipe dodges');await touch('touchEnd');
   await p.waitForTimeout(700);
-  await p.evaluate(()=>{const m=MH.S.m;m.state='idle';m.wait=10;MH.S.h.state='idle';MH.S.h.inv=0;}); // keep the monster quiet for the hold
+  await p.evaluate(()=>{const m=MH.S.m;m.state='idle';m.wait=10;m.evadeCd=99;MH.S.h.state='idle';MH.S.h.inv=0;}); // keep the monster quiet for the hold
   const before=await p.evaluate(()=>MH.S.stats.dealt);
   await touch('touchStart',200,500);await p.waitForTimeout(1500);
   ok(await p.evaluate(()=>MH.S.h.state==='charge'&&MH.S.h.lvl>=1),'a held press charges');
@@ -81,7 +87,7 @@ const shots=process.argv[2]; // optional folder for screenshots
   await p.evaluate(()=>{MH.S.h.hp=40;MH.S.h.state='idle';});
   await touch('touchStart',200,500);await touch('touchMove',202,460);await touch('touchMove',203,420);await touch('touchEnd');await p.waitForTimeout(900);
   ok(await p.evaluate(()=>MH.S.h.potions===1||MH.S.h.state==='hurt'),'a swipe up drinks a potion');
-  const cb=await p.evaluate(()=>{const S=MH.S,m=S.m;m.state='idle';m.wait=10;S.h.state='idle';S.h.inv=0;S.h.counter=1.4;S.slow=0;MH.manual=true;
+  const cb=await p.evaluate(()=>{const S=MH.S,m=S.m;m.state='idle';m.wait=10;m.evadeCd=99;S.h.state='idle';S.h.inv=0;S.h.counter=1.4;S.slow=0;MH.manual=true;
     const r=document.getElementById('c').getBoundingClientRect(),c=MH.L.counter;return{x:r.left+(c.x+c.w/2)/128*r.width,y:r.top+(c.y+c.h/2)/MH.LH*r.height,d:S.stats.dealt};});
   await p.waitForTimeout(80);if(shots)await p.screenshot({path:shots+'/counter.png'});
   await p.touchscreen.tap(cb.x,cb.y);
