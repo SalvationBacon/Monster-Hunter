@@ -5,8 +5,9 @@
 <meta name="theme-color" content="#141826">
 <title>Fernwing Hunt · fight prototype</title>
 <style>
-html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-#c{position:absolute;left:50%;top:0;transform:translateX(-50%);height:100vh;height:100dvh;image-rendering:pixelated;image-rendering:crisp-edges;display:block;cursor:pointer;touch-action:none}
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relative;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#c{position:absolute;left:50%;top:0;transform:translateX(-50%);image-rendering:pixelated;image-rendering:crisp-edges;display:block;cursor:pointer;touch-action:none}
 </style></head><body>
 <canvas id="c"></canvas>
 <script>
@@ -619,7 +620,7 @@ function draw(){
 
 // ── Sizing: fixed logical width, logical height follows the screen's shape ──
 function resize(){
-  const vw=innerWidth,vh=innerHeight;
+  const r=document.body.getBoundingClientRect(), vw=r.width||innerWidth, vh=r.height||innerHeight;   // the body, so safe-area padding is respected
   LH=clamp(Math.round(W*vh/vw),200,284);
   cv.width=W;cv.height=LH;
   const scale=Math.min(vw/W,vh/LH);cv.style.width=Math.floor(W*scale)+'px';cv.style.height=Math.floor(LH*scale)+'px';
