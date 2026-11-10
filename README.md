@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.7.0).** Five monsters, four weapon types, elements, thirteen perks, a camp to pick hunts from, and a forge that turns loot into gear.
+**Current state: prototype (v0.8.0).** Five monsters, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -20,7 +20,8 @@ Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` 
 ## The loop
 1. Hunt a monster. Break its head, back or wings, and tail for their drops.
 2. Forge its materials into weapons of its element, an armor and a charm, each with a perk.
-3. Each first win unlocks the next monster. Every monster is weak to one element.
+3. Upgrade weapons and armor up to +5 to keep an element you need in play.
+4. Each first win unlocks the next monster. Every monster is weak to one element, and armor resists its own monster's element.
 
 ## Files
 | File | Purpose |

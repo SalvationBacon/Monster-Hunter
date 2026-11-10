@@ -18,7 +18,7 @@
 - **Breakable parts (weak points):** head, wings and tail. Every 2 to 3 seconds a red circle shrinks onto one part, taking turns between the unbroken parts, and the player has 0.5s to tap it. Three hits on a part break it: the monster staggers and that part's drop is guaranteed. Normal hits no longer break parts. A one-minute hunt has room for about nine circles, so breaking all three takes near-perfect taps.
 - **Balance (bots, `tools/check.js`):** see the numbers the script prints. A bot that never stops attacking should win in about 45 seconds, so a person lands near a minute.
 
-## The loop around the fight (v0.7.0)
+## The loop around the fight (v0.8.0)
 
 - **Camp:** after the title, a camp screen with two tabs. HUNT lists the monsters; FORGE has a page of gear per monster, a starter page and a relics page.
 - **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.
@@ -40,12 +40,14 @@ Later monsters also attack faster and dodge more often. New attacks: rush (Tuskh
 
 All four are owned in iron from the start. A weapon of a monster's tier costs its scales, claws and one part.
 
-| Type | Tap combo | Hold | Notes |
+| Type | Hits per second | Hold | Notes |
 |---|---|---|---|
-| Greatsword | medium | charge a heavy hit, three levels | the all-rounder |
-| Dual Blades | fast, light | keep slashing for +20% damage, on stamina | cheaper dodge, weaker counter |
-| Hammer | slow, heavy | charge a heavy hit | every hit builds stun, head hits most |
-| Lance | medium | guard: a hit costs stamina and 20% damage | a guard raised in the last 0.3s is perfect and opens a counter |
+| Dual Blades | 5.2 | keep slashing for +20% damage, on stamina | cheaper dodge, weaker counter |
+| Lance | 3.3 | guard: a hit costs stamina and 20% damage | a guard raised in the last 0.3s is perfect and opens a counter |
+| Greatsword | 2.3 | charge a heavy hit, three levels | the all-rounder |
+| Hammer | 1.7 | charge a heavy hit | every hit builds stun, head hits most |
+
+All four deal the same damage per second with taps alone (about 44 in iron, measured by `tools/check.js`, which fails if they drift more than 6% apart). Slower weapons hit harder per swing. The brief freeze on each hit scales with the hit, so fast weapons do not lose more time to it.
 
 A weapon does 25% more damage to a monster weak to its element.
 
@@ -60,7 +62,18 @@ A weapon does 25% more damage to a monster weak to its element.
 | Frost | x2.05 | 240 | Nimble | Herbalist |
 | Storm | x2.4 | 290 | Keen Edge | Fortune |
 
+### Upgrades and resistance
+
+- **Levels:** every weapon and armor can be upgraded to +5 at the forge. Each level adds 8% of its base attack or health, so +5 is 40% more. Charms have no levels.
+- **Costs:** levels 1 and 2 take scales and claws, level 3 adds a part, and levels 4 and 5 also need scales from the next monster up. Iron and leather use Fernwing materials.
+- **Why:** an upgraded older weapon stays worth using where its element has the edge. A Fern weapon at +5 (x1.82) with the 25% element bonus is about level with a fresh Storm weapon.
+- **Resistance:** armor takes 25% less damage from its own monster's element. The hunt card shows each monster's element, and "-25%" when the worn armor resists it.
+- **Not a tree yet:** upgrades are a straight line of levels. Branching paths, where one weapon turns into another, are not built.
+
 ### Perks
+
+Perks are kept modest on purpose (most are 10% to 40% on one narrow thing), to leave room for a rebirth system later.
+
 
 Modelled on Monster Hunter's skills, under their own names.
 
@@ -88,4 +101,5 @@ Relic charms each cost a Wyvern Gem (8% drop from any monster) plus parts from t
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
-- **Weapon upgrade trees and armor in several pieces**, as in Monster Hunter.
+- **Branching upgrade trees and armor in several pieces**, as in Monster Hunter.
+- **A rebirth system** at the end of the ladder. Perks are sized with this in mind.
