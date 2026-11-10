@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: fight prototype (v0.2.0).** One hunt of about a minute against one monster, the Fernwing, to test how combat feels.
+**Current state: fight prototype (v0.3.0).** One hunt of about a minute against one monster, the Fernwing, to test how combat feels.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies.
@@ -11,7 +11,7 @@ Open `index.html` in a browser. It is one file with no dependencies.
 |---|---|
 | Tap | Attack (three-hit combo). Tap the head or tail to aim at it |
 | Hold, then release | Charged heavy hit, three levels |
-| Swipe left or right | Dodge roll. Dodge just as the ring closes for a PERFECT |
+| Swipe left or right | Dodge roll. Dodge just as the ring closes for a PERFECT, then tap COUNTER |
 | Swipe up, or the potion button | Drink a potion |
 
 Keyboard: `J` or `Space` attack the head (hold to charge), `K` the tail, `A`/`D` dodge, `W` potion.
