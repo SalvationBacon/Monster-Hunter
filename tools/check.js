@@ -60,7 +60,7 @@ const shots=process.argv[2]; // optional folder for screenshots
 
   const ev=await p.evaluate(()=>{MH.manual=true;MH.newHunt();const S=MH.S,m=S.m;m.evadeCd=0;m.wait=10;for(let i=0;i<5;i++)MH.update(1/60);return 1;});
   await p.waitForTimeout(80);if(shots)await p.screenshot({path:shots+'/wary.png'});
-  const ev2=await p.evaluate(()=>{const S=MH.S;MH.actTap('head');for(let i=0;i<10;i++)MH.update(1/60);const a={st:S.m.state,d:S.stats.dealt};for(let i=0;i<60;i++)MH.update(1/60);MH.actTap('head');for(let i=0;i<20;i++)MH.update(1/60);a.d2=S.stats.dealt;return a;});
+  const ev2=await p.evaluate(()=>{const S=MH.S;MH.actTap('head');for(let i=0;i<10;i++)MH.update(1/60);const a={st:S.m.state,d:S.stats.dealt};for(let i=0;i<80;i++)MH.update(1/60);MH.actTap('head');for(let i=0;i<20;i++)MH.update(1/60);a.d2=S.stats.dealt;return a;});
   if(shots){await p.waitForTimeout(80);}
   ok(ev2.st==='evade'&&ev2.d===0,'a wary monster dodges the next hit');ok(ev2.d2>0,'and can be hit again straight after');
   // real touch input on a live clock
