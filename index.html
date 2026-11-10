@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.4.0';
+const VER='0.4.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -33,7 +33,7 @@ const HEAVY_DMG=[0,40,85,150], CHARGE_AT=[.45,1.0,1.7];
 const DODGE_DUR=.42, DODGE_IFR=.36, DODGE_COST=25, PERFECT_WIN=.2;
 const COUNTER_WIN=1.4, COUNTER_DMG=120, COUNTER_STUN=40;   // a perfect dodge opens a counter
 const STUN_MAX=100, STUN_GROW=40, STUN_TIME=4, STUN_HEAVY=[0,8,16,30], STUN_TAP=2;   // head hits fill the stun meter
-const EVADE_CD=[5,3.6,2.6], EVADE_DUR=.45;   // seconds between the monster's dodges, per phase
+const EVADE_CD=[3.4,2.6,1.9], EVADE_DUR=.45;   // seconds between the monster's dodges, per phase
 const PHASE_SPEED=[1,.88,.78];
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
 const ATTACKS={
@@ -228,7 +228,7 @@ function saveBag(b){try{localStorage.setItem(BAG_KEY,JSON.stringify(b));}catch(e
 function newHunt(){
   S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0;
   S.h={hp:H_HP,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS,buff:0,counter:0,target:'body',hitDone:false,drank:false};
-  S.m={hp:M_HP,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:STUN_MAX,stunned:false,evadeCd:6,
+  S.m={hp:M_HP,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:STUN_MAX,stunned:false,evadeCd:4,
        parts:{head:{hp:HEAD_HP,broken:false},tail:{hp:TAIL_HP,broken:false}}};
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
   S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0};
@@ -561,6 +561,12 @@ function drawWorld(){
   if(m.state==='stagger'){for(let i=0;i<(m.stunned?5:3);i++){const a=S.clock*5+i*2.1;g.fillStyle='#ffe14d';g.fillRect(Math.round(hp.x+4+Math.cos(a)*9),Math.round(hp.y-10+Math.sin(a)*3),2,2);}}
   if(m.phase===2&&!dead&&Math.random()<.3)S.pt.push({x:hp.x-6,y:hp.y+4,vx:rnd(-20,0),vy:rnd(-30,-10),life:.4,col:'#c8d0e8',g:-20});
   if(m.state==='roar'){for(let i=0;i<3;i++)ring(hp.x-4,hp.y+4,6+((m.t*40+i*9)%28),'#e8f0fc');}
+  if(mWary()){                                                                   // wary badge: blue chevrons, it will dodge the next hit
+    const bx=clamp(hp.x+2,8,W-10),by=Math.max(HUD_T+2,hp.y-26+(Math.floor(S.clock*6)%2));
+    g.fillStyle=OUTLINE;g.fillRect(bx-5,by-1,11,11);g.fillStyle='#4cc9ff';g.fillRect(bx-4,by,9,9);g.fillStyle='#fff';
+    for(const cx of [bx-3,bx+1]){g.fillRect(cx,by+2,1,1);g.fillRect(cx+1,by+3,1,1);g.fillRect(cx+2,by+4,1,1);g.fillRect(cx+1,by+5,1,1);g.fillRect(cx,by+6,1,1);}
+    if(Math.floor(S.clock*6)%2)ring(hp.x+26,L.mFeet+2,34,'#4cc9ff');
+  }
   // telegraph: "!" over the monster, and a ring closing on the hunter for every hit on its way
   const hcx=L.hx+18, hcy=L.hFeet-1;
   if(m.state==='attack'&&m.hi<m.hits.length){
@@ -630,7 +636,7 @@ function drawTitle(){
   text('DODGE AS THE RING CLOSES',W/2,y+47,'#c8d0e8',{al:1});
   text('PERFECT DODGE: COUNTER!',W/2,y+54,'#ffe14d',{al:1});
   text('HIT THE HEAD TO STUN IT',W/2,y+64,'#c8d0e8',{al:1});
-  text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
+  text('BLUE SIGN: IT WILL DODGE',W/2,y+74,'#4cc9ff',{al:1});
   text('BREAK HEAD AND TAIL',W/2,y+84,'#c8d0e8',{al:1});
   text('FOR EXTRA LOOT',W/2,y+91,'#c8d0e8',{al:1});
   if(Math.floor(S.t*2)%2)text('TAP TO HUNT',W/2,y+112,'#fff',{al:1,out:OUTLINE});
