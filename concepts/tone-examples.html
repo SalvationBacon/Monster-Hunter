@@ -1,0 +1,223 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tone Examples</title>
+<style>
+body{margin:0;background:#111;color:#ddd;font:14px/1.4 system-ui,sans-serif;padding:20px}
+.row{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+.card{display:flex;flex-direction:column;align-items:center;gap:8px;max-width:384px}
+canvas{image-rendering:pixelated;border:3px solid #333;border-radius:10px}
+h2{margin:0;font-size:16px;color:#fff}
+p{margin:0;text-align:center;color:#aaa;font-size:13px}
+</style></head><body>
+<div class="row" id="row"></div>
+<script>
+// ── Same pipeline as 8-Bit Industry: draw into a tiny canvas, scale up with smoothing off ──
+const W=128,H=208,S=3;
+function hash2(x,y,s){let h=(Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(s,1442695041))|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;}
+function shade(hex,f){const n=parseInt(hex.slice(1),16),t=f<0?0:255,a=Math.abs(f);const c=v=>Math.round(v+(t-v)*a);return'#'+((1<<24)|(c(n>>16)<<16)|(c(n>>8&255)<<8)|c(n&255)).toString(16).slice(1);}
+
+// Shape sprite: paint colour indices into a grid, then auto-shade (light from top-left) and outline.
+function shapeSpr(w,h,pal,outline,paint){
+  const G=new Array(w*h).fill(0);
+  const set=(x,y,c)=>{x|=0;y|=0;if(x>=0&&y>=0&&x<w&&y<h)G[y*w+x]=c;};
+  const api={
+    ell(cx,cy,rx,ry,c){for(let y=-ry;y<=ry;y++)for(let x=-rx;x<=rx;x++)if((x*x)/(rx*rx+.5)+(y*y)/(ry*ry+.5)<=1)set(cx+x,cy+y,c);},
+    rect(x,y,ww,hh,c){for(let j=0;j<hh;j++)for(let i=0;i<ww;i++)set(x+i,y+j,c);},
+    poly(pts,c){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;pts.forEach(([x,y])=>{x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);});
+      for(let y=Math.floor(y0);y<=y1;y++)for(let x=Math.floor(x0);x<=x1;x++){let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const[xi,yi]=pts[i],[xj,yj]=pts[j];if(((yi>y+.5)!==(yj>y+.5))&&(x+.5<(xj-xi)*(y+.5-yi)/(yj-yi)+xi))ins=!ins;}if(ins)set(x,y,c);}},
+    px:set, raw:{}
+  };
+  paint(api);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+  const at=(x,y)=>x<0||y<0||x>=w||y>=h?0:G[y*w+x];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const v=at(x,y);
+    if(!v){ if(at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1)){g.fillStyle=outline;g.fillRect(x,y,1,1);} continue;}
+    const p=pal[v]; if(typeof p==='string'&&p.startsWith('!')){g.fillStyle=p.slice(1);g.fillRect(x,y,1,1);continue;} // flat (eyes, glow)
+    let col=p;
+    if(at(x-1,y-1)!==v&&at(x,y-1)!==v)col=shade(p,.28);
+    else if(at(x+1,y+1)!==v||at(x,y+2)!==v&&at(x,y+1)===v&&false)col=shade(p,-.3);
+    else if(at(x,y+2)!==v||at(x+2,y)!==v)col=shade(p,-.14);
+    g.fillStyle=col;g.fillRect(x,y,1,1);
+  }
+  return c;
+}
+
+// 3×5 pixel digits for damage numbers
+const DIG=['111101101101111','010110010010111','111001111100111','111001111001111','101101111001001','111100111001111','111100111101111','111001001001001','111101111101111','111101111001111'];
+function num(g,str,x,y,col,out){
+  [...str].forEach((ch,k)=>{const d=DIG[+ch];for(let i=0;i<15;i++)if(d[i]==='1'){const px=x+k*4+i%3,py=y+(i/3|0);
+    g.fillStyle=out;g.fillRect(px-1,py,3,1);g.fillRect(px,py-1,1,3);}});
+  [...str].forEach((ch,k)=>{const d=DIG[+ch];for(let i=0;i<15;i++)if(d[i]==='1'){g.fillStyle=col;g.fillRect(x+k*4+i%3,y+(i/3|0),1,1);}});
+}
+function bar(g,x,y,w,h,f,col,back,frame){g.fillStyle=frame;g.fillRect(x-1,y-1,w+2,h+2);g.fillStyle=back;g.fillRect(x,y,w,h);g.fillStyle=col;g.fillRect(x,y,Math.round(w*f),h);g.fillStyle=shade(col,.35);g.fillRect(x,y,Math.round(w*f),1);}
+function dither(g,y0,y1,c0,c1,seed){for(let y=y0;y<y1;y++){const t=(y-y0)/(y1-y0);for(let x=0;x<W;x++){const th=((x+y)%2?.25:.75)*0+(((x&1)*2+(y&1))/4);g.fillStyle=t>th*0.999+0.0001&&t>((x*7+y*13)%4)/4?c1:c0;g.fillRect(x,y,1,1);}}}
+function bands(g,y0,y1,cols){const n=cols.length;for(let y=y0;y<y1;y++){const t=(y-y0)/(y1-y0)*(n-1);const i=Math.floor(t),f=t-i;for(let x=0;x<W;x++){const th=[0,.5,.75,.25][(x&1)+(y&1)*2];g.fillStyle=cols[Math.min(n-1,i+(f>th?1:0))];g.fillRect(x,y,1,1);}}}
+
+// ── Tone definitions ──
+const TONES=[
+{ name:'A · Cozy & Chibi', desc:'Bright, round and cute. Monsters are chunky critters with big eyes; hunter is a big-headed chibi. Think Slime Rancher meets Monster Hunter Stories.',
+  sky:['#7fd6ff','#a9e6ff','#d8f6ff'], hills:['#7bd46a','#5cbf5a'], ground:'#69c25b', groundB:'#57ad4d', speck:'#fff2a8', outline:'#3a2440', ui:{frame:'#3a2440',back:'#f4e4ff',hp:'#ff5c8a',st:'#ffd23f',mhp:'#ff7a3d'},
+  monster:{ pal:{1:'#ff9e5e',2:'#ffe0b8',3:'!#3a2440',4:'!#ffffff',5:'#fff6e0',6:'#ff6f91'}, kind:'puff' },
+  hunter:{ pal:{1:'#ffd8b0',2:'#4a9cff',3:'#ffcc33',4:'!#3a2440',5:'#c0c8d8',6:'#8a5a3c'}, chibi:true },
+  dmg:'#ffffff', tele:'#ff3d7f'
+},
+{ name:'B · Classic Adventure', desc:'SNES-era fantasy. Saturated but grounded: lush forests, proper wyverns, readable silhouettes. The "default" Monster Hunter feel.',
+  sky:['#3b6bc4','#5d8fe0','#9cc4f2'], hills:['#2f6d4a','#245a3c'], ground:'#3f8a3a', groundB:'#33752f', speck:'#a5d86a', outline:'#141826', ui:{frame:'#141826',back:'#2b2f45',hp:'#4cd964',st:'#f5c542',mhp:'#e2483d',ink:'#c8d0e8'},
+  monster:{ pal:{1:'#3f9e8a',2:'#d9c88e',3:'!#141826',4:'!#ffe14d',5:'#e8e2cc',6:'#2c7366'}, kind:'wyvern' },
+  hunter:{ pal:{1:'#f0c098',2:'#8a3b2a',3:'#b0b8c8',4:'!#141826',5:'#dde4f0',6:'#6b4a2e'}, chibi:false },
+  dmg:'#fff3a0', tele:'#ffb020'
+},
+{ name:'C · Dark Fantasy', desc:'Grim and moody, closest to 8-Bit Industry\'s dark palette. Ash, blood-red moon, hulking beasts with glowing eyes. More Darkest Dungeon than cartoon.',
+  sky:['#120a14','#2a0f1a','#4a1420'], hills:['#1a1418','#120e12'], ground:'#2a2420', groundB:'#211b18', speck:'#5a3a2a', outline:'#050305', ui:{frame:'#000000',back:'#1a1214',hp:'#b0242e',st:'#c8a040',mhp:'#7a1a8a',ink:'#8a7a70'},
+  monster:{ pal:{1:'#3d3640',2:'#6a5a50',3:'!#050305',4:'!#ff3a2a',5:'#c8beaa',6:'#2a242c'}, kind:'brute' },
+  hunter:{ pal:{1:'#c89878',2:'#3a3a44',3:'#7a7a88',4:'!#050305',5:'#a8a8b8',6:'#4a3428'}, chibi:false, cloak:'#5a1a1e' },
+  dmg:'#ff5040', tele:'#ff2a1a'
+}];
+
+function monsterSpr(t){
+  const m=t.monster;
+  if(m.kind==='puff') return shapeSpr(64,52,m.pal,t.outline,a=>{
+    a.ell(44,36,5,6,1); a.ell(26,38,5,6,1);              // back legs
+    a.ell(36,26,20,16,1);                                  // round body
+    a.ell(34,32,13,9,2);                                   // belly
+    a.ell(54,18,6,4,6); a.ell(58,14,3,3,6);                // curly tail puff
+    a.poly([[20,8],[26,14],[18,16]],5); a.poly([[38,6],[42,14],[34,13]],5); // tiny horns
+    a.ell(20,40,5,6,1); a.ell(40,42,5,5,1);                // front legs
+    a.ell(16,24,5,4,2);                                    // snout
+    a.ell(23,19,4,5,4); a.ell(22,20,2,3,3); a.px(21,18,4); // big eye
+    a.px(13,23,3); a.px(16,23,3);                          // nostrils
+    a.ell(28,26,2,1,6);                                    // blush
+  });
+  if(m.kind==='wyvern') return shapeSpr(76,56,m.pal,t.outline,a=>{
+    a.poly([[44,20],[60,2],[74,6],[70,14],[62,12],[58,24]],6);   // far wing
+    a.poly([[46,30],[64,34],[75,42],[62,38],[48,38]],1);         // tail
+    a.poly([[70,36],[75,42],[69,44]],5);                          // tail spike
+    a.rect(38,40,4,12,6); a.rect(37,50,6,3,5);                    // back leg
+    a.ell(38,30,13,9,1);                                          // body
+    a.ell(36,34,9,5,2);                                           // belly
+    a.poly([[30,24],[22,14],[18,16],[26,30]],1);                  // neck
+    a.ell(16,14,8,6,1); a.poly([[4,14],[12,10],[12,20],[3,18]],1);// head + jaw
+    a.poly([[4,18],[12,18],[11,21],[5,20]],2);                    // lower jaw
+    a.px(6,17,5);a.px(8,17,5);a.px(10,17,5);                       // teeth
+    a.poly([[18,9],[28,2],[22,11]],5); a.poly([[15,8],[20,1],[19,9]],5); // horns
+    a.px(13,12,4); a.px(14,12,4); a.px(13,13,3);                  // eye
+    a.poly([[34,22],[44,4],[54,8],[46,26]],6);                    // near wing (folded up)
+    a.poly([[44,4],[40,0],[46,3]],5);
+    a.rect(30,38,4,14,1); a.rect(29,50,6,3,5);                    // front leg
+    for(let i=0;i<4;i++)a.poly([[34+i*5,21],[36+i*5,17],[38+i*5,21]],5); // back ridge
+  });
+  return shapeSpr(76,60,m.pal,t.outline,a=>{                       // brute
+    a.ell(54,48,7,9,6); a.rect(50,50,10,9,6);                     // back leg
+    a.ell(42,32,24,18,1);                                         // massive hunched body
+    a.ell(48,22,16,10,6);                                         // hump shadow
+    for(let i=0;i<6;i++)a.poly([[30+i*7,16-(i%2)*2],[34+i*7,4+(i%2)*3],[37+i*7,17]],5); // bone spikes
+    a.ell(16,34,12,10,1);                                         // head low and forward
+    a.poly([[6,38],[18,40],[16,46],[7,44]],2);                    // jaw
+    a.px(8,39,5);a.px(11,39,5);a.px(14,40,5);a.px(9,43,5);a.px(12,44,5); // fangs
+    a.poly([[10,26],[2,14],[6,26]],5); a.poly([[22,24],[30,10],[26,26]],5); // horns
+    a.ell(11,31,2,1,4); a.ell(19,31,2,1,4);                       // glowing eyes
+    a.ell(26,48,6,10,1); a.rect(20,52,13,7,1);                    // front arm
+    a.poly([[19,58],[21,55],[23,58]],5);a.poly([[24,58],[26,55],[28,58]],5);a.poly([[29,58],[31,55],[33,58]],5); // claws
+    a.ell(40,40,10,6,2);                                          // scarred chest
+    a.px(36,38,6);a.px(37,39,6);a.px(38,40,6);a.px(42,37,6);a.px(43,38,6);
+  });
+}
+
+function hunterSpr(t){
+  const h=t.hunter,p=h.cloak?{...h.pal,7:h.cloak}:h.pal;
+  if(h.chibi) return shapeSpr(26,28,p,t.outline,a=>{
+    a.rect(8,22,4,5,6); a.rect(13,22,4,5,6);       // boots
+    a.rect(7,15,11,8,2);                            // tunic
+    a.ell(12,9,7,7,1);                              // big head
+    a.poly([[5,6],[12,0],[20,6],[18,4],[12,3]],3);  // hair
+    a.ell(6,5,2,3,3); a.ell(18,5,2,3,3);
+    a.rect(14,8,2,3,4); a.rect(9,8,2,3,4);          // eyes
+    a.poly([[18,16],[24,4],[25,5],[20,17]],5);      // sword
+    a.rect(17,15,4,2,3);
+  });
+  return shapeSpr(28,34,p,t.outline,a=>{
+    if(h.cloak)a.poly([[4,12],[16,10],[14,30],[2,30]],7);
+    a.rect(8,26,4,7,6); a.rect(14,26,4,7,6);        // legs
+    a.rect(7,13,12,14,2);                            // armour
+    a.rect(7,20,12,2,6);                             // belt
+    a.ell(13,8,5,5,1);                               // head
+    a.poly([[7,6],[13,1],[19,6],[19,9],[8,9]],3);    // helmet
+    a.rect(14,8,3,1,4);                              // visor slit
+    a.rect(5,13,4,4,3); a.rect(17,13,4,4,3);         // pauldrons
+    a.poly([[20,18],[27,0],[28,1],[22,19]],5);       // greatsword
+    a.rect(19,17,5,2,6);
+  });
+}
+
+function scene(t,idx){
+  const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  // sky
+  bands(g,0,120,t.sky);
+  if(idx===2){ // blood moon + ash
+    for(let y=-10;y<=10;y++)for(let x=-10;x<=10;x++)if(x*x+y*y<=100){g.fillStyle=x*x+y*y>70?'#8a1a1a':(hash2(x,y,3)>.85?'#a02a22':'#c0352a');g.fillRect(96+x,30+y,1,1);}
+    for(let i=0;i<40;i++){g.fillStyle=hash2(i,1,9)>.5?'#6a5050':'#3a2a2a';g.fillRect(hash2(i,2,9)*W|0,hash2(i,3,9)*190|0,1,1);}
+  } else if(idx===0){ // sun + fluffy clouds
+    for(let y=-8;y<=8;y++)for(let x=-8;x<=8;x++)if(x*x+y*y<=64){g.fillStyle=x*x+y*y>45?'#ffe680':'#fff6c0';g.fillRect(100+x,24+y,1,1);}
+    [[20,30],[60,18],[34,52]].forEach(([cx,cy])=>{[[0,0,8],[7,-3,6],[-7,1,5],[13,1,5]].forEach(([dx,dy,r])=>{for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(x*x+y*y<=r*r&&dy+y<=2){g.fillStyle=y>r-3?'#e4f6ff':'#ffffff';g.fillRect(cx+dx+x,cy+dy+y,1,1);}});});
+  } else { // drifting clouds + birds
+    [[24,26],[86,40]].forEach(([cx,cy])=>{g.fillStyle='#c8dcf6';g.fillRect(cx-12,cy,28,3);g.fillRect(cx-6,cy-3,16,3);g.fillStyle='#e8f0fc';g.fillRect(cx-4,cy-3,10,2);});
+    [[70,20],[78,24]].forEach(([x,y])=>{g.fillStyle='#1c2440';g.fillRect(x,y,2,1);g.fillRect(x+3,y,2,1);g.fillRect(x+2,y+1,1,1);});
+  }
+  // far hills / silhouettes
+  for(let x=0;x<W;x++){
+    const h1=80+Math.sin(x*.06)*8+Math.sin(x*.17+1)*4, h2=96+Math.sin(x*.09+2)*6+Math.sin(x*.23)*3;
+    g.fillStyle=t.hills[0];g.fillRect(x,h1,1,140-h1);
+    g.fillStyle=t.hills[1];g.fillRect(x,h2,1,140-h2);
+  }
+  if(idx===1){ // pine trees
+    [6,18,104,118,30].forEach((tx,k)=>{const base=104+(k%2)*4;for(let j=0;j<18;j++){const w=Math.floor(j/2)+1;g.fillStyle=j%5===0?'#1a4a30':'#1f5a38';g.fillRect(tx-w,base-18+j,w*2+1,1);}g.fillStyle='#4a2e1c';g.fillRect(tx,base,2,4);});
+  }
+  if(idx===2){ // dead trees
+    [[12,100],[112,104]].forEach(([tx,ty])=>{g.fillStyle='#0a0608';g.fillRect(tx,ty-26,2,30);g.fillRect(tx-6,ty-20,6,1);g.fillRect(tx-6,ty-24,1,4);g.fillRect(tx+2,ty-16,7,1);g.fillRect(tx+8,ty-21,1,5);g.fillRect(tx-3,ty-12,3,1);});
+  }
+  // ground
+  for(let y=118;y<H;y++)for(let x=0;x<W;x++){const r=hash2(x>>1,y>>1,idx);g.fillStyle=r>.93?t.speck:(r>.5?t.ground:t.groundB);g.fillRect(x,y,1,1);}
+  if(idx===0)for(let i=0;i<14;i++){const fx=hash2(i,5,1)*W|0,fy=125+hash2(i,6,1)*75|0;g.fillStyle=['#ff7aa8','#fff','#ffd23f'][i%3];g.fillRect(fx,fy,1,1);g.fillRect(fx-1,fy+1,3,1);g.fillRect(fx,fy+2,1,1);g.fillStyle='#ffe680';g.fillRect(fx,fy+1,1,1);}
+  // shadows
+  g.fillStyle='rgba(0,0,0,.28)';
+  g.beginPath();g.ellipse(80,164,30,5,0,0,7);g.fill();g.beginPath();g.ellipse(26,176,10,3,0,0,7);g.fill();
+  // monster + telegraph glow (combat B: attacks are telegraphed)
+  const ms=monsterSpr(t);
+  const mx=Math.round(80-ms.width/2), my=164-ms.height+3;
+  g.drawImage(ms,mx,my);
+  // wind-up "!" telegraph
+  const tx=mx+10,ty=my-12;
+  g.fillStyle=t.outline;g.fillRect(tx-3,ty-1,7,12);g.fillStyle=t.tele;g.fillRect(tx-2,ty,5,10);g.fillStyle='#fff';g.fillRect(tx,ty+1,1,5);g.fillRect(tx,ty+7,1,2);
+  // hunter
+  const hs=hunterSpr(t); g.drawImage(hs,26-Math.round(hs.width/2),178-hs.height);
+  // slash fx + damage number
+  g.fillStyle='#fff';for(let i=0;i<10;i++)g.fillRect(52+i,128+i*1.4|0,2,1);
+  g.fillStyle=t.dmg;for(let i=0;i<8;i++)g.fillRect(55+i,127+i*1.4|0,1,1);
+  num(g,'248',36,138,t.dmg,t.outline);
+  // HUD: monster HP (top)
+  const u=t.ui;
+  g.fillStyle=u.frame;g.fillRect(0,0,W,13);
+  bar(g,24,4,100,5,.62,u.mhp,u.back,'#000');
+  const ic=shapeSpr(16,10,t.monster.pal,t.outline,a=>{a.ell(8,5,6,4,1);a.px(6,4,4);a.px(5,4,3);});g.drawImage(ic,4,2);
+  // HUD: hunter (bottom)
+  g.fillStyle=u.frame;g.fillRect(0,186,W,22);
+  bar(g,6,190,56,4,.8,u.hp,u.back,'#000');
+  bar(g,6,197,40,3,.55,u.st,u.back,'#000');
+  // control hints: TAP / SWIPE / HOLD glyphs
+  const ink=u.ink||u.back;const glyph=(x,kind)=>{g.fillStyle=ink;g.fillRect(x,189,16,16);g.fillStyle=u.frame;g.fillRect(x+1,190,14,14);g.fillStyle=ink;
+    if(kind===0){g.fillRect(x+7,192,2,2);g.fillRect(x+5,195,6,1);g.fillRect(x+4,197,8,1);g.fillRect(x+5,199,6,1);}
+    if(kind===1){g.fillRect(x+3,197,10,1);g.fillRect(x+10,195,1,5);g.fillRect(x+11,196,1,3);g.fillRect(x+3,195,1,5);}
+    if(kind===2){for(let a=0;a<16;a++){const an=a/16*Math.PI*2;if(a<11)g.fillRect(x+8+Math.cos(an-1.6)*4|0,197+Math.sin(an-1.6)*4|0,1,1);}g.fillRect(x+7,196,2,2);}};
+  glyph(70,0);glyph(88,1);glyph(106,2);
+  return c;
+}
+
+const row=document.getElementById('row');
+TONES.forEach((t,i)=>{
+  const card=document.createElement('div');card.className='card';
+  const src=scene(t,i);const big=document.createElement('canvas');big.width=W*S;big.height=H*S;
+  const bg=big.getContext('2d');bg.imageSmoothingEnabled=false;bg.drawImage(src,0,0,W*S,H*S);
+  card.innerHTML=`<h2>${t.name}</h2>`;card.appendChild(big);card.insertAdjacentHTML('beforeend',`<p>${t.desc}</p>`);
+  row.appendChild(card);
+});
+</script></body></html>
