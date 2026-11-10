@@ -19,25 +19,25 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.1.0';
+const VER='0.2.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
 // ── Tuning ──
-const HUNT_TIME=300;                     // soft limit, seconds
-const M_HP=9000, HEAD_HP=1200, TAIL_HP=1000;
-const H_HP=100, POTIONS=3, POTION_HEAL=50;
+const HUNT_TIME=150;                     // soft limit, seconds
+const M_HP=3000, HEAD_HP=450, TAIL_HP=380;
+const H_HP=100, POTIONS=2, POTION_HEAL=40;
 const TAP_DMG=[12,14,22], TAP_DUR=[.26,.26,.4], TAP_HIT=[.09,.09,.16];
 const HEAVY_DMG=[0,40,85,150], CHARGE_AT=[.45,1.0,1.7];
 const DODGE_DUR=.42, DODGE_IFR=.36, DODGE_COST=25, PERFECT_WIN=.2;
 const PHASE_SPEED=[1,.88,.78];
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
 const ATTACKS={
-  bite:  {wind:.8,  hits:[0],     after:.3,  rec:.9,  dmg:8},
-  tail:  {wind:1.15,hits:[0],     after:.35, rec:1.0, dmg:10},
-  dbl:   {wind:.75, hits:[0,.55], after:.3,  rec:1.1, dmg:8},
-  fire:  {wind:1.3, hits:[0,.5],  after:.35, rec:1.2, dmg:7},
-  dive:  {wind:1.7, hits:[0],     after:.3,  rec:1.7, dmg:18, heavy:true},
+  bite:  {wind:.8,  hits:[0],     after:.3,  rec:.9,  dmg:14},
+  tail:  {wind:1.15,hits:[0],     after:.35, rec:1.0, dmg:18},
+  dbl:   {wind:.75, hits:[0,.55], after:.3,  rec:1.1, dmg:13},
+  fire:  {wind:1.3, hits:[0,.5],  after:.35, rec:1.2, dmg:12},
+  dive:  {wind:1.7, hits:[0],     after:.3,  rec:1.7, dmg:30, heavy:true},
 };
 const POOLS=[['bite','bite','bite','tail','tail'],['bite','tail','dbl','dbl','fire','fire'],['tail','dbl','fire','fire','dive','dive']];
 
@@ -318,7 +318,7 @@ function mUpdate(dt){
 }
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
-  const m=S.m,h=S.h,A=ATTACKS[m.atk]; let dmg=A.dmg; if(m.atk==='tail'&&m.parts.tail.broken)dmg=7;
+  const m=S.m,h=S.h,A=ATTACKS[m.atk]; let dmg=A.dmg; if(m.atk==='tail'&&m.parts.tail.broken)dmg=10;
   const hc={x:L.hx+18+hunterX(),y:L.hFeet-18};
   if(m.atk==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:'#a5d86a',g:260});sfx('heavy');buzz(60);}
   if(m.atk==='tail')for(let k=0;k<12;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-40,0),life:rnd(.2,.5),col:'#d9c88e',g:150});
@@ -363,7 +363,7 @@ function dealDamage(base,part,heavy){
   if(P&&!P.broken&&(P.hp-=dmg)<=0){
     P.broken=true;addNum(pp.x,pp.y-22,'BREAK!','#ffffff',1.3);sfx('brk');buzz(120);S.shake=.6;S.stop=.14;
     for(let k=0;k<14;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-130,-30),life:rnd(.4,.8),col:'#e8e2cc',g:300});
-    if(m.hp>0)mStagger(part==='head'?3:2);
+    if(m.hp>0)mStagger(part==='head'?2.2:1.6);
   }
   if(m.hp<=0){m.hp=0;m.state='dead';m.t=0;S.slow=1.2;S.endT=0;h.state='win';h.t=0;S.shake=.7;return;}
   const ph=m.hp<=M_HP/3?2:m.hp<=M_HP*2/3?1:0;
