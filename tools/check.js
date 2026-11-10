@@ -12,7 +12,7 @@ const shots=process.argv[2]; // optional folder for screenshots
 
   // skill: chance to dodge each incoming hit. heavy: uses charged attacks in openings
   const bot=(skill,counters)=>p.evaluate(({skill,counters})=>{
-    MH.manual=true;MH.newHunt();const S=MH.S;let t=0,decided=-1,will=false,holdUntil=0;
+    MH.manual=true;MH.newHunt();const S=MH.S;let t=0,decided=-1,will=false,holdUntil=0,qdec=null;
     const tgt=part=>{S.h.state==='idle'&&MH.actTap(part);};
     while(S.mode==='hunt'&&t<600){
       const m=S.m,h=S.h;
@@ -21,23 +21,23 @@ const shots=process.argv[2]; // optional folder for screenshots
         if(decided!==m.hi+':'+m.atk+':'+m.hits[0]){decided=m.hi+':'+m.atk+':'+m.hits[0];will=Math.random()<skill;}
         if(will&&d<.15&&d>0&&h.state!=='dodge'&&h.state!=='counter')MH.actDodge(-1);
       }
+      if(S.qte&&S.qte.t>.35&&qdec!==S.qte){qdec=S.qte;if(Math.random()<skill){const pp=MH.partPos(S.qte.part,MH.mPose());MH.qteTap(pp.x,pp.y);}}
       if(counters&&h.counter>0&&h.state!=='counter'){MH.actCounter();}
       if(h.hp<50&&h.potions>0&&h.state==='idle'&&m.state!=='attack')MH.actPotion();
       else if(h.state==='idle'){
-        const part=!m.parts.head.broken?'head':!m.parts.tail.broken?'tail':'head';
-        MH.actTap(part);
+        MH.actTap('head');
       }
       MH.update(1/60);t+=1/60;
     }
-    return{mode:S.mode,time:150-S.timeLeft,hp:S.h.hp,mhp:S.m.hp,stats:S.stats,potions:S.h.potions,head:S.m.parts.head.broken,tail:S.m.parts.tail.broken,loot:S.loot&&S.loot.drops,fail:S.fail};
+    return{mode:S.mode,time:150-S.timeLeft,hp:S.h.hp,mhp:S.m.hp,stats:S.stats,potions:S.h.potions,breaks:['head','wings','tail'].filter(k=>S.m.parts[k].broken),loot:S.loot&&S.loot.drops,fail:S.fail};
   },{skill,counters});
 
   for(const [name,skill] of [['skilled',.95],['average',.7],['casual',.45],['never dodges',0]]){
     const runs=[];for(let i=0;i<6;i++)runs.push(await bot(skill,skill>.5));
     const wins=runs.filter(r=>r.mode==='loot'),avg=a=>a.length?Math.round(a.reduce((s,v)=>s+v,0)/a.length):0;
-    console.log(`     ${name}: ${wins.length}/6 wins, avg win time ${avg(wins.map(r=>r.time))}s, avg damage taken ${avg(runs.map(r=>r.stats.taken))}, potions left ${avg(runs.map(r=>r.potions))}, counters ${avg(runs.map(r=>r.stats.counters))}, stuns ${avg(runs.map(r=>r.stats.stuns))}, monster dodges ${avg(runs.map(r=>r.stats.evaded))}`);
+    console.log(`     ${name}: ${wins.length}/6 wins, avg win time ${avg(wins.map(r=>r.time))}s, avg damage taken ${avg(runs.map(r=>r.stats.taken))}, potions left ${avg(runs.map(r=>r.potions))}, counters ${avg(runs.map(r=>r.stats.counters))}, stuns ${avg(runs.map(r=>r.stats.stuns))}, monster dodges ${avg(runs.map(r=>r.stats.evaded))}, weak points hit ${avg(runs.map(r=>r.stats.qteHit))} missed ${avg(runs.map(r=>r.stats.qteMiss))}, parts broken ${(runs.reduce((s,r)=>s+r.breaks.length,0)/6).toFixed(1)}`);
     if(name==='skilled'){ok(wins.length===6,'a skilled bot always wins');const t=avg(wins.map(r=>r.time));ok(t>35&&t<60,'skilled hunt takes about a minute ('+t+'s)');
-      ok(wins.every(r=>r.head&&r.tail),'both parts break when targeted');ok(wins.every(r=>r.stats.counters>0&&r.stats.stuns>0),'perfect dodges allow counters, and counters stun the monster');ok(wins.every(r=>r.stats.evaded>0),'the monster dodges some hits');ok(wins.every(r=>r.loot.some(d=>d.id==='horn')&&r.loot.some(d=>d.id==='spike')),'broken parts drop their loot');}
+      ok(wins.every(r=>r.breaks.length>=1),'a skilled bot breaks at least one part');ok(wins.every(r=>r.stats.counters>0&&r.stats.stuns>0),'perfect dodges allow counters, and counters stun the monster');ok(wins.every(r=>r.stats.evaded>0),'the monster dodges some hits');ok(wins.every(r=>r.breaks.every(k=>r.loot.some(d=>d.id==={head:'horn',wings:'wing',tail:'spike'}[k]))),'broken parts drop their loot');}
     if(name==='never dodges')ok(wins.length<=1,'never dodging loses the hunt');
   }
   // time limit
@@ -52,6 +52,7 @@ const shots=process.argv[2]; // optional folder for screenshots
     await until("S.fx.length>0&&S.m.state!=='attack'");await p.waitForTimeout(60);await p.screenshot({path:shots+'/hit.png'});
     await p.evaluate(()=>{MH.S.m.hp=2300;});await until("S.m.state==='roar'&&S.m.t>.3");await p.waitForTimeout(60);await p.screenshot({path:shots+'/roar.png'});
     await until("S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/fire.png'});
+    await until("S.qte&&S.qte.t>.3",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/qte.png'});
     await until("S.m.state==='stagger'&&S.m.t>.3",120);await p.waitForTimeout(60);await p.screenshot({path:shots+'/stagger.png'});
     await p.evaluate(()=>{MH.S.m.hp=1100;MH.S.h.hp=60;});
     await until("S.m.state==='attack'&&S.m.atk==='dive'&&S.m.t>S.m.hits[0]-.5",200);await p.waitForTimeout(60);await p.screenshot({path:shots+'/dive.png'});
@@ -70,7 +71,7 @@ const shots=process.argv[2]; // optional folder for screenshots
   const head=await p.evaluate(()=>{const r=document.getElementById('c').getBoundingClientRect(),pp=MH.partPos('head',MH.mPose());return{x:r.left+pp.x/128*r.width,y:r.top+pp.y/MH.LH*r.height,r:{l:r.left,t:r.top,w:r.width,h:r.height}};});
   await p.evaluate(()=>{MH.S.m.evadeCd=9;});
   await p.touchscreen.tap(head.x,head.y);await p.waitForTimeout(250);
-  ok(await p.evaluate(()=>MH.S.stats.dealt>0&&MH.S.m.parts.head.hp<450&&MH.S.m.stun>0),'a tap on the head damages the head');
+  ok(await p.evaluate(()=>MH.S.stats.dealt>0&&MH.S.m.stun>0),'a tap on the head damages the head');
   const cdp=await p.context().newCDPSession(p);
   const touch=(type,x,y)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:type==='touchEnd'?[]:[{x,y}]});
   await p.waitForTimeout(500);
@@ -84,6 +85,13 @@ const shots=process.argv[2]; // optional folder for screenshots
   await touch('touchEnd');await p.waitForTimeout(400);
   const hv=await p.evaluate(()=>MH.S.stats.dealt);
   ok(hv-before>=40,'releasing lands a heavy hit ('+(hv-before)+')');
+  // weak point with a real tap
+  const qp=await p.evaluate(()=>{const S=MH.S,m=S.m;MH.manual=true;m.state='idle';m.wait=10;m.evadeCd=99;S.qte={part:'tail',t:0};
+    const r=document.getElementById('c').getBoundingClientRect(),pp=MH.partPos('tail',MH.mPose());return{x:r.left+pp.x/128*r.width,y:r.top+pp.y/MH.LH*r.height};});
+  await p.touchscreen.tap(qp.x,qp.y);
+  ok(await p.evaluate(()=>MH.S.m.parts.tail.hits===1&&!MH.S.qte),'a tap on a red circle counts as a weak-point hit');
+  ok(await p.evaluate(()=>{const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'tail',t:0};const pp=MH.partPos('tail',MH.mPose());MH.qteTap(pp.x,pp.y);}return S.m.parts.tail.broken&&S.m.state==='stagger';}),'three hits break the part');
+  ok(await p.evaluate(()=>{const S=MH.S;S.qte={part:'head',t:0};for(let i=0;i<60;i++)MH.update(1/60);const r=!S.qte&&S.m.parts.head.hits===0;MH.manual=false;S.m.state='idle';S.m.wait=10;return r;}),'an untouched circle times out');
   await p.evaluate(()=>{MH.S.h.hp=40;MH.S.h.state='idle';});
   await touch('touchStart',200,500);await touch('touchMove',202,460);await touch('touchMove',203,420);await touch('touchEnd');await p.waitForTimeout(900);
   ok(await p.evaluate(()=>MH.S.h.potions===1||MH.S.h.state==='hurt'),'a swipe up drinks a potion');
