@@ -20,33 +20,54 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.5.1';
+const VER='0.6.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
 // ── Tuning ──
 const HUNT_TIME=150;                     // soft limit, seconds
-const M_HP=3100;
-const H_HP=100, POTIONS=2, POTION_HEAL=40;
+const POTIONS=2, POTION_HEAL=.4;       // a potion heals this share of full health
 const TAP_DMG=[12,14,22], TAP_DUR=[.26,.26,.4], TAP_HIT=[.09,.09,.16];
 const HEAVY_DMG=[0,40,85,150], CHARGE_AT=[.45,1.0,1.7];
 const DODGE_DUR=.42, DODGE_IFR=.36, DODGE_COST=25, PERFECT_WIN=.2;
 const COUNTER_WIN=1.4, COUNTER_DMG=120, COUNTER_STUN=40;   // a perfect dodge opens a counter
-const STUN_MAX=100, STUN_GROW=40, STUN_TIME=4, STUN_HEAVY=[0,8,16,30], STUN_TAP=2;   // head hits fill the stun meter
+const STUN_GROW=40, STUN_TIME=4, STUN_HEAVY=[0,8,16,30], STUN_TAP=2;   // head hits fill the stun meter
 // Weak points: a red circle shrinks on a part; tap it in time. Three hits break the part.
-const QTE_TIME=.5, QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_HITS=3, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
+const QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
 const PARTS=['head','wings','tail'];
-const EVADE_CD=[3.4,2.6,1.9], EVADE_DUR=1;   // seconds between the monster's dodges, per phase
-const PHASE_SPEED=[1,.88,.78];
+const EVADE_DUR=1;
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
 const ATTACKS={
   bite:  {wind:.8,  hits:[0],     after:.3,  rec:.9,  dmg:14},
   tail:  {wind:1.15,hits:[0],     after:.35, rec:1.0, dmg:18},
   dbl:   {wind:.75, hits:[0,.55], after:.3,  rec:1.1, dmg:13},
   fire:  {wind:1.3, hits:[0,.5],  after:.35, rec:1.2, dmg:12},
+  tri:   {wind:.7,  hits:[0,.45,.9], after:.3, rec:1.3, dmg:9},
   dive:  {wind:1.7, hits:[0],     after:.3,  rec:1.7, dmg:30, heavy:true},
 };
-const POOLS=[['bite','bite','bite','tail','tail'],['bite','tail','dbl','dbl','fire','fire'],['tail','dbl','fire','fire','dive','dive']];
+// ── Monsters. speed: wind-up multiplier per phase. qteTime: seconds a weak-point circle takes to close.
+//    evadeCd: seconds between its dodges per phase. loot.parts: the drop each broken part guarantees.
+const MONSTERS={
+  fern:{id:'fern',name:'FERNWING',kind:0,biome:0,stars:1,hp:3100,dmg:1,speed:[1,.88,.78],qteTime:.5,evadeCd:[3.4,2.6,1.9],stunMax:100,blood:'#3f9e8a',
+    pools:[['bite','bite','bite','tail','tail'],['bite','tail','dbl','dbl','fire','fire'],['tail','dbl','fire','fire','dive','dive']],
+    loot:{common:[['scale',2,4],['claw',1,2]],parts:{head:'horn',wings:'wing',tail:'spike'}}},
+  ember:{id:'ember',name:'EMBERWING',kind:1,biome:1,stars:3,needs:'fern',hp:5400,dmg:1.5,speed:[.9,.8,.7],qteTime:.38,evadeCd:[3,2.2,1.6],stunMax:130,blood:'#b8402e',
+    pools:[['bite','tail','tail','dbl','dbl'],['tail','dbl','tri','tri','fire','fire'],['tri','tri','fire','fire','dive','dive','dbl']],
+    loot:{common:[['e_scale',2,4],['e_claw',1,2]],parts:{head:'e_horn',wings:'e_wing',tail:'e_spike'}}},
+};
+const HUNTS=['fern','ember'];
+// ── Gear. One weapon, one armor and one charm are worn at a time.
+const GEAR={
+  iron:   {slot:'weapon',name:'IRON SWORD',   atk:1},
+  leather:{slot:'armor', name:'LEATHER ARMOR',hp:100},
+  fblade: {slot:'weapon',name:'FERN BLADE',   desc:'ATTACK +30%',       atk:1.3, cost:{scale:6,claw:3,horn:1}},
+  fmail:  {slot:'armor', name:'FERN MAIL',    desc:'HEALTH 140',        hp:140,  cost:{scale:8,claw:2,wing:1}},
+  keen:   {slot:'charm', name:'KEEN EYE CHARM',desc:'CIRCLES 40% SLOWER',qteSlow:1.4,cost:{horn:1,wing:1,spike:1}},
+  eblade: {slot:'weapon',name:'EMBER GREATSWORD',desc:'ATTACK +70%',    atk:1.7, cost:{e_scale:6,e_claw:3,e_horn:2}},
+  eplate: {slot:'armor', name:'EMBER PLATE',  desc:'HEALTH 190',        hp:190,  cost:{e_scale:8,e_wing:2,scale:6}},
+  breaker:{slot:'charm', name:'BREAKER CHARM',desc:'BREAKS NEED 2 HITS',qteHits:2,cost:{e_spike:2,e_horn:1,spike:2}},
+};
+const FORGE=['fblade','fmail','keen','eblade','eplate','breaker'];
 
 // ── Helpers ──
 const rnd=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*clamp(t,0,1);
@@ -119,8 +140,10 @@ function ring(cx,cy,r,col){g.fillStyle=col;const n=Math.max(12,Math.round(r*5));
 // ── Monster: the Fernwing, a forest wyvern ──
 const MS_W=88, MS_H=68, MS_OX=8, MS_OY=8;      // sprite size and the margin the head and wings move in
 function wyvernSpr(p,flash){
-  const key=`wy:${p.hx}:${p.hy}:${p.jaw}:${p.wing}:${p.tail}:${p.horn?1:0}:${p.spike?1:0}:${p.glow}:${p.rage}:${p.torn?1:0}`;
-  const pal={1:'#3f9e8a',2:'#d9c88e',3:'!#141826',4:p.rage?'!#ff4030':'!#ffe14d',5:'#e8e2cc',6:'#2c7366',7:['!#141826','!#ff9a2e','!#ffd34d','!#fff6c0'][p.glow]};
+  const key=`wy:${p.hx}:${p.hy}:${p.jaw}:${p.wing}:${p.tail}:${p.horn?1:0}:${p.spike?1:0}:${p.glow}:${p.rage}:${p.torn?1:0}:${p.kind|0}`;
+  const E=p.kind===1, mouth=['!#141826','!#ff9a2e','!#ffd34d','!#fff6c0'][E?Math.max(1,p.glow):p.glow];   // the Emberwing's mouth always glows
+  const pal=E?{1:'#b8402e',2:'#f0b070',3:'!#141826',4:p.rage?'!#ffffff':'!#ffe14d',5:'#4a3c48',6:'#6a1f24',7:mouth}
+             :{1:'#3f9e8a',2:'#d9c88e',3:'!#141826',4:p.rage?'!#ff4030':'!#ffe14d',5:'#e8e2cc',6:'#2c7366',7:mouth};
   const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
     a.off(MS_OX,MS_OY);
     const hx=p.hx,hy=p.hy,t=p.tail;
@@ -129,7 +152,7 @@ function wyvernSpr(p,flash){
     else if(p.wing===1)a.poly([[44,20],[56,-6],[76,-4],[70,6],[62,4],[58,24]],6);
     else a.poly([[44,24],[62,28],[76,38],[66,36],[58,34]],6);
     a.poly([[46,30],[64,34],[75,42+t],[62,38+t/2],[48,38]],1);                 // tail
-    if(p.spike)a.poly([[70,36+t],[76,42+t],[69,44+t]],5);
+    if(p.spike){if(E)a.ell(73,42+t,4,4,5);else a.poly([[70,36+t],[76,42+t],[69,44+t]],5);}
     a.rect(38,40,4,12,6); a.rect(37,50,6,3,5);                                  // back leg
     a.ell(38,30,13,9,1); a.ell(36,34,9,5,2);                                    // body, belly
     a.poly([[30,24],[22+hx,14+hy],[18+hx,16+hy],[26,30]],1);                    // neck
@@ -138,7 +161,8 @@ function wyvernSpr(p,flash){
     if(p.jaw>0)a.poly([[5+hx,18+hy],[12+hx,18+hy],[12+hx,19+hy+p.jaw],[5+hx,18+hy+p.jaw]],7); // open mouth
     a.poly([[4+hx,18+hy+p.jaw],[12+hx,18+hy+p.jaw],[11+hx,21+hy+p.jaw],[5+hx,20+hy+p.jaw]],2); // lower jaw
     a.px(6+hx,17+hy,5);a.px(8+hx,17+hy,5);a.px(10+hx,17+hy,5);                  // teeth
-    if(p.horn){a.poly([[18+hx,9+hy],[28+hx,2+hy],[22+hx,11+hy]],5);a.poly([[15+hx,8+hy],[20+hx,1+hy],[19+hx,9+hy]],5);}
+    if(p.horn){if(E){a.poly([[18+hx,9+hy],[32+hx,4+hy],[30+hx,-2+hy],[28+hx,3+hy],[22+hx,11+hy]],5);a.poly([[14+hx,8+hy],[16+hx,-2+hy],[20+hx,-4+hy],[19+hx,9+hy]],5);}
+      else{a.poly([[18+hx,9+hy],[28+hx,2+hy],[22+hx,11+hy]],5);a.poly([[15+hx,8+hy],[20+hx,1+hy],[19+hx,9+hy]],5);}}
     else{a.rect(19+hx,8+hy,3,2,5);a.rect(15+hx,7+hy,2,2,5);}                     // broken stumps
     a.px(13+hx,12+hy,4);a.px(14+hx,12+hy,4);a.px(13+hx,13+hy,3);                // eye
     // near wing
@@ -147,7 +171,7 @@ function wyvernSpr(p,flash){
     else a.poly([[34,24],[48,30],[60,46],[50,42],[40,34]],6);
     if(p.torn)for(const[x,y]of p.wing===0?[[44,11],[45,12],[45,13],[49,15],[50,16],[42,18],[43,19],[50,9],[47,21],[47,22]]:p.wing===1?[[44,3],[45,4],[45,5],[50,1],[51,2],[42,11],[43,12],[47,14],[47,15],[52,8]]:[[44,30],[45,31],[48,34],[49,35],[52,39],[53,40],[46,36]])a.px(x,y,0);
     a.rect(30,38,4,14,1); a.rect(29,50,6,3,5);                                  // front leg
-    for(let i=0;i<4;i++)a.poly([[34+i*5,21],[36+i*5,17],[38+i*5,21]],5);        // back ridge
+    for(let i=0;i<4;i++)a.poly([[34+i*5,21],[36+i*5,E?13+(i%2)*2:17],[38+i*5,21]],5);        // back ridge
   });
   return flash?whiteSpr(key,s):s;
 }
@@ -157,8 +181,10 @@ const HS_W=46, HS_H=42;
 const H_PAL={1:'#f0c098',2:'#8a3b2a',3:'#b0b8c8',4:'!#141826',5:'#dde4f0',6:'#6b4a2e',8:'!#ffe14d',9:'!#ff9a2e',10:'!#ffffff',11:'!#e2483d'};
 function hunterSpr(p){
   const aq=Math.round(p.a*5);                                                    // sword angle in 0.2 rad steps
-  const key=`hu:${p.kind}:${aq}:${p.bob}:${p.lean}:${p.glow}:${p.f}`;
-  return shapeSpr(key,HS_W,HS_H,H_PAL,a=>{
+  const eq=SAVE.eq, key=`hu:${p.kind}:${aq}:${p.bob}:${p.lean}:${p.glow}:${p.f}:${eq.weapon}:${eq.armor}`;
+  const ar={leather:['#8a3b2a','#b0b8c8','#6b4a2e'],fmail:['#2f8f7a','#d9c88e','#1f5a50'],eplate:['#7a2a2a','#4a3c48','#2a1a1e']}[eq.armor];
+  const pal=Object.assign({},H_PAL,{2:ar[0],3:ar[1],6:ar[2],5:{iron:'#dde4f0',fblade:'#8fe8c8',eblade:'#ff9a4d'}[eq.weapon]});
+  return shapeSpr(key,HS_W,HS_H,pal,a=>{
     a.off(4,2);
     if(p.kind==='roll'){
       if(p.f){a.ell(14,31,7,6,2);a.ell(17,28,4,4,3);a.rect(8,34,5,2,6);}
@@ -189,6 +215,13 @@ const LOOT={
   wing: {name:'WING MEMBRANE',pal:{1:'#2c7366',2:'#e8e2cc'},draw:a=>{a.poly([[0,9],[2,1],[10,0],[8,5],[6,4],[5,8],[3,7]],1);a.rect(1,0,2,3,2);}},
   gem:  {name:'WYVERN GEM', pal:{1:'#4cd9c0',2:'!#e8fffb'}, draw:a=>{a.poly([[5,0],[10,4],[5,10],[0,4]],1);a.px(4,3,2);a.px(5,2,2);}},
 };
+for(const [k,name,pal] of [['scale','EMBER SCALE',{1:'#b8402e',2:'#6a1f24'}],['claw','EMBER CLAW',{1:'#4a3c48',2:'#6a1f24'}],['horn','EMBER HORN',{1:'#4a3c48',2:'#6a5a6a'}],
+  ['spike','CLUB TAIL',{1:'#4a3c48',2:'#b8402e'}],['wing','EMBER WING',{1:'#6a1f24',2:'#4a3c48'}]])LOOT['e_'+k]={name,pal,draw:LOOT[k].draw};
+const GEAR_COL={iron:'#dde4f0',leather:'#8a3b2a',fblade:'#8fe8c8',fmail:'#2f8f7a',keen:'#4cc9ff',eblade:'#ff9a4d',eplate:'#7a2a2a',breaker:'#ff6a4d'};
+const gearSpr=id=>shapeSpr('gear:'+id,12,12,{1:GEAR_COL[id],2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);const sl=GEAR[id].slot;
+  if(sl==='weapon'){a.poly([[9,0],[10,1],[4,7],[3,6]],1);a.poly([[1,5],[5,9],[4,10],[0,6]],2);a.rect(0,8,2,2,2);}
+  else if(sl==='armor'){a.poly([[1,1],[4,1],[5,2],[6,1],[9,1],[10,4],[8,5],[8,10],[2,10],[2,5],[0,4]],1);a.rect(2,7,7,1,2);}
+  else{a.poly([[3,0],[7,0],[5,3]],3);a.ell(5,6,3,3,2);a.ell(5,6,2,2,1);}});
 const lootSpr=id=>shapeSpr('loot:'+id,12,12,LOOT[id].pal,a=>{a.off(1,1);LOOT[id].draw(a);});
 
 // ═══════════════════════════════════════════════════
@@ -226,14 +259,28 @@ function buzz(ms){if(!MH.manual&&navigator.vibrate)try{navigator.vibrate(ms);}ca
 // ═══════════════════════════════════════════════════
 const S={mode:'title',t:0};
 const MH=window.MH={S,manual:false};       // test hook (tools/check.js)
-const BAG_KEY='mh_proto_bag';
-function loadBag(){try{return JSON.parse(localStorage.getItem(BAG_KEY))||{};}catch(e){return {};}}
-function saveBag(b){try{localStorage.setItem(BAG_KEY,JSON.stringify(b));}catch(e){}}
+// ── Save: bag of materials, owned and worn gear, wins per monster. On this device only.
+const SAVE_KEY='mh_save_v1';
+function loadSave(){
+  let v=null; try{v=JSON.parse(localStorage.getItem(SAVE_KEY));}catch(e){}
+  if(!v){v={};try{const old=JSON.parse(localStorage.getItem('mh_proto_bag'));if(old)v.bag=old;}catch(e){}}   // loot from the first prototypes carries over
+  v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.eq=Object.assign({weapon:'iron',armor:'leather',charm:null},v.eq);v.own.iron=v.own.leather=true;
+  for(const sl of ['weapon','armor','charm'])if(v.eq[sl]&&!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]={weapon:'iron',armor:'leather',charm:null}[sl];
+  return v;
+}
+let SAVE=loadSave();
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}}
+// What the worn gear adds up to
+function gearStats(){const e=SAVE.eq,c=GEAR[e.charm]||{};return{atk:GEAR[e.weapon].atk,hp:GEAR[e.armor].hp,qteSlow:c.qteSlow||1,qteHits:c.qteHits||3};}
+const canAfford=id=>Object.entries(GEAR[id].cost).every(([k,n])=>(SAVE.bag[k]||0)>=n);
+const unlocked=id=>!MONSTERS[id].needs||(SAVE.wins[MONSTERS[id].needs]||0)>0;
 
-function newHunt(){
+function newHunt(id){
+  const D=S.def=MONSTERS[id||(S.def&&S.def.id)||'fern'], gs=gearStats(); BG=bgFor(D.biome);
+  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits;
   S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0;
-  S.h={hp:H_HP,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS,buff:0,counter:0,target:'body',hitDone:false,drank:false};
-  S.m={hp:M_HP,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:STUN_MAX,stunned:false,evadeCd:4,
+  S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,potions:POTIONS,buff:0,counter:0,target:'body',hitDone:false,drank:false};
+  S.m={hp:D.hp,max:D.hp,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:D.stunMax,stunned:false,evadeCd:4,
        parts:{head:{hits:0,broken:false},wings:{hits:0,broken:false},tail:{hits:0,broken:false}},qteT:QTE_FIRST,qteLast:PARTS[(Math.random()*3)|0]};
   S.qte=null;
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
@@ -266,7 +313,7 @@ function mPose(){
   else if(m.state==='evade'){const u=Math.sin(Math.PI*clamp(m.t/EVADE_DUR,0,1));p.ox=Math.round(16*u);p.oy=-Math.round(12*u);p.wing=Math.floor(m.t*8)%2?1:2;p.hx=2;}
   if(m.state==='attack'){
     const t=m.t,h0=m.hits[0],a=m.atk;
-    if(a==='bite'||a==='dbl'){
+    if(a==='bite'||a==='dbl'||a==='tri'){
       let k=-1;for(let i=0;i<m.hits.length;i++)if(t>=m.hits[i]-.07&&t<m.hits[i]+.2)k=i;
       if(k>=0){p.hx=-8;p.hy=3;p.jaw=1;p.ox=-14;}
       else{const nx=m.hits[Math.min(m.hi,m.hits.length-1)],prev=m.hi?m.hits[m.hi-1]+.2:0,u=ease((t-prev)/Math.max(.01,nx-.07-prev));
@@ -307,9 +354,9 @@ function partPos(part,p){
 }
 const mWary=()=>{const m=S.m;return m.state==='idle'&&m.evadeCd<=0&&!m.roarDue;};
 function mStartAttack(){
-  const m=S.m, pool=POOLS[m.phase]; let id;
+  const m=S.m, pool=S.def.pools[m.phase]; let id;
   do{id=pool[(Math.random()*pool.length)|0];}while(id===m.last&&Math.random()<.7);
-  const A=ATTACKS[id], sp=PHASE_SPEED[m.phase], w=A.wind*sp;
+  const A=ATTACKS[id], sp=S.def.speed[m.phase], w=A.wind*sp;
   m.state='attack';m.t=0;m.atk=id;m.last=id;m.hi=0;m.hits=A.hits.map(o=>w+o);m.dur=m.hits[m.hits.length-1]+A.after;m.rec=A.rec;
   sfx('warn');
 }
@@ -327,14 +374,14 @@ function mUpdate(dt){
       const hp=mHeadPos(mPose());for(let i=0;i<3;i++)S.pt.push({x:hp.x-8,y:hp.y+6,vx:rnd(-120,-70),vy:rnd(10,60),life:rnd(.25,.5),col:['#ff9a2e','#ffd34d','#e2483d'][i],g:-40});
     }
     if(m.t>=m.dur){m.state='recover';m.t=0;}
-  }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*PHASE_SPEED[m.phase];}}
+  }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*S.def.speed[m.phase];}}
   else if(m.state==='stagger'){if(m.t>=m.staggerDur){m.state='idle';m.wait=.5;m.stunned=false;}}
   else if(m.state==='evade'){if(m.t>=EVADE_DUR){m.state='idle';m.wait=m.phase?.15:.4;}}
   else if(m.state==='roar'){if(m.t>=1.2){m.state='idle';m.wait=.35;}}
 }
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
-  const m=S.m,h=S.h,A=ATTACKS[m.atk]; let dmg=A.dmg; if(m.atk==='tail'&&m.parts.tail.broken)dmg=10;
+  const m=S.m,h=S.h,A=ATTACKS[m.atk]; let dmg=A.dmg; if(m.atk==='tail'&&m.parts.tail.broken)dmg=10; dmg=Math.round(dmg*S.def.dmg);
   const hc={x:L.hx+18+hunterX(),y:L.hFeet-18};
   if(m.atk==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:'#a5d86a',g:260});sfx('heavy');buzz(60);}
   if(m.atk==='tail')for(let k=0;k<12;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-40,0),life:rnd(.2,.5),col:'#d9c88e',g:150});
@@ -370,25 +417,25 @@ function dealDamage(base,part,heavy,stun){
   const pose=mPose();
   if(mAir()){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
   if(mWary()){                                                                   // it hops back and the hit misses
-    m.state='evade';m.t=0;m.evadeCd=EVADE_CD[m.phase];S.stats.evaded++;const hp=mHeadPos(pose);
+    m.state='evade';m.t=0;m.evadeCd=S.def.evadeCd[m.phase];S.stats.evaded++;const hp=mHeadPos(pose);
     addNum(hp.x+6,hp.y-14,'DODGED!','#c8d0e8',1.1);sfx('dodge');
     for(let k=0;k<8;k++)S.pt.push({x:L.mx+MS_OX+rnd(26,46),y:L.mFeet,vx:rnd(-50,10),vy:rnd(-40,-5),life:rnd(.2,.4),col:'#d9c88e',g:150});
     return;
   }
   if(m.state==='evade'&&m.t<EVADE_DUR-.2){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
   let mult=1; if(h.buff>0)mult*=1.5; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=1.15;
-  const dmg=Math.round(base*mult*rnd(.92,1.08)), pp=partPos(part,pose);
+  const dmg=Math.round(base*h.atk*mult*rnd(.92,1.08)), pp=partPos(part,pose);
   m.hp-=dmg;S.stats.dealt+=dmg;m.flash=.09;S.stop=Math.max(S.stop,heavy?.1:.035);S.shake=Math.max(S.shake,heavy?.4:.12);
   addNum(pp.x+rnd(-6,6),pp.y-10,''+dmg,heavy||mult>1.2?'#ffe14d':'#fff3a0',heavy?1:.7);
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:heavy,flip:h.combo===1});
-  for(let k=0;k<(heavy?12:5);k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-70,70),vy:rnd(-90,-10),life:rnd(.2,.5),col:k%2?'#fff':'#3f9e8a',g:240});
+  for(let k=0;k<(heavy?12:5);k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-70,70),vy:rnd(-90,-10),life:rnd(.2,.5),col:k%2?'#fff':S.def.blood,g:240});
   sfx(heavy?'heavy':'hit');buzz(heavy?40:10);
   if(m.hp<=0){m.hp=0;m.state='dead';m.t=0;S.slow=1.2;S.endT=0;h.state='win';h.t=0;S.shake=.7;return;}
   if(stun&&!m.stunned&&(m.stun+=stun)>=m.stunMax){                               // stun meter full: the monster goes down
     m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);
     addNum(pp.x,pp.y-30,'STUNNED!','#ffe14d',1.4);sfx('brk');buzz(150);S.shake=.7;S.stop=.14;
   }
-  const ph=m.hp<=M_HP/3?2:m.hp<=M_HP*2/3?1:0;
+  const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
 }
 // ── Weak points ──
@@ -396,7 +443,7 @@ function qteUpdate(dt){
   const m=S.m,h=S.h;
   if(S.qte){S.qte.t+=dt;
     if(m.state==='dead'||h.state==='dead'){S.qte=null;return;}
-    if(S.qte.t>=QTE_TIME){const pp=partPos(S.qte.part,mPose());addNum(pp.x,pp.y-12,'TOO SLOW','#8a93b0',.6);S.stats.qteMiss++;S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);}
+    if(S.qte.t>=S.qteTime){const pp=partPos(S.qte.part,mPose());addNum(pp.x,pp.y-12,'TOO SLOW','#8a93b0',.6);S.stats.qteMiss++;S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);}
     return;}
   const ok=(m.state==='idle'||m.state==='attack'||m.state==='recover'||m.state==='stagger')&&!mAir()&&h.state!=='dead'&&h.state!=='win';
   if(!ok||(m.qteT-=dt)>0)return;
@@ -411,18 +458,18 @@ function qteTap(x,y){
   S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);S.stats.qteHit++;
   const P=m.parts[q.part];P.hits++;
   if(h.state==='idle'||h.state==='atk'){h.combo=(h.combo+1)%3;h.state='atk';h.t=0;h.hitDone=true;h.buf=0;}   // swing for show: the hit is dealt here
-  m.hp-=QTE_DMG;S.stats.dealt+=QTE_DMG;m.flash=.09;S.stop=.07;S.shake=Math.max(S.shake,.3);
+  const qd=Math.round(QTE_DMG*h.atk);m.hp-=qd;S.stats.dealt+=qd;m.flash=.09;S.stop=.07;S.shake=Math.max(S.shake,.3);
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:true,flip:false});
   for(let k=0;k<10;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-80,80),vy:rnd(-100,-10),life:rnd(.2,.5),col:k%2?'#fff':'#ff6a4d',g:240});
-  addNum(pp.x,pp.y-12,P.hits+'/'+QTE_HITS,'#ffffff',.9);sfx('heavy');buzz(30);
-  if(P.hits>=QTE_HITS){
+  addNum(pp.x,pp.y-12,P.hits+'/'+S.qteHits,'#ffffff',.9);sfx('heavy');buzz(30);
+  if(P.hits>=S.qteHits){
     P.broken=true;addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');buzz(120);S.shake=.6;S.stop=.14;
     for(let k=0;k<14;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-130,-30),life:rnd(.4,.8),col:'#e8e2cc',g:300});
     if(m.hp>0)mStagger(2);
   }
   if(m.hp<=0){m.hp=0;m.state='dead';m.t=0;S.slow=1.2;S.endT=0;h.state='win';h.t=0;S.shake=.7;return true;}
   if(q.part==='head'&&!m.stunned&&(m.stun+=QTE_STUN)>=m.stunMax){m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);addNum(pp.x,pp.y-34,'STUNNED!','#ffe14d',1.4);}
-  const ph=m.hp<=M_HP/3?2:m.hp<=M_HP*2/3?1:0;
+  const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
   return true;
 }
@@ -448,7 +495,7 @@ function hUpdate(dt){
   }else if(h.state==='dodge'){if(h.t>=DODGE_DUR)h.state='idle';}
   else if(h.state==='hurt'){if(h.t>=.45){h.state='idle';h.inv=.7;}}
   else if(h.state==='drink'){
-    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;h.hp=Math.min(H_HP,h.hp+POTION_HEAL);addNum(L.hx+18,L.hFeet-34,'+'+POTION_HEAL,'#4cd964',.9);sfx('heal');}
+    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;const heal=Math.round(h.max*POTION_HEAL);h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');}
     if(h.t>=.9)h.state='idle';
   }
   if(h.state==='idle'){
@@ -472,7 +519,7 @@ function actDodge(dir){const h=S.h;
   h.st-=DODGE_COST;h.stDelay=.6;h.state='dodge';h.t=0;h.dir=dir;h.charge=0;h.lvl=0;h.buf=0;sfx('dodge');}
 function actPotion(){const h=S.h;
   if(!(h.state==='idle'||h.state==='atk'||h.state==='charge'))return;
-  if(h.potions<=0||h.hp>=H_HP){sfx('miss');return;}
+  if(h.potions<=0||h.hp>=h.max){sfx('miss');return;}
   h.state='drink';h.t=0;h.drank=false;h.charge=0;h.lvl=0;h.buf=0;}
 
 // ═══════════════════════════════════════════════════
@@ -482,8 +529,9 @@ const IN={down:false,downAt:0,x0:0,y0:0,swiped:false,part:'body',id:-1};
 function toLogical(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*LH};}
 function press(x,y){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
-  if(S.mode==='title'){newHunt();return;}
-  if(S.mode==='loot'||S.mode==='fail'){if(S.t>1.2)newHunt();return;}
+  if(S.mode==='title'){toCamp('hunt');return;}
+  if(S.mode==='loot'||S.mode==='fail'){if(S.t>1.2)toCamp('hunt');return;}
+  if(S.mode==='camp'){for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();break;}return;}
   if(S.mode!=='hunt')return;
   const b=L.potion; if(x>=b.x-2&&x<=b.x+b.w+2&&y>=b.y-2){actPotion();return;}
   const c=L.counter; if(S.h.counter>0&&x>=c.x-10&&x<=c.x+c.w+10&&y>=c.y-8&&y<=c.y+c.h+8&&actCounter())return;
@@ -523,17 +571,33 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k===' '||k==='j'||k=
 //  UPDATE
 // ═══════════════════════════════════════════════════
 function rollLoot(){
-  const m=S.m,out=[],add=(id,n)=>{if(n>0)out.push({id,n});};
-  add('scale',2+((Math.random()*3)|0)); add('claw',1+((Math.random()*2)|0));
-  add('horn',m.parts.head.broken?1:(Math.random()<.1?1:0));
-  add('wing',m.parts.wings.broken?1:(Math.random()<.1?1:0));
-  add('spike',m.parts.tail.broken?1:(Math.random()<.1?1:0));
+  const m=S.m,D=S.def,out=[],add=(id,n)=>{if(n>0)out.push({id,n});};
+  for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
+  for(const k of PARTS)add(D.loot.parts[k],m.parts[k].broken?1:(Math.random()<.1?1:0));
   add('gem',Math.random()<.06?1:0);
-  const bag=loadBag();for(const d of out)bag[d.id]=(bag[d.id]||0)+d.n;saveBag(bag);
-  return{drops:out,bag,time:HUNT_TIME-S.timeLeft};
+  for(const d of out)SAVE.bag[d.id]=(SAVE.bag[d.id]||0)+d.n;
+  const first=!SAVE.wins[D.id]; SAVE.wins[D.id]=(SAVE.wins[D.id]||0)+1; save();
+  const next=first&&HUNTS.map(k=>MONSTERS[k]).find(x=>x.needs===D.id);
+  return{drops:out,bag:SAVE.bag,time:HUNT_TIME-S.timeLeft,unlock:next?next.name:''};
 }
+// ── Camp: pick a hunt, or forge and wear gear ──
+function toCamp(tab){S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.btns=[];S.toast=null;}
+function toast(txt,col){S.toast={txt,col:col||'#fff',t:0};}
+function forgeTap(id){
+  const G=GEAR[id],eq=SAVE.eq;
+  if(SAVE.own[id]){
+    if(eq[G.slot]===id){if(G.slot!=='charm')return;eq.charm=null;toast('CHARM TAKEN OFF');}
+    else{eq[G.slot]=id;toast(G.name+' EQUIPPED','#4cc9ff');}
+    sfx('charge',2);
+  }else if(canAfford(id)){
+    for(const [k,n] of Object.entries(G.cost))SAVE.bag[k]-=n;
+    SAVE.own[id]=true;eq[G.slot]=id;toast(G.name+' CRAFTED!','#ffe14d');sfx('win');buzz(60);
+  }else{toast('NOT ENOUGH MATERIALS','#ff6a4d');sfx('miss');return;}
+  save();
+}
+function huntTap(id){if(!unlocked(id)){toast('BEAT '+MONSTERS[MONSTERS[id].needs].name+' FIRST','#ff6a4d');sfx('miss');return;}newHunt(id);}
 function update(dt){
-  S.t+=dt;
+  S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
   if(S.mode!=='hunt')return;
   if(S.stop>0){S.stop-=dt;return;}                                               // hitstop
   if(S.slow>0){S.slow-=dt;dt*=.3;}
@@ -555,16 +619,25 @@ function update(dt){
 // ═══════════════════════════════════════════════════
 //  DRAW
 // ═══════════════════════════════════════════════════
-let BG=null;
-function makeBg(){
-  BG=document.createElement('canvas');BG.width=W+8;BG.height=LH;const q=BG.getContext('2d'),BW=W+8, gt=L.ground;
-  const sky=['#3b6bc4','#5d8fe0','#9cc4f2'];
-  for(let y=0;y<gt+4;y++){const t=y/(gt+4)*2,i=Math.floor(t),f=t-i;for(let x=0;x<BW;x++){const th=[0,.5,.75,.25][(x&1)+(y&1)*2];q.fillStyle=sky[Math.min(2,i+(f>th?1:0))];q.fillRect(x,y,1,1);}}
-  [[26,gt*.25],[92,gt*.42]].forEach(([cx,cy])=>{cy|=0;q.fillStyle='#c8dcf6';q.fillRect(cx-12,cy,28,3);q.fillRect(cx-6,cy-3,16,3);q.fillStyle='#e8f0fc';q.fillRect(cx-4,cy-3,10,2);});
+const BIOMES=[
+  {sky:['#3b6bc4','#5d8fe0','#9cc4f2'],hills:['#2f6d4a','#245a3c'],ground:['#3f8a3a','#33752f'],speck:'#a5d86a',rare:.93},   // forest
+  {sky:['#1a0c14','#5a1822','#c2552e'],hills:['#2e1a1e','#1e1114'],ground:['#3a2c28','#2f2320'],speck:'#ff7a2e',rare:.985},  // volcano
+];
+let BG=null, BGS={};
+function bgFor(i){return BGS[i]||(BGS[i]=makeBg(i));}
+function makeBg(bi){
+  const B=BIOMES[bi], c=document.createElement('canvas');c.width=W+8;c.height=LH;const q=c.getContext('2d'),BW=W+8, gt=L.ground;
+  for(let y=0;y<gt+4;y++){const t=y/(gt+4)*2,i=Math.floor(t),f=t-i;for(let x=0;x<BW;x++){const th=[0,.5,.75,.25][(x&1)+(y&1)*2];q.fillStyle=B.sky[Math.min(2,i+(f>th?1:0))];q.fillRect(x,y,1,1);}}
+  if(bi===0)[[26,gt*.25],[92,gt*.42]].forEach(([cx,cy])=>{cy|=0;q.fillStyle='#c8dcf6';q.fillRect(cx-12,cy,28,3);q.fillRect(cx-6,cy-3,16,3);q.fillStyle='#e8f0fc';q.fillRect(cx-4,cy-3,10,2);});
+  else{for(let i=0;i<34;i++){q.fillStyle=i%3?'#ff7a2e':'#ffd34d';q.fillRect((hash2(i,1,7)*BW)|0,(hash2(i,2,7)*gt)|0,1,1);}                      // drifting embers
+    const vx=96,vy=gt-58;for(let j=0;j<46;j++){const w=6+j*.9;q.fillStyle='#24141a';q.fillRect(Math.round(vx-w),vy+j,Math.round(w*2),1);}          // volcano
+    q.fillStyle='#ff7a2e';q.fillRect(vx-5,vy,10,2);q.fillStyle='#ffd34d';q.fillRect(vx-3,vy,6,1);q.fillStyle='#ff7a2e';q.fillRect(vx-1,vy+2,2,9);q.fillRect(vx+1,vy+9,2,8);}
   for(let x=0;x<BW;x++){const h1=gt-38+Math.sin(x*.06)*8+Math.sin(x*.17+1)*4,h2=gt-22+Math.sin(x*.09+2)*6+Math.sin(x*.23)*3;
-    q.fillStyle='#2f6d4a';q.fillRect(x,h1,1,gt+4-h1);q.fillStyle='#245a3c';q.fillRect(x,h2,1,gt+4-h2);}
-  [8,22,36,108,122].forEach((tx,k)=>{const base=gt-10+(k%2)*5;for(let j=0;j<18;j++){const w=(j>>1)+1;q.fillStyle=j%5===0?'#1a4a30':'#1f5a38';q.fillRect(tx-w,base-18+j,w*2+1,1);}q.fillStyle='#4a2e1c';q.fillRect(tx,base,2,4);});
-  for(let y=gt;y<LH;y++)for(let x=0;x<BW;x++){const r=hash2(x>>1,y>>1,1);q.fillStyle=r>.93?'#a5d86a':(r>.5?'#3f8a3a':'#33752f');q.fillRect(x,y,1,1);}
+    q.fillStyle=B.hills[0];q.fillRect(x,h1,1,gt+4-h1);q.fillStyle=B.hills[1];q.fillRect(x,h2,1,gt+4-h2);}
+  if(bi===0)[8,22,36,108,122].forEach((tx,k)=>{const base=gt-10+(k%2)*5;for(let j=0;j<18;j++){const w=(j>>1)+1;q.fillStyle=j%5===0?'#1a4a30':'#1f5a38';q.fillRect(tx-w,base-18+j,w*2+1,1);}q.fillStyle='#4a2e1c';q.fillRect(tx,base,2,4);});
+  else [10,30,116].forEach((tx,k)=>{const base=gt-4+(k%2)*4;for(let j=0;j<20;j++){const w=(j>>2)+1;q.fillStyle='#140b0e';q.fillRect(tx-w,base-20+j,w*2,1);}});   // rock spires
+  for(let y=gt;y<LH;y++)for(let x=0;x<BW;x++){const r=hash2(x>>1,y>>1,1+bi);q.fillStyle=r>B.rare?B.speck:(r>.5?B.ground[0]:B.ground[1]);q.fillRect(x,y,1,1);}
+  return c;
 }
 function circ(cx,cy,r,col){g.fillStyle=col;const n=Math.max(16,Math.round(r*6));for(let i=0;i<n;i++){const a=i/n*Math.PI*2;g.fillRect(Math.round(cx+Math.cos(a)*r),Math.round(cy+Math.sin(a)*r),1,1);}}
 function shadow(cx,cy,rx,ry){g.fillStyle='rgba(0,0,0,.28)';for(let y=-ry;y<=ry;y++){const w=Math.round(rx*Math.sqrt(1-(y*y)/(ry*ry+.01)));g.fillRect(Math.round(cx-w),Math.round(cy+y),w*2,1);}}
@@ -594,14 +667,14 @@ function drawWorld(){
   shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
   const dead=m.state==='dead';
   if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)){
-    const ms=wyvernSpr({hx:p.hx,hy:p.hy,jaw:p.jaw,wing:p.wing,tail:p.tail&~1,horn:!m.parts.head.broken,spike:!m.parts.tail.broken,torn:m.parts.wings.broken,glow:p.glow,rage:m.phase>0?1:0},m.flash>0);
+    const ms=wyvernSpr({hx:p.hx,hy:p.hy,jaw:p.jaw,wing:p.wing,tail:p.tail&~1,horn:!m.parts.head.broken,spike:!m.parts.tail.broken,torn:m.parts.wings.broken,glow:p.glow,rage:m.phase>0?1:0,kind:S.def.kind},m.flash>0);
     g.drawImage(ms,L.mx+p.ox,L.my+p.oy);
   }
   const hp=mHeadPos(p);
   if(m.state==='stagger'){for(let i=0;i<(m.stunned?5:3);i++){const a=S.clock*5+i*2.1;g.fillStyle='#ffe14d';g.fillRect(Math.round(hp.x+4+Math.cos(a)*9),Math.round(hp.y-10+Math.sin(a)*3),2,2);}}
   if(m.phase===2&&!dead&&Math.random()<.3)S.pt.push({x:hp.x-6,y:hp.y+4,vx:rnd(-20,0),vy:rnd(-30,-10),life:.4,col:'#c8d0e8',g:-20});
   if(m.state==='roar'){for(let i=0;i<3;i++)ring(hp.x-4,hp.y+4,6+((m.t*40+i*9)%28),'#e8f0fc');}
-  if(S.qte){const q=S.qte,pp=partPos(q.part,p),u=q.t/QTE_TIME,r=lerp(20,6,u),bl=Math.floor(S.clock*16)%2;       // weak point: a red circle shrinking onto the part
+  if(S.qte){const q=S.qte,pp=partPos(q.part,p),u=q.t/S.qteTime,r=lerp(20,6,u),bl=Math.floor(S.clock*16)%2;       // weak point: a red circle shrinking onto the part
     circ(pp.x,pp.y,6,'#ffffff');circ(pp.x,pp.y,r+1,OUTLINE);circ(pp.x,pp.y,r,bl?'#ff4030':'#ff9a8a');circ(pp.x,pp.y,r-1,'#ff4030');
     g.fillStyle='#fff';g.fillRect(Math.round(pp.x)-1,Math.round(pp.y)-1,3,3);g.fillStyle='#ff4030';g.fillRect(Math.round(pp.x),Math.round(pp.y),1,1);}
   // telegraph: "!" over the monster, and a ring closing on the hunter for every hit on its way
@@ -638,22 +711,22 @@ function fmtTime(s){s=Math.max(0,Math.ceil(s));return((s/60)|0)+':'+('0'+s%60).s
 function drawHud(){
   const h=S.h,m=S.m;
   g.fillStyle=OUTLINE;g.fillRect(0,0,W,HUD_T);
-  text('FERNWING',3,2,'#e8f0fc');
+  text(S.def.name,3,2,'#e8f0fc');
   // part status
   // parts: icon and three pips each, one per weak-point hit
-  [['head','horn'],['wings','wing'],['tail','spike']].forEach(([k,spr],i)=>{const P=m.parts[k],x=40+i*17,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
+  PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=46+i*16,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
     g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,0,9,9);g.globalAlpha=1;
     if(P.broken){g.fillStyle='#e2483d';g.fillRect(x+1,4,7,1);}
-    for(let j=0;j<QTE_HITS;j++){g.fillStyle=j<P.hits?'#ffe14d':act?'#ff4030':'#3a4060';g.fillRect(x+10,6-j*3,3,2);}});
+    for(let j=0;j<S.qteHits;j++){g.fillStyle=j<P.hits?'#ffe14d':act?'#ff4030':'#3a4060';g.fillRect(x+10,6-j*3,3,2);}});
   text(fmtTime(S.timeLeft),W-3,2,S.timeLeft<30?'#ff6a4d':'#c8d0e8',{al:2});
-  bar(3,10,W-6,3,m.hp/M_HP,m.phase===2?'#ff4030':m.phase===1?'#f08030':'#e2483d','#2b2f45');
+  bar(3,10,W-6,3,m.hp/m.max,m.phase===2?'#ff4030':m.phase===1?'#f08030':'#e2483d','#2b2f45');
   g.fillStyle='#000';g.fillRect(3+Math.round((W-6)/3),10,1,3);g.fillRect(3+Math.round((W-6)*2/3),10,1,3);
   const sf=m.stunned&&m.state==='stagger'?1-m.t/m.staggerDur:m.stun/m.stunMax;
   text('STUN',3,14,'#c8d0e8');g.fillStyle='#000';g.fillRect(21,14,W-24,4);g.fillStyle='#2b2f45';g.fillRect(22,15,W-26,2);
   g.fillStyle=m.stunned&&m.state==='stagger'?(Math.floor(S.clock*10)%2?'#fff':'#ffe14d'):'#ffe14d';g.fillRect(22,15,Math.round((W-26)*clamp(sf,0,1)),2);
   // bottom
   g.fillStyle=OUTLINE;g.fillRect(0,L.gy,W,HUD_B);
-  text('HP',4,L.gy+4,'#8a93b0');bar(14,L.gy+4,62,5,h.hp/H_HP,h.hp<30?'#e2483d':'#4cd964','#2b2f45');
+  text('HP',4,L.gy+4,'#8a93b0');bar(14,L.gy+4,62,5,h.hp/h.max,h.hp<h.max*.3?'#e2483d':'#4cd964','#2b2f45');
   text('ST',4,L.gy+14,'#8a93b0');bar(14,L.gy+15,46,3,h.st/100,h.st<DODGE_COST?'#8a6a20':'#f5c542','#2b2f45');
   const b=L.potion;g.fillStyle=h.potions>0?'#c8d0e8':'#3a4060';g.fillRect(b.x,b.y,b.w,b.h);g.fillStyle='#1c2134';g.fillRect(b.x+1,b.y+1,b.w-2,b.h-2);
   const fx=b.x+4,fy=b.y+3;g.fillStyle='#c8d0e8';g.fillRect(fx+2,fy,4,3);g.fillRect(fx,fy+3,8,10);g.fillStyle=h.potions>0?'#e2483d':'#3a4060';g.fillRect(fx+1,fy+6,6,6);g.fillStyle='#6b4a2e';g.fillRect(fx+2,fy-1,4,2);
@@ -661,9 +734,9 @@ function drawHud(){
 }
 function panel(x,y,w,h){g.fillStyle='#000';g.fillRect(x-1,y-1,w+2,h+2);g.fillStyle='#c8d0e8';g.fillRect(x,y,w,h);g.fillStyle='#1c2134';g.fillRect(x+1,y+1,w-2,h-2);}
 function drawTitle(){
-  g.drawImage(BG,-4,0);
+  g.drawImage(bgFor(0),-4,0);
   shadow(L.mx+MS_OX+38,L.mFeet+2,30,5);
-  g.drawImage(wyvernSpr({hx:0,hy:Math.sin(S.t*2.4)>.3?1:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0}),L.mx,L.my);
+  g.drawImage(wyvernSpr({hx:0,hy:Math.sin(S.t*2.4)>.3?1:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0,kind:0}),L.mx,L.my);
   shadow(L.hx+18,L.hFeet+1,9,2);
   g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),L.hx,L.hy);
   g.fillStyle='rgba(10,12,22,.55)';g.fillRect(0,0,W,LH);
@@ -679,28 +752,65 @@ function drawTitle(){
   text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
   text('TAP THE RED CIRCLES:',W/2,y+84,'#ff6a4d',{al:1});
   text('3 HITS BREAK A PART',W/2,y+91,'#c8d0e8',{al:1});
-  if(Math.floor(S.t*2)%2)text('TAP TO HUNT',W/2,y+112,'#fff',{al:1,out:OUTLINE});
+  if(Math.floor(S.t*2)%2)text('TAP TO START',W/2,y+112,'#fff',{al:1,out:OUTLINE});
 }
 function drawLoot(){
   const R=S.loot; g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,0,W,LH);
-  const ph=58+R.drops.length*14, y=Math.max(18,((LH-ph)/2)|0);panel(8,y,W-16,ph);
+  const ph=58+R.drops.length*14+(R.unlock?10:0), y=Math.max(18,((LH-ph)/2)|0);panel(8,y,W-16,ph);
   text('HUNT COMPLETE',W/2,y+6,'#ffe14d',{al:1});
   text('TIME '+fmtTime(R.time)+'  PERFECT '+S.stats.perfect,W/2,y+16,'#8a93b0',{al:1});
   R.drops.forEach((d,i)=>{const at=.5+i*.35;if(S.t<at)return;if(!d.snd){d.snd=1;sfx('loot');}
     const yy=y+27+i*14;g.drawImage(lootSpr(d.id),14,yy-3);text(LOOT[d.id].name,30,yy,d.id==='gem'?'#4cd9c0':'#e8f0fc');text('*'+d.n,W-14,yy,'#ffe14d',{al:2});
     text('BAG '+R.bag[d.id],30,yy+6,'#5a6080');});
-  if(S.t>.8+R.drops.length*.35&&Math.floor(S.t*2)%2)text('TAP TO HUNT AGAIN',W/2,y+ph-11,'#fff',{al:1});
+  if(R.unlock&&S.t>.6+R.drops.length*.35)text('NEW HUNT: '+R.unlock,W/2,y+ph-21,'#ff9a4d',{al:1});
+  if(S.t>.8+R.drops.length*.35&&Math.floor(S.t*2)%2)text('TAP TO CONTINUE',W/2,y+ph-11,'#fff',{al:1});
 }
 function drawFail(){
   g.fillStyle='rgba(30,6,10,.7)';g.fillRect(0,0,W,LH);
   const y=((LH-56)/2)|0;panel(12,y,W-24,56);
   text('HUNT FAILED',W/2,y+8,'#ff6a4d',{al:1});text(S.fail,W/2,y+20,'#c8d0e8',{al:1});
-  text('FERNWING HP '+Math.round(S.m.hp/M_HP*100)+'%',W/2,y+30,'#8a93b0',{al:1});
-  if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETRY',W/2,y+43,'#fff',{al:1});
+  text(S.def.name+' HP '+Math.round(S.m.hp/S.m.max*100)+'%',W/2,y+30,'#8a93b0',{al:1});
+  if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,y+43,'#fff',{al:1});
+}
+function drawCamp(){
+  const B=S.btns=[]; g.drawImage(bgFor(0),-4,0); g.fillStyle='rgba(12,14,26,.86)';g.fillRect(0,0,W,LH);
+  g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('CAMP',4,3,'#ffe14d');text(S.tab==='hunt'?'CHOOSE A HUNT':'FORGE',W-4,3,'#8a93b0',{al:2});
+  const eq=SAVE.eq;
+  if(S.tab==='hunt'){
+    HUNTS.forEach((id,i)=>{const D=MONSTERS[id],y=16+i*64,open=unlocked(id);
+      panel(6,y,116,58);
+      g.save();g.beginPath();g.rect(7,y+1,58,56);g.clip();g.drawImage(bgFor(D.biome),0,L.ground-30,60,58,7,y+1,58,56);
+      g.drawImage(wyvernSpr({hx:0,hy:open&&Math.sin(S.t*2.4+i)>.3?1:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0,kind:D.kind}),1,y-7);g.restore();
+      text(D.name,68,y+5,'#ffe14d');for(let k=0;k<3;k++)text('*',68+k*5,y+13,k<D.stars?'#ff9a4d':'#3a4060');
+      text('HP '+D.hp,68,y+22,'#c8d0e8');text('CIRCLE '+D.qteTime.toFixed(2)+'S',68,y+29,'#c8d0e8');text('WINS '+(SAVE.wins[id]||0),68,y+36,'#8a93b0');
+      if(open){g.fillStyle='#000';g.fillRect(67,y+44,52,11);g.fillStyle='#2f8f4a';g.fillRect(68,y+45,50,9);text('HUNT',93,y+47,'#fff',{al:1});}
+      else{g.fillStyle='rgba(12,14,26,.78)';g.fillRect(7,y+1,114,56);text('LOCKED',W/2,y+20,'#ff6a4d',{al:1,s:2});text('BEAT '+MONSTERS[D.needs].name+' FIRST',W/2,y+38,'#c8d0e8',{al:1});}
+      B.push({id:'hunt:'+id,x:6,y,w:116,h:58,fn:()=>huntTap(id)});});
+    const gy=16+HUNTS.length*64+2, gs=gearStats();
+    text('YOUR GEAR',6,gy,'#8a93b0');
+    [[eq.weapon,'ATTACK *'+gs.atk.toFixed(1)],[eq.armor,'HEALTH '+gs.hp],[eq.charm,eq.charm?GEAR[eq.charm].desc:'']].forEach(([id,st],i)=>{const yy=gy+8+i*8;
+      text(id?GEAR[id].name:'NO CHARM',6,yy,id?'#e8f0fc':'#5a6080');if(i<2)text(st,W-6,yy,'#4cd964',{al:2});});
+  }else{
+    FORGE.forEach((id,i)=>{const G=GEAR[id],y=15+i*25,own=!!SAVE.own[id],on=eq[G.slot]===id,can=!own&&canAfford(id);
+      g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,24);
+      g.drawImage(gearSpr(id),5,y+2);text(G.name,19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');text(G.desc,19,y+9,'#4cd964');
+      if(own)text(on?'EQUIPPED':'OWNED',19,y+17,on?'#ffe14d':'#5a6080');
+      else{let cx=19;for(const [k,n] of Object.entries(G.cost)){const have=SAVE.bag[k]||0,t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,cx,y+15,9,9);text(t,cx+10,y+17,have>=n?'#4cd964':'#ff6a4d');cx+=10+t.length*4+4;}}
+      const lab=on?(G.slot==='charm'?'OFF':'ON'):own?'EQUIP':'CRAFT', bc=on?'#8a6a20':own?'#2a6aa8':can?'#2f8f4a':'#3a4060';
+      g.fillStyle='#000';g.fillRect(W-35,y+2,31,11);g.fillStyle=bc;g.fillRect(W-34,y+3,29,9);text(lab,W-19.5,y+5,own||can?'#fff':'#8a93b0',{al:1});
+      B.push({id:'forge:'+id,x:3,y,w:W-6,h:24,fn:()=>forgeTap(id)});});
+  }
+  // tabs
+  const ty=LH-20;[['hunt','HUNT'],['forge','FORGE']].forEach(([k,lab],i)=>{const x=i*64,act=S.tab===k,craft=k==='forge'&&FORGE.some(id=>!SAVE.own[id]&&canAfford(id));
+    g.fillStyle='#000';g.fillRect(x,ty,64,20);g.fillStyle=act?'#2b3358':'#141826';g.fillRect(x+1,ty+1,62,19);if(act){g.fillStyle='#ffe14d';g.fillRect(x+1,ty+1,62,2);}
+    text(lab,x+32,ty+8,act?'#fff':'#8a93b0',{al:1});if(craft&&Math.floor(S.t*3)%2){g.fillStyle='#4cd964';g.fillRect(x+52,ty+7,4,4);}
+    B.push({id:'tab:'+k,x,y:ty,w:64,h:20,fn:()=>{S.tab=k;sfx('charge',1);}});});
+  if(S.toast){const w=textW(S.toast.txt)+10;g.fillStyle='#000';g.fillRect((W-w)/2-1,LH-37,w+2,13);g.fillStyle='#1c2134';g.fillRect((W-w)/2,LH-36,w,11);text(S.toast.txt,W/2,LH-33,S.toast.col,{al:1});}
 }
 function draw(){
   g.imageSmoothingEnabled=false;
   if(S.mode==='title'){drawTitle();return;}
+  if(S.mode==='camp'){drawCamp();return;}
   drawWorld();drawHud();
   if(S.mode==='loot')drawLoot();else if(S.mode==='fail')drawFail();
 }
@@ -711,7 +821,7 @@ function resize(){
   LH=clamp(Math.round(W*vh/vw),200,284);
   cv.width=W;cv.height=LH;
   const scale=Math.min(vw/W,vh/LH);cv.style.width=Math.floor(W*scale)+'px';cv.style.height=Math.floor(LH*scale)+'px';
-  layout();makeBg();
+  layout();BGS={};BG=bgFor(S.def?S.def.biome:0);
 }
 addEventListener('resize',resize);resize();
 
@@ -722,7 +832,8 @@ function frame(now){
   draw();requestAnimationFrame(frame);
 }
 // test hooks
-Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,actCounter,qteTap,mPose,partPos,ATTACKS,
+Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,actCounter,qteTap,mPose,partPos,ATTACKS,MONSTERS,GEAR,toCamp,forgeTap,canAfford,gearStats,
+  get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);
 </script>
