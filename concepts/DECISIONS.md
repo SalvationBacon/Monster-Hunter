@@ -17,3 +17,8 @@
 - **Monster dodge:** between its attacks the monster turns wary (wings up, no other marker) every few seconds, more often in later phases. The next hit on a wary monster misses as it hops back for about a second, with a "DODGED!" label. It never dodges while attacking, recovering or stunned, so those are the safe times to hit.
 - **Breakable parts (weak points):** head, wings and tail. Every 2 to 3 seconds a red circle shrinks onto one part, taking turns between the unbroken parts, and the player has 0.5s to tap it. Three hits on a part break it: the monster staggers and that part's drop is guaranteed. Normal hits no longer break parts. A one-minute hunt has room for about nine circles, so breaking all three takes near-perfect taps.
 - **Balance (bots, `tools/check.js`):** see the numbers the script prints. A bot that never stops attacking should win in about 45 seconds, so a person lands near a minute.
+
+## Decided for later (not built yet)
+
+- **Weak-point speed scales with the monster:** 0.5s is the baseline for a normal monster like the Fernwing. Harder monsters close their circles faster (0.3s was discussed as a harder setting).
+- **Gear perks for part breaking:** some gear makes breaks easier, for example slower circles, a bigger tap area, or fewer hits needed. This is the counterweight to faster circles on harder monsters.
