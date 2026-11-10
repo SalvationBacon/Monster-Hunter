@@ -18,31 +18,74 @@
 - **Breakable parts (weak points):** head, wings and tail. Every 2 to 3 seconds a red circle shrinks onto one part, taking turns between the unbroken parts, and the player has 0.5s to tap it. Three hits on a part break it: the monster staggers and that part's drop is guaranteed. Normal hits no longer break parts. A one-minute hunt has room for about nine circles, so breaking all three takes near-perfect taps.
 - **Balance (bots, `tools/check.js`):** see the numbers the script prints. A bot that never stops attacking should win in about 45 seconds, so a person lands near a minute.
 
-## The loop around the fight (v0.6.0)
+## The loop around the fight (v0.7.0)
 
-- **Camp:** after the title, a camp screen with two tabs. HUNT lists the monsters; FORGE lists the gear.
-- **Gear slots:** one weapon (attack), one armor (health) and one charm (a perk). Crafting spends materials and equips the piece. Progress is saved on the device.
-- **Monsters are data:** health, damage, attack speed per phase, attack pools, circle speed, dodge frequency, stun threshold and loot table live in one `MONSTERS` table, so a new monster is mostly a new entry plus its sprite.
+- **Camp:** after the title, a camp screen with two tabs. HUNT lists the monsters; FORGE has a page of gear per monster, a starter page and a relics page.
+- **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.
+- **Everything is data:** monsters, weapon types, perks and gear are tables at the top of `index.html`. Gear is generated from them, so a new monster brings its weapons, armor and charm with it.
 
-| Monster | Health | Damage | Circle | Unlock |
-|---|---|---|---|---|
-| Fernwing | 3100 | x1 | 0.50s | from the start |
-| Emberwing | 5400 | x1.5 | 0.38s | first Fernwing win |
+### Monsters
 
-The Emberwing also attacks faster, dodges more often and has a triple bite.
+| Monster | Body | Health | Damage | Circle | Element | Weak to | Unlock |
+|---|---|---|---|---|---|---|---|
+| Fernwing | wyvern | 3100 | x1 | 0.50s | nature | fire | from the start |
+| Tuskhide | brute | 4800 | x1.25 | 0.45s | earth | nature | Fernwing |
+| Emberwing | wyvern | 5800 | x1.5 | 0.38s | fire | earth | Tuskhide |
+| Frostmaw | brute | 7800 | x1.8 | 0.34s | ice | fire | Emberwing |
+| Stormwing | wyvern | 10500 | x2.1 | 0.30s | thunder | ice | Frostmaw |
 
-| Gear | Slot | Effect | Cost |
+Later monsters also attack faster and dodge more often. New attacks: rush (Tuskhide, Frostmaw), triple bite, and lightning bolts (Stormwing). Each monster is weak to the element of the one before it, except the Fernwing (fire) and the Frostmaw (fire).
+
+### Weapon types
+
+All four are owned in iron from the start. A weapon of a monster's tier costs its scales, claws and one part.
+
+| Type | Tap combo | Hold | Notes |
 |---|---|---|---|
-| Fern Blade | weapon | attack +30% | 6 scale, 3 claw, 1 horn |
-| Fern Mail | armor | health 140 | 8 scale, 2 claw, 1 wing |
-| Keen Eye Charm | charm | circles close 40% slower | 1 horn, 1 wing, 1 tail spike |
-| Ember Greatsword | weapon | attack +70% | 6 ember scale, 3 ember claw, 2 ember horn |
-| Ember Plate | armor | health 190 | 8 ember scale, 2 ember wing, 6 fern scale |
-| Breaker Charm | charm | breaks need 2 hits | 2 club tail, 1 ember horn, 2 tail spike |
+| Greatsword | medium | charge a heavy hit, three levels | the all-rounder |
+| Dual Blades | fast, light | keep slashing for +20% damage, on stamina | cheaper dodge, weaker counter |
+| Hammer | slow, heavy | charge a heavy hit | every hit builds stun, head hits most |
+| Lance | medium | guard: a hit costs stamina and 20% damage | a guard raised in the last 0.3s is perfect and opens a counter |
 
-- **Balance (bots, `tools/check.js`):** an average bot beats the Emberwing about half the time in starter gear, reliably in Fernwing gear (about a minute), and faster in Emberwing gear.
+A weapon does 25% more damage to a monster weak to its element.
+
+### Tiers
+
+| Tier | Attack | Armor health | Armor perk | Charm perk |
+|---|---|---|---|---|
+| Iron | x1.0 | 100 | none | none |
+| Fern | x1.3 | 140 | Tireless | Keen Eye |
+| Tusk | x1.5 | 170 | Guardian | Bludgeoner |
+| Ember | x1.75 | 200 | Might | Breaker |
+| Frost | x2.05 | 240 | Nimble | Herbalist |
+| Storm | x2.4 | 290 | Keen Edge | Fortune |
+
+### Perks
+
+Modelled on Monster Hunter's skills, under their own names.
+
+| Perk | Effect |
+|---|---|
+| Tireless | dodge costs 40% less stamina |
+| Guardian | 1 in 4 hits does half damage |
+| Might | attack +10% |
+| Nimble | longer dodge and perfect-dodge windows |
+| Keen Edge | 20% chance of a critical hit for x1.5 |
+| Keen Eye | weak-point circles close 40% slower |
+| Bludgeoner | stun builds 40% faster |
+| Breaker | parts break in 2 hits |
+| Herbalist | one more potion, and potions heal 50% more |
+| Fortune | one more of each common drop, better odds on parts and gems |
+| Quick Draw (relic) | charge 30% faster |
+| Riposte (relic) | counter damage +40% |
+| Weak Spot (relic) | head damage bonus rises from 15% to 40% |
+
+Relic charms each cost a Wyvern Gem (8% drop from any monster) plus parts from two monsters.
+
+- **Balance (bots, `tools/check.js`):** each iron weapon type beats the Fernwing in about 45 seconds. An average bot beats every monster in the gear of the one before it in 45 to 65 seconds, and takes longer or loses in gear two tiers old.
 
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
-- **Harder monsters keep closing circles faster** (0.3s was discussed).
+- **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
+- **Weapon upgrade trees and armor in several pieces**, as in Monster Hunter.

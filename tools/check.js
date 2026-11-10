@@ -29,6 +29,7 @@ const shots=process.argv[2];
     }
     return{mode:S.mode,time:150-S.timeLeft,stats:S.stats,potions:S.h.potions,breaks:['head','wings','tail'].filter(k=>S.m.parts[k].broken),loot:S.loot&&S.loot.drops,fail:S.fail,mhp:Math.round(S.m.hp/S.m.max*100)};
   },{monster,eq,skill,counters});
+  const MH_PRE={fern:'',tusk:'t_',ember:'e_',frost:'f_',storm:'s_'};
   const avg=a=>a.length?Math.round(a.reduce((s,v)=>s+v,0)/a.length):0;
   const trial=async(label,monster,eq,skill)=>{
     const runs=[];for(let i=0;i<6;i++)runs.push(await bot(monster,eq,skill,skill>.5));
@@ -36,36 +37,53 @@ const shots=process.argv[2];
     console.log(`     ${label}: ${wins.length}/6 wins, win time ${avg(wins.map(r=>r.time))}s, damage taken ${avg(runs.map(r=>r.stats.taken))}, counters ${avg(runs.map(r=>r.stats.counters))}, stuns ${avg(runs.map(r=>r.stats.stuns))}, monster dodges ${avg(runs.map(r=>r.stats.evaded))}, circles hit ${avg(runs.map(r=>r.stats.qteHit))} missed ${avg(runs.map(r=>r.stats.qteMiss))}, parts broken ${(runs.reduce((s,r)=>s+r.breaks.length,0)/6).toFixed(1)}, monster hp left on a loss ${avg(runs.filter(r=>r.mode!=='loot').map(r=>r.mhp))}%`);
     return{runs,wins,time:avg(wins.map(r=>r.time))};
   };
-  const START={weapon:'iron',armor:'leather',charm:null}, FERN={weapon:'fblade',armor:'fmail',charm:'keen'}, EMBER={weapon:'eblade',armor:'eplate',charm:'breaker'};
+  const set=(t,wt,charm)=>({weapon:t+'_'+(wt||'gs'),armor:t==='iron'?'leather':t+'_ar',charm:charm===undefined?(t==='iron'?null:t+'_ch'):charm});
   await p.evaluate(()=>{for(const k in MH.GEAR)MH.SAVE.own[k]=true;});
-  console.log('  Fernwing, starter gear');
-  let r=await trial('skilled','fern',START,.95);
+  console.log('  Fernwing, starter greatsword');
+  let r=await trial('skilled','fern',set('iron'),.95);
   ok(r.wins.length===6,'a skilled bot always beats the Fernwing');ok(r.time>30&&r.time<60,'that hunt takes under a minute ('+r.time+'s)');
   ok(r.wins.every(x=>x.breaks.length>=1),'it breaks at least one part');ok(r.wins.every(x=>x.stats.counters>0&&x.stats.stuns>0),'perfect dodges allow counters, and counters stun');
   ok(r.wins.every(x=>x.stats.evaded>0),'the monster dodges some hits');
   ok(r.wins.every(x=>x.breaks.every(k=>x.loot.some(d=>d.id==={head:'horn',wings:'wing',tail:'spike'}[k]))),'broken parts drop their loot');
-  await trial('average','fern',START,.7);await trial('casual','fern',START,.45);
-  r=await trial('never dodges','fern',START,0);ok(r.wins.length<=1,'never dodging loses the hunt');
-  console.log('  Emberwing');
-  const es=await trial('average, starter gear','ember',START,.7);
-  const ef=await trial('average, Fernwing gear','ember',FERN,.7);
-  r=await trial('skilled, Fernwing gear','ember',FERN,.95);ok(r.wins.length>=5,'a skilled bot in Fernwing gear beats the Emberwing');
-  ok(r.wins.every(x=>x.loot.some(d=>d.id==='e_scale')),'the Emberwing drops its own materials');
-  ok(ef.wins.length>es.wins.length||(ef.wins.length===6&&ef.time<es.time),'Fernwing gear makes the Emberwing easier');
-  await trial('casual, Fernwing gear','ember',FERN,.45);
-  const ee=await trial('average, Emberwing gear','ember',EMBER,.7);ok(ee.wins.length>=5&&ee.time<ef.time+1,'Emberwing gear makes it easier still');
-  const tu=await p.evaluate(()=>{MH.manual=true;MH.newHunt('fern');const S=MH.S;S.h.hp=S.h.max=1e9;let t=0;while(S.mode==='hunt'&&t<400){MH.update(1/30);t+=1/30;}return S.fail;});
+  await trial('average','fern',set('iron'),.7);await trial('casual','fern',set('iron'),.45);
+  r=await trial('never dodges','fern',set('iron'),0);ok(r.wins.length<=1,'never dodging loses the hunt');
+  console.log('  Each weapon type against the Fernwing (average bot)');
+  for(const wt of ['gs','db','hm','ln']){r=await trial(await p.evaluate(w=>MH.WTYPES[w].name,wt),'fern',set('iron',wt),.7);ok(r.wins.length>=5&&r.time>30&&r.time<75,'the iron '+wt+' wins in about a minute ('+r.time+'s)');}
+  console.log('  The ladder: each monster in the gear of the one before (average bot), then in its own gear');
+  const order=await p.evaluate(()=>MH.HUNTS);
+  for(let i=1;i<order.length;i++){
+    const prev=await trial(order[i]+' in '+order[i-1]+' gear',order[i],set(order[i-1]),.7);
+    ok(prev.wins.length>=4&&prev.time<110,order[i]+' is beatable in '+order[i-1]+' gear ('+prev.wins.length+'/6, '+prev.time+'s)');
+    ok(prev.wins.every(x=>x.loot.some(d=>d.id===MH_PRE[order[i]]+'scale')),order[i]+' drops its own materials');
+    if(i>=2){const old=await trial(order[i]+' in '+order[i-2]+' gear',order[i],set(order[i-2]),.7);ok(old.wins.length<prev.wins.length||old.time>prev.time,'older gear makes '+order[i]+' harder');}
+  }
+  r=await trial('storm in storm gear','storm',set('storm'),.7);ok(r.wins.length>=5,'the Stormwing falls to its own gear');
+  // perks and weapon rules, checked directly
+  ok(await p.evaluate(()=>{MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'ember_gs',armor:'ember_ar',charm:'relic_weak'});const g=MH.gearStats();return g.elem==='fire'&&Math.abs(g.atk-1.925)<1e-6&&g.perks.might&&g.perks.weakspot&&g.hp===200;}),'gear adds up: element, attack with Might, health, perks');
+  ok(await p.evaluate(()=>{const hit=(w,mon)=>{MH.SAVE.eq.weapon=w;MH.SAVE.eq.armor='leather';MH.SAVE.eq.charm=null;MH.newHunt(mon);const S=MH.S;S.m.evadeCd=99;let n=0;for(let k=0;k<40;k++){S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<8;i++)MH.update(1/60);n+=S.stats.dealt;S.m.hp=S.m.max;S.m.phase=0;S.m.roarDue=false;}return n/40;};
+    const a=hit('ember_gs','frost'),b=hit('ember_gs','tusk');return a/b>1.2&&a/b<1.3;}),'a weapon does 25% more to a monster weak to its element');
+  ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_ln',armor:'leather',charm:null});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=99;m.wait=0;m.qteT=99;MH.update(1/60);
+    Object.assign(MH.IN,{down:true,swiped:false,downAt:-9});let t=0;while(m.state==='attack'&&m.hi===0&&t<3){S.h.state='guard';S.h.t=1;MH.update(1/60);t+=1/60;}MH.IN.down=false;
+    return S.stats.guards===1&&S.stats.taken>0&&S.stats.taken<=4&&S.h.st<100&&S.h.state!=='hurt';}),'a lance guard blocks a hit for chip damage and stamina');
+  ok(await p.evaluate(()=>{MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=99;m.wait=0;m.qteT=99;MH.update(1/60);let t=0;
+    while(m.state==='attack'&&m.hi===0&&t<3){if(m.hits[0]-m.t<.1&&S.h.state!=='guard'){Object.assign(MH.IN,{down:true,swiped:false,downAt:-9});S.h.state='guard';S.h.t=0;}MH.update(1/60);t+=1/60;}MH.IN.down=false;
+    return S.h.counter>0&&S.stats.taken===0;}),'a guard raised just in time is perfect and opens a counter');
+  ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:'frost_ch'});MH.newHunt('fern');return MH.S.h.potions===3;}),'Herbalist adds a potion');
+  await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:null});});
+  const tu=await p.evaluate(()=>{MH.manual=true;MH.newHunt('fern');const S=MH.S;S.h.hp=S.h.max=1e9;S.m.hp=S.m.max=1e9;let t=0;while(S.mode==='hunt'&&t<400){MH.update(1/30);t+=1/30;}return S.fail;});
   ok(tu==='TIME UP','the hunt ends when time runs out');
 
   // screenshots of the fights
   const until=(cond,max=40)=>p.evaluate(({c,max})=>{const f=new Function('S','MH','return '+c);const S=MH.S;let t=0;while(!f(S,MH)&&t<max){if(S.h.state==='idle'&&S.m.state!=='attack')MH.actTap('head');MH.update(1/60);t+=1/60;}return t<max;},{c:cond,max});
   if(shots){
-    await p.evaluate(()=>{MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'iron',armor:'leather',charm:null});MH.newHunt('fern');MH.S.h.hp=MH.S.h.max=1e6;});
-    await until("S.qte&&S.qte.t>.2",120);await shot('fern-circle');
-    await p.evaluate(()=>{MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'fblade',armor:'fmail',charm:'keen'});MH.newHunt('ember');MH.S.h.hp=MH.S.h.max=1e6;});
-    await until("S.m.state==='attack'&&S.m.hits[0]-S.m.t<.3");await shot('ember-telegraph');
-    await p.evaluate(()=>{MH.S.m.hp=MH.S.m.max*.6;});await until("S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",200);await shot('ember-fire');
-    await p.evaluate(()=>{MH.S.m.hp=10;});await until("S.mode==='loot'",60);await p.evaluate(()=>{MH.S.t=5;});await shot('ember-loot');
+    const scene=async(mon,eq,cond,name,max)=>{await p.evaluate(({mon,eq})=>{MH.manual=true;Object.assign(MH.SAVE.eq,eq);MH.newHunt(mon);MH.S.h.hp=MH.S.h.max=1e6;MH.S.m.hp=MH.S.m.max*.6;},{mon,eq});await until(cond,max||200);await shot(name);};
+    await scene('fern',set('iron','db'),"S.qte&&S.qte.t>.2",'fern-circle');
+    await scene('tusk',set('fern','hm'),"S.m.state==='attack'&&S.m.atk==='rush'&&S.m.hits[0]-S.m.t<.25",'tusk-rush');
+    await scene('ember',set('tusk','gs'),"S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",'ember-fire');
+    await scene('frost',set('ember','ln'),"S.m.state==='attack'&&S.m.atk==='fire'&&S.m.t>S.m.hits[0]+.2",'frost-breath');
+    await p.evaluate(()=>{MH.S.h.state='guard';MH.S.h.t=1;});await shot('frost-guard');
+    await scene('storm',set('frost','db'),"S.m.state==='attack'&&S.m.atk==='bolt'&&S.m.t>S.m.hits[0]+.02",'storm-bolt');
+    await scene('storm',set('storm','gs'),"S.m.state==='stagger'&&S.m.t>.3",'storm-stagger',400);
   }
 
   // ── camp, on a fresh save, with real taps ──
@@ -75,18 +93,22 @@ const shots=process.argv[2];
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await p.evaluate(()=>MH.S.mode==='camp'&&MH.S.tab==='hunt'),'a tap on the title opens the camp');
   await shot('camp-hunt-locked');
-  await tapBtn('hunt:ember');ok(await p.evaluate(()=>MH.S.mode==='camp'),'the Emberwing is locked on a fresh save');
+  await tapBtn('hunt:tusk');ok(await p.evaluate(()=>MH.S.mode==='camp'),'the Tuskhide is locked on a fresh save');
   await tapBtn('tab:forge');ok(await p.evaluate(()=>MH.S.tab==='forge'),'the FORGE tab opens');
-  await tapBtn('forge:fblade');ok(await p.evaluate(()=>!MH.SAVE.own.fblade&&MH.SAVE.eq.weapon==='iron'),'gear cannot be crafted without materials');
+  ok(await p.evaluate(()=>MH.S.btns.some(b=>b.id==='forge:iron_ln')),'the forge opens on the starter gear');
+  await tapBtn('forge:iron_ln');ok(await p.evaluate(()=>MH.SAVE.eq.weapon==='iron_ln'),'a starter weapon of another type can be equipped');await tapBtn('forge:iron_gs');
+  await shot('camp-forge-starter');
+  await tapBtn('page:next');ok(await p.evaluate(()=>MH.S.btns.some(b=>b.id==='forge:fern_gs')),'the next page shows the Fernwing gear');
+  await tapBtn('forge:fern_gs');ok(await p.evaluate(()=>!MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='iron_gs'),'gear cannot be crafted without materials');
   await p.evaluate(()=>{Object.assign(MH.SAVE.bag,{scale:9,claw:4,horn:2,wing:1,spike:1});});await shot('camp-forge');
-  await tapBtn('forge:fblade');
-  ok(await p.evaluate(()=>MH.SAVE.own.fblade&&MH.SAVE.eq.weapon==='fblade'&&MH.SAVE.bag.scale===3&&MH.SAVE.bag.claw===1&&MH.SAVE.bag.horn===1),'crafting spends the materials and equips the gear');
-  ok(await p.evaluate(()=>MH.gearStats().atk===1.3),'the Fern Blade raises attack');
-  await tapBtn('forge:keen');ok(await p.evaluate(()=>MH.SAVE.eq.charm==='keen'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
-  await tapBtn('forge:keen');ok(await p.evaluate(()=>MH.SAVE.eq.charm===null),'a worn charm can be taken off');await tapBtn('forge:keen');
+  await tapBtn('forge:fern_gs');
+  ok(await p.evaluate(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.bag.scale===4&&MH.SAVE.bag.claw===2&&MH.SAVE.bag.horn===1),'crafting spends the materials and equips the gear');
+  ok(await p.evaluate(()=>MH.gearStats().atk===1.3&&MH.gearStats().elem==='nature'),'the Fern Greatsword raises attack and carries its element');
+  await tapBtn('forge:fern_ch');ok(await p.evaluate(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
+  await tapBtn('forge:fern_ch');ok(await p.evaluate(()=>MH.SAVE.eq.charm===null),'a worn charm can be taken off');await tapBtn('forge:fern_ch');
   await shot('camp-forge-crafted');
   await p.reload();await p.waitForTimeout(200);
-  ok(await p.evaluate(()=>MH.SAVE.own.fblade&&MH.SAVE.eq.weapon==='fblade'&&MH.SAVE.eq.charm==='keen'&&MH.SAVE.bag.scale===3),'gear and materials survive a reload');
+  ok(await p.evaluate(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.eq.charm==='fern_ch'&&MH.SAVE.bag.scale===4),'gear and materials survive a reload');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   await tapBtn('hunt:fern');
   ok(await p.evaluate(()=>MH.S.mode==='hunt'&&MH.S.def.id==='fern'&&MH.S.h.atk===1.3&&Math.abs(MH.S.qteTime-.7)<1e-9),'a tap on the Fernwing card starts the hunt with the worn gear');
@@ -115,8 +137,8 @@ const shots=process.argv[2];
   ok(await p.evaluate(()=>MH.S.m.parts.tail.hits===1&&!MH.S.qte),'a tap on a red circle counts as a weak-point hit');
   ok(await p.evaluate(()=>{const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'tail',t:0};const pp=MH.partPos('tail',MH.mPose());MH.qteTap(pp.x,pp.y);}return S.m.parts.tail.broken&&S.m.state==='stagger';}),'three hits break the part');
   ok(await p.evaluate(()=>{const S=MH.S;S.qte={part:'head',t:0};for(let i=0;i<60;i++)MH.update(1/60);const r=!S.qte&&S.m.parts.head.hits===0;MH.manual=false;return r;}),'an untouched circle times out');
-  ok(await p.evaluate(()=>{MH.manual=true;MH.SAVE.eq.charm='breaker';MH.SAVE.own.breaker=true;MH.newHunt('fern');const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);}
-    const r=S.m.parts.head.broken;MH.SAVE.eq.charm='keen';delete MH.SAVE.own.breaker;MH.newHunt('fern');MH.manual=false;return r;}),'the Breaker Charm breaks a part in two hits');
+  ok(await p.evaluate(()=>{MH.manual=true;MH.SAVE.eq.charm='ember_ch';MH.SAVE.own.ember_ch=true;MH.newHunt('fern');const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);}
+    const r=S.m.parts.head.broken;MH.SAVE.eq.charm='fern_ch';delete MH.SAVE.own.ember_ch;MH.newHunt('fern');MH.manual=false;return r;}),'the Breaker Charm breaks a part in two hits');
   await quiet();
   await p.evaluate(()=>{MH.S.h.hp=40;});
   await touch('touchStart',200,600);await touch('touchMove',202,560);await touch('touchMove',203,520);await touch('touchEnd');await p.waitForTimeout(900);
@@ -130,15 +152,19 @@ const shots=process.argv[2];
   ok(await p.evaluate(d=>MH.S.stats.dealt-d>=100&&MH.S.m.stun>=40,cb.d),'the counter lands a big hit and fills the stun meter');
   // win → loot → camp, with the Emberwing unlocked
   await p.evaluate(()=>{const S=MH.S;S.m.hp=1;S.m.state='idle';S.h.state='idle';MH.actTap('head');for(let i=0;i<400&&S.mode==='hunt';i++)MH.update(1/60);S.t=5;MH.manual=false;});
-  ok(await p.evaluate(()=>MH.S.mode==='loot'&&MH.S.loot.unlock==='EMBERWING'&&MH.SAVE.wins.fern===1),'the first Fernwing win unlocks the Emberwing');
+  ok(await p.evaluate(()=>MH.S.mode==='loot'&&MH.S.loot.unlock==='TUSKHIDE'&&MH.SAVE.wins.fern===1),'the first Fernwing win unlocks the Tuskhide');
   await shot('loot-unlock');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await p.evaluate(()=>MH.S.mode==='camp'),'a tap on the loot screen returns to camp');await shot('camp-hunt');
-  await tapBtn('hunt:ember');ok(await p.evaluate(()=>MH.S.mode==='hunt'&&MH.S.def.id==='ember'&&MH.S.m.max===MH.MONSTERS.ember.hp),'the Emberwing hunt now starts');
+  await tapBtn('hunt:tusk');ok(await p.evaluate(()=>MH.S.mode==='hunt'&&MH.S.def.id==='tusk'&&MH.S.m.max===MH.MONSTERS.tusk.hp),'the Tuskhide hunt now starts');
   await p.setViewportSize({width:1280,height:720});await p.waitForTimeout(150);
   ok(await p.evaluate(()=>{const r=document.getElementById('c').getBoundingClientRect();return r.height<=innerHeight+1&&r.width<=innerWidth&&r.height>innerHeight*.9;}),'the canvas fits a desktop window');
-  await p.evaluate(()=>MH.toCamp('forge'));await p.waitForTimeout(150);await shot('camp-forge-short');
-  ok(await p.evaluate(()=>MH.S.btns.every(b=>b.y+b.h<=MH.LH)&&MH.S.btns.filter(b=>b.id.startsWith('forge:')).every(b=>b.y+b.h<=MH.LH-20)),'the forge list fits the shortest screen');
+  await p.evaluate(()=>{MH.toCamp('forge');MH.S.fpage=2;});await p.waitForTimeout(150);await shot('camp-forge-short');
+  ok(await p.evaluate(()=>MH.S.btns.filter(b=>b.id.startsWith('forge:')).length===6&&MH.S.btns.filter(b=>b.id.startsWith('forge:')).every(b=>b.y+b.h<=MH.LH-20)),'a full forge page fits the shortest screen');
+  await p.evaluate(()=>{MH.toCamp('hunt');});await p.waitForTimeout(150);await shot('camp-hunt-short');
+  ok(await p.evaluate(()=>MH.S.btns.filter(b=>b.id.startsWith('hunt:')).length===5&&MH.S.btns.filter(b=>b.id.startsWith('hunt:')).every(b=>b.y+b.h<=MH.LH-20)),'all five hunts fit the shortest screen');
+  ok(await p.evaluate(()=>{const v={bag:{scale:2},own:{iron:true,fblade:true,keen:true},eq:{weapon:'fblade',armor:'leather',charm:'keen'},wins:{fern:2,ember:1}};localStorage.setItem('mh_save_v1',JSON.stringify(v));const s=MH.loadSave();
+    return s.eq.weapon==='fern_gs'&&s.eq.charm==='fern_ch'&&s.own.fern_gs&&s.own.iron_hm&&!s.own.fblade&&s.bag.scale===2;}),'a save from the last version keeps its gear under the new names');
   ok(errs.length===0,'no page errors'+(errs.length?': '+errs.join(' | '):''));
   await b.close();process.exit(fail?1:0);
 })();
