@@ -24,6 +24,7 @@ const shots=process.argv[2];
       if(S.qte&&S.qte.t>S.qteTime*.55&&qdec!==S.qte){qdec=S.qte;if(Math.random()<skill){const pp=MH.partPos(S.qte.part,MH.mPose());MH.qteTap(pp.x,pp.y);}}
       if(counters&&h.counter>0&&h.state!=='counter')MH.actCounter();
       if(h.state==='frozen')MH.actTap('head');
+      if(h.sharp<25&&h.state==='idle'&&m.state!=='attack'&&m.state!=='idle')MH.actSharpen();
       if(h.burn>0&&skill>.5&&h.st>70&&h.state==='idle'&&m.state!=='attack')MH.actDodge(-1);
       if(h.hp<h.max*.5&&h.potions>0&&h.state==='idle'&&m.state!=='attack')MH.actPotion();
       else if(h.state==='idle')MH.actTap('head');
@@ -68,11 +69,12 @@ const shots=process.argv[2];
   const dv=Object.values(dps).map(v=>v.dps);ok(Math.max(...dv)/Math.min(...dv)<1.06,'all four weapon types deal the same tap damage per second, within 6%');
   ok(dps.db.rate>dps.ln.rate&&dps.ln.rate>dps.gs.rate&&dps.gs.rate>dps.hm.rate&&dps.db.rate/dps.hm.rate>2.5,'dual blades hit fastest, then lance, greatsword, hammer');
   // upgrades
-  ok(await p.evaluate(()=>{const S=MH.SAVE;S.lv={};S.bag={scale:99,claw:99,horn:9,wing:9,spike:9,t_scale:99};Object.assign(S.eq,{weapon:'fern_gs',armor:'fern_ar',charm:null});
+  ok(await p.evaluate(()=>{const S=MH.SAVE;S.lv={};S.bag={scale:99,claw:99,horn:9,wing:9,spike:9,t_scale:99,rare:2};Object.assign(S.eq,{weapon:'fern_gs',armor:'fern_ar',charm:null});
     const c1=JSON.stringify(MH.upCost('fern_gs'));MH.upgradeTap('fern_gs');const a1=MH.gearStats().atk,sc=S.bag.scale;
     for(let i=0;i<9;i++)MH.upgradeTap('fern_gs');for(let i=0;i<9;i++)MH.upgradeTap('fern_ar');const g=MH.gearStats();
-    return c1==='{"scale":3,"claw":1}'&&Math.abs(a1-1.404)<1e-6&&sc===96&&MH.lvOf('fern_gs')===5&&Math.abs(g.atk-1.82)<1e-6&&g.hp===196&&MH.upCost('fern_gs')===null&&S.bag.t_scale===99-6-6;}),
-    'upgrades cost materials, add 8% a level, stop at +5, and the last levels need the next monster\'s scales');
+    return c1==='{"scale":3,"claw":1}'&&Math.abs(a1-1.404)<1e-6&&sc===96&&MH.lvOf('fern_gs')===5&&Math.abs(g.atk-1.82)<1e-6&&g.hp===196&&MH.upCost('fern_gs')===null&&S.bag.t_scale===99-6-6&&S.bag.rare===0;}),
+    'upgrades cost materials, add 8% a level, stop at +5, and the last levels need the next monster\'s scales and the rare drop');
+  ok(await p.evaluate(()=>{const S=MH.SAVE;S.lv={fern_gs:4};S.bag={scale:99,claw:99,horn:9,wing:9,t_scale:99};MH.upgradeTap('fern_gs');const no=MH.lvOf('fern_gs')===4;S.lv={};S.bag={};return no;}),'+5 cannot be reached without the rare drop');
   ok(await p.evaluate(()=>{MH.SAVE.bag={};MH.SAVE.lv={};const b=MH.lvOf('fern_gs');MH.upgradeTap('fern_gs');return MH.lvOf('fern_gs')===0&&MH.upCost('fern_ch')===null;}),'no upgrade without materials, and charms have no levels');
   ok(await p.evaluate(()=>{const taken=ar=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:ar,charm:null});let n=0;for(let k=0;k<12;k++){MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}
       const A=MH.ATTACKS[m.atk];n+=S.stats.taken/Math.round(A.dmg*1.5);}return n/12;};const a=taken('ember_ar'),b=taken('frost_ar');return Math.abs(a-.75)<.06&&Math.abs(b-1)<.01;}),'armor takes 25% less from its own monster\'s element');
@@ -96,10 +98,24 @@ const shots=process.argv[2];
     S.h.state='idle';S.h.counter=1;MH.actCounter();for(let i=0;i<30;i++)MH.update(1/60);return half&&drained&&over&&!m.over&&m.charge<5&&m.state==='stagger';}),'the Stormwing builds charge, a counter drains it, and overcharge is knocked out by a counter');
   ok(await p.evaluate(()=>{MH.newHunt('storm');const m=MH.S.m;m.over=true;m.wait=0;m.qteT=1e9;MH.update(1/60);const fast=m.hits[0];MH.newHunt('storm');const n=MH.S.m;n.wait=0;n.qteT=1e9;let slow=0;for(let k=0;k<40&&!slow;k++){MH.newHunt('storm');MH.S.m.wait=0;MH.update(1/60);if(MH.S.m.atk===m.atk)slow=MH.S.m.hits[0];}
     return slow&&Math.abs(fast/slow-.8)<.01;}),'an overcharged Stormwing attacks faster');
+  // sharpness, weapon statuses, rare drops
+  ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:null});const dmg=sh=>{MH.newHunt('storm');const S=MH.S,m=S.m;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;S.h.inv=1e9;let n=0;
+      for(let k=0;k<30;k++){S.h.sharp=sh;S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<16;i++)MH.update(1/60);n+=S.stats.dealt;}return n/30;};
+    const keen=dmg(100),mid=dmg(50),dull=dmg(10);return Math.abs(keen/mid-1.1)<.03&&Math.abs(dull/mid-.75)<.03;}),'a keen edge hits 10% harder and a dull one 25% softer');
+  ok(await p.evaluate(()=>{MH.newHunt('storm');const S=MH.S,m=S.m,h=S.h;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;h.inv=1e9;let t=0;while(h.sharp>=MH.SHARP.lo&&t<60){MH.actTap('body');MH.update(1/60);t+=1/60;}
+    const wore=t>15&&t<35;h.state='idle';MH.actSharpen();const busy=h.state==='sharpen';for(let i=0;i<90;i++)MH.update(1/60);const done=h.sharp===100&&h.state==='idle';
+    h.sharp=40;MH.actSharpen();h.inv=0;m.wait=0;let u=0;while(h.state==='sharpen'&&u<4){MH.update(1/60);u+=1/60;}return wore&&busy&&done&&h.sharp===40&&h.state!=='sharpen';}),'the edge dulls in about 25 seconds of hitting, sharpening restores it, and a hit interrupts it');
+  ok(await p.evaluate(()=>{const run=(w)=>{Object.assign(MH.SAVE.eq,{weapon:w,armor:'leather',charm:null});MH.newHunt('tusk');const S=MH.S,m=S.m;m.hp=m.max=1e7;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;S.h.inv=1e9;let st=0,pz=0;
+      for(let i=0;i<60*25;i++){S.h.sharp=50;MH.actTap('body');MH.update(1/60);if(m.state==='stagger')st++;if(m.mpoison>0)pz++;}return{procs:S.stats.procs||0,sd:S.stats.statusDmg||0,st,pz};};
+    const po=run('fern_gs'),bl=run('ember_gs'),pa=run('storm_gs'),no=run('tusk_gs');
+    return po.procs>=2&&po.sd>0&&po.pz>0&&bl.procs>=2&&bl.sd>=2*150*1.75&&pa.procs>=1&&pa.st>100&&no.procs===0&&MH.GEAR.tusk_gs.atk===1.62;}),'poison, blast and paralysis weapons each trigger their effect, and plain weapons hit 8% harder instead');
+  ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_gs',armor:'leather',charm:null});const roll=(breaks,dry)=>{let n=0;for(let i=0;i<4000;i++){MH.SAVE.dry.fern=dry;MH.newHunt('fern');for(const k of ['head','wings','tail'].slice(0,breaks))MH.S.m.parts[k].broken=true;
+      if(MH.rollLoot().drops.some(d=>d.id==='rare'))n++;}return n/4000;};const a=roll(0,0),b=roll(3,0),c=roll(0,20);MH.SAVE.bag={};MH.SAVE.wins={};MH.SAVE.dry={};
+    return a>.015&&a<.05&&b>.09&&b<.15&&c>.1&&c<.16;}),'the rare drop is about 3%, 12% with every part broken, and creeps up over a dry streak');
   // perks and weapon rules, checked directly
   ok(await p.evaluate(()=>{MH.manual=true;Object.assign(MH.SAVE.eq,{weapon:'ember_gs',armor:'ember_ar',charm:'relic_weak'});const g=MH.gearStats();return g.elem==='fire'&&Math.abs(g.atk-1.925)<1e-6&&g.perks.might&&g.perks.weakspot&&g.hp===200;}),'gear adds up: element, attack with Might, health, perks');
   ok(await p.evaluate(()=>{const hit=(w,mon)=>{MH.SAVE.eq.weapon=w;MH.SAVE.eq.armor='leather';MH.SAVE.eq.charm=null;MH.newHunt(mon);const S=MH.S;S.m.evadeCd=99;let n=0;for(let k=0;k<40;k++){S.stats.dealt=0;S.h.state='idle';S.h.comboT=0;MH.actTap('body');for(let i=0;i<16;i++)MH.update(1/60);n+=S.stats.dealt;S.m.hp=S.m.max;S.m.phase=0;S.m.roarDue=false;S.m.wait=1e9;S.m.state='idle';S.h.inv=1e9;}return n/40;};
-    MH.SAVE.lv={};const a=hit('ember_gs','frost'),b=hit('ember_gs','storm');return a/b>1.2&&a/b<1.3;}),'a weapon does 25% more to a monster weak to its element');
+    MH.SAVE.lv={};const a=hit('tusk_gs','ember'),b=hit('tusk_gs','storm');return a/b>1.2&&a/b<1.3;}),'a weapon does 25% more to a monster weak to its element');
   ok(await p.evaluate(()=>{Object.assign(MH.SAVE.eq,{weapon:'iron_ln',armor:'leather',charm:null});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=99;m.wait=0;m.qteT=99;MH.update(1/60);
     Object.assign(MH.IN,{down:true,swiped:false,downAt:-9});let t=0;while(m.state==='attack'&&m.hi===0&&t<3){S.h.state='guard';S.h.t=1;MH.update(1/60);t+=1/60;}MH.IN.down=false;
     return S.stats.guards===1&&S.stats.taken>0&&S.stats.taken<=4&&S.h.st<100&&S.h.state!=='hurt';}),'a lance guard blocks a hit for chip damage and stamina');
@@ -132,6 +148,9 @@ const shots=process.argv[2];
     await scene('storm',set('frost','db'),"S.m.state==='attack'&&S.m.atk==='hover'&&S.m.t>S.m.hits[1]+.02",'storm-hover',400);
     await p.evaluate(()=>{MH.newHunt('storm');MH.S.m.charge=99.5;MH.S.m.wait=99;for(let i=0;i<40;i++)MH.update(1/60);});await shot('storm-overcharged');
     await p.evaluate(()=>{MH.newHunt('storm');for(let i=0;i<50;i++)MH.update(1/60);});await shot('storm-intro');
+    await scene('tusk',set('fern','gs'),"S.m.mpoison>0&&S.h.sharp<25",'status-poison',900);
+    await p.evaluate(()=>{MH.S.h.state='idle';MH.S.m.wait=99;MH.actSharpen();for(let i=0;i<30;i++)MH.update(1/60);});await shot('sharpening');
+    await p.evaluate(()=>{MH.SAVE.dry.fern=1e4;MH.newHunt('fern');MH.S.m.hp=1;MH.S.m.evadeCd=99;MH.actTap('head');for(let i=0;i<400&&MH.S.mode==='hunt';i++)MH.update(1/60);MH.S.t=5.1;MH.SAVE.dry={};});await shot('rare-drop');
   }
 
   // ── camp, on a fresh save, with real taps ──
@@ -153,6 +172,7 @@ const shots=process.argv[2];
   ok(await p.evaluate(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.bag.scale===4&&MH.SAVE.bag.claw===2&&MH.SAVE.bag.horn===1),'crafting spends the materials and equips the gear');
   ok(await p.evaluate(()=>MH.gearStats().atk===1.3&&MH.gearStats().elem==='nature'),'the Fern Greatsword raises attack and carries its element');
   await tapBtn('forge:fern_ch');ok(await p.evaluate(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
+  ok(await p.evaluate(()=>MH.GEAR.fern_gs.status==='poison'&&MH.gearStats().status==='poison'),'the Fern Greatsword carries poison');
   await tapBtn('forge:fern_ch');ok(await p.evaluate(()=>MH.SAVE.eq.charm===null),'a worn charm can be taken off');await tapBtn('forge:fern_ch');
   ok(await tapBtn('up:fern_gs')&&await p.evaluate(()=>MH.lvOf('fern_gs')===1&&MH.SAVE.bag.scale===1&&MH.SAVE.bag.claw===1&&MH.SAVE.eq.weapon==='fern_gs'),'a tap on UP upgrades the weapon and spends materials');
   await shot('camp-forge-crafted');
@@ -188,6 +208,14 @@ const shots=process.argv[2];
   ok(await p.evaluate(()=>{const S=MH.S;S.qte={part:'head',t:0};for(let i=0;i<60;i++)MH.update(1/60);const r=!S.qte&&S.m.parts.head.hits===0;MH.manual=false;return r;}),'an untouched circle times out');
   ok(await p.evaluate(()=>{MH.manual=true;MH.SAVE.eq.charm='ember_ch';MH.SAVE.own.ember_ch=true;MH.newHunt('fern');const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);}
     const r=S.m.parts.head.broken;MH.SAVE.eq.charm='fern_ch';delete MH.SAVE.own.ember_ch;MH.newHunt('fern');MH.manual=false;return r;}),'the Breaker Charm breaks a part in two hits');
+  await quiet();
+  const sbtn=await p.evaluate(()=>{MH.S.h.sharp=30;const r=document.getElementById('c').getBoundingClientRect(),q=MH.L.sharp;return{x:r.left+(q.x+q.w/2)/128*r.width,y:r.top+(q.y+q.h/2)/MH.LH*r.height};});
+  await p.touchscreen.tap(sbtn.x,sbtn.y);await p.waitForTimeout(80);
+  ok(await p.evaluate(()=>MH.S.h.state==='sharpen'),'a tap on the whetstone button starts sharpening');await p.waitForTimeout(1500);
+  ok(await p.evaluate(()=>MH.S.h.sharp===100),'and the edge comes back');
+  await quiet();await p.evaluate(()=>{MH.S.h.sharp=30;});
+  await touch('touchStart',200,560);await touch('touchMove',202,600);await touch('touchMove',203,640);await touch('touchEnd');await p.waitForTimeout(80);
+  ok(await p.evaluate(()=>MH.S.h.state==='sharpen'),'a swipe down sharpens too');await p.waitForTimeout(1500);
   await quiet();
   await p.evaluate(()=>{MH.S.h.hp=40;});
   await touch('touchStart',200,600);await touch('touchMove',202,560);await touch('touchMove',203,520);await touch('touchEnd');await p.waitForTimeout(900);

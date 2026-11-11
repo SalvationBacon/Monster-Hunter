@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.9.0).** Five monsters, each with its own moves, animations and signature mechanic, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
+**Current state: prototype (v0.10.0).** Five monsters, each with its own moves, animations and signature mechanic, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -14,8 +14,9 @@ Open `index.html` in a browser. It is one file with no dependencies. Progress is
 | Hold | The weapon's skill: charge (greatsword, hammer), keep slashing (dual blades), guard (lance) |
 | Swipe left or right | Dodge roll. Dodge just as the ring closes for a PERFECT, then tap COUNTER |
 | Swipe up, or the potion button | Drink a potion |
+| Swipe down, or the whetstone button | Sharpen the weapon |
 
-Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` potion.
+Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` potion, `S` sharpen.
 
 ## The loop
 1. Hunt a monster. Break its head, back or wings, and tail for their drops.

@@ -86,6 +86,20 @@ A weapon does 25% more damage to a monster weak to its element.
 - **Resistance:** armor takes 25% less damage from its own monster's element. The hunt card shows each monster's element, and "-25%" when the worn armor resists it.
 - **Not a tree yet:** upgrades are a straight line of levels. Branching paths, where one weapon turns into another, are not built.
 
+### Weapon statuses, sharpness and rare drops (v0.10.0)
+
+- **Weapon statuses:** three monsters' weapons build a status on the monster as well as carrying an element. Build-up is half the hit's base damage, so every weapon type builds at the same rate, and the threshold grows 40% each time.
+
+| Status | Weapons | Trigger | Effect |
+|---|---|---|---|
+| Poison | Fernwing | 220 | 8s of damage, 12 x attack per half second. Never lands the kill |
+| Blast | Emberwing | 180 | one explosion for 150 x attack |
+| Paralysis | Stormwing | 300 | the monster is held still for 3s |
+
+  Tuskhide and Frostmaw weapons have no status and hit 8% harder instead.
+- **Sharpness:** a meter that wears with every hit, by the hit's base damage. Above 60 the edge is keen (+10% damage), below 25 it is dull (-25%). It dulls after about 25 seconds of steady hitting. Sharpening takes 1.3s (whetstone button, or swipe down), leaves the hunter open, and a hit interrupts it.
+- **Rare drops:** every monster has one (Heartleaf, Ivory Core, Magma Heart, Rime Heart, Storm Core). The chance per win is 3%, plus 3% for each broken part, plus 0.5% for every win since the last one, doubled by Fortune. The +5 upgrade of that monster's gear needs one.
+
 ### Perks
 
 Perks are kept modest on purpose (most are 10% to 40% on one narrow thing), to leave room for a rebirth system later.
@@ -116,6 +130,8 @@ Relic charms each cost a Wyvern Gem (8% drop from any monster) plus parts from t
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
+- **Camp systems, to be designed together:** pre-hunt meals, gathering mini-game, terrarium of caught creatures with small buffs, quests (daily, weekly, main story, side), smaller hunts, a companion.
+- **Variants and ranks**, once there are more monsters.
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
 - **Branching upgrade trees and armor in several pieces**, as in Monster Hunter.
 - **A rebirth system** at the end of the ladder. Perks are sized with this in mind.
