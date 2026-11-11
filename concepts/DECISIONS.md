@@ -153,11 +153,18 @@ The camp has five tabs: HUNT, FORGE, COOK, QUEST and BUGS.
 | Honey Cake | potions heal 50% more | 2 honey, 1 herb |
 | Stormcap Soup | the Stormwing charges 40% slower | 2 stormcap, 1 meat |
 | Hunter Feast | health +10%, attack +5% | 2 meat, 1 skyfruit, 1 pepper |
+| Bean Broth | no mud or stench | 2 bog bean, 1 meat |
+| Marsh Lily Tea | cannot bleed | 1 marsh lily, 2 herb |
+| Kelp Wrap | cannot be soaked | 2 kelp, 1 meat |
+| Clam Chowder | health +15%, cannot be numbed | 2 clam, 1 meat |
+| Glowcap Pie | cannot be blighted | 2 ruin fig, 1 glowcap |
 
-- **Expeditions** open after the first Fernwing, one biome per unlocked monster.
+New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fig and glowcap (ruins).
+
+- **Expeditions** cover eight biomes (v0.14.0): forest, swamp, desert, volcano, coast, tundra, ruins and storm peaks. Each opens with the first monster that lives there (Fernwing, Mudclaw, Tuskhide, Emberwing, Shellsnap, Frostmaw, Dreadbeak, Stormwing). The list scrolls.
   - **Gather run (25s):** ingredients pop up and are tapped before they vanish. Each biome has a common and a scarce ingredient (12% of pop-ups, gone sooner). A creature crosses every few seconds inside a closing circle; tapping it catches it.
   - **Pack hunt:** three Snapjaws, one after another, with the normal combat. No parts to break. Pays meat and the biome monster's common materials.
-- **Terrarium:** 20 creatures, four per biome, the fourth rare (15% of sightings). Caught species wander in a tank. Each common adds 0.3% health or attack and each rare 0.6% of both, so the full set is about +4.8% health and +4.5% attack.
+- **Terrarium:** 32 creatures, four per biome, the fourth rare (15% of sightings). Caught species wander in a tank. Each common adds 0.3% health or attack and each rare 0.6% of both, so the full set is about +9.6% health and +7.2% attack.
 - **Quests:**
   - **Main story (10 chapters):** the first chapters are the tutorial (hunt, gather, forge, eat). The lore: monsters are acting strangely, a faint glow is found on them, and every trail leads to the peaks and to an elder being the elders call the Hollow Star. The last chapter is "to be continued".
   - **Side quests (10):** one-off goals, open after the Fernwing.
@@ -178,7 +185,6 @@ The camp has five tabs: HUNT, FORGE, COOK, QUEST and BUGS.
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
-- **More expedition biomes** for the swamp, coast and ruins.
 - **Variants and ranks**, once there are more monsters.
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
 - **Branching upgrade trees and armor in several pieces**, as in Monster Hunter.

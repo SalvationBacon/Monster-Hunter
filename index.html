@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.13.0';
+const VER='0.14.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -177,7 +177,7 @@ ROSTER.forEach((r,i)=>{
   D.loot={common:[[D.mat.scale,2,4],[D.mat.claw,1,2]],parts:{head:D.mat.head,wings:D.mat.wings,tail:D.mat.tail}};
   HUNTS.push(id);
 });
-const EXPED=['fern','tusk','ember','frost','storm'];     // the five biomes with expeditions, by the monster that opens each
+const EXPED=['fern','mud','tusk','ember','shell','frost','dread','storm'];     // the eight biomes with expeditions, by the monster that opens each
 // ── Perks, carried by armor and charms ──
 const PERKS={
   tireless:{name:'TIRELESS',  desc:'DODGE COST -40%'},
@@ -223,9 +223,11 @@ const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather',
 // ── Pantry: two ingredients per biome (the second is the scarcer one), and meat from pack hunts
 const ING={herb:['HERB','#4cd964','#2f8f4a','leaf'],honey:['HONEY','#ffc83d','#c98a1a','drop'],pepper:['PEPPER','#e2483d','#4cd964','fruit'],ashroot:['ASH ROOT','#a89080','#6a5a50','root'],
   cactus:['PEAR','#d94a8a','#4a8a4a','fruit'],spice:['SPICE','#e0a03a','#a86a1a','drop'],frostberry:['ICEBERRY','#7fd6ff','#3a8ac8','fruit'],icefish:['ICEFISH','#bfeaff','#6a9ab8','fish'],
-  stormcap:['STORMCAP','#a8a8ff','#ffe14d','cap'],skyfruit:['SKYFRUIT','#ffe14d','#6a6ad8','fruit'],meat:['RAW MEAT','#d86a5a','#f0ead8','meat']};
-const BIOME_ING=[['herb','honey'],['pepper','ashroot'],['cactus','spice'],['frostberry','icefish'],['stormcap','skyfruit']];   // by biome number
-const BIOME_NAME=['FOREST','VOLCANO','DESERT','TUNDRA','STORM PEAKS'];
+  stormcap:['STORMCAP','#a8a8ff','#ffe14d','cap'],skyfruit:['SKYFRUIT','#ffe14d','#6a6ad8','fruit'],
+  bogbean:['BOG BEAN','#8a9a4a','#4a5a2a','fruit'],lily:['MARSH LILY','#f0a8d0','#4a8a5a','leaf'],kelp:['KELP','#3a8a5a','#2a5a3a','leaf'],clam:['CLAM','#e8dcc0','#a8947a','drop'],
+  fig:['RUIN FIG','#8a5a9a','#4a8a4a','fruit'],glowcap:['GLOWCAP','#b8f0e8','#e0508a','cap'],meat:['RAW MEAT','#d86a5a','#f0ead8','meat']};
+const BIOME_ING=[['herb','honey'],['pepper','ashroot'],['cactus','spice'],['frostberry','icefish'],['stormcap','skyfruit'],['bogbean','lily'],['kelp','clam'],['fig','glowcap']];   // by biome number
+const BIOME_NAME=['FOREST','VOLCANO','DESERT','TUNDRA','STORM PEAKS','SWAMP','COAST','RUINS','SUMMIT'];
 // ── Meals: one may be eaten before a hunt, and lasts that hunt
 const MEALS={
   stew:    {name:'HEARTY STEW',    desc:'HEALTH +25%',            hp:1.25,           cost:{meat:2,herb:2}},
@@ -239,6 +241,11 @@ const MEALS={
   cake:    {name:'HONEY CAKE',     desc:'POTIONS HEAL 50% MORE',  heal:1.5,          cost:{honey:2,herb:1}},
   soup:    {name:'STORMCAP SOUP',  desc:'MONSTER CHARGES SLOWER', chargeSlow:.6,     cost:{stormcap:2,meat:1}},
   feast:   {name:'HUNTER FEAST',   desc:'HEALTH +10%, ATTACK +5%',hp:1.1,atk:1.05,   cost:{meat:2,skyfruit:1,pepper:1}},
+  beanbroth:{name:'BEAN BROTH',    desc:'NO MUD OR STENCH',       immune:{mud:1,stench:1},cost:{bogbean:2,meat:1}},
+  lilytea: {name:'MARSH LILY TEA', desc:'CANNOT BLEED',           immune:{bleed:1},  cost:{lily:1,herb:2}},
+  kelpwrap:{name:'KELP WRAP',      desc:'CANNOT BE SOAKED',       immune:{wet:1},    cost:{kelp:2,meat:1}},
+  chowder: {name:'CLAM CHOWDER',   desc:'HEALTH +15%, NO NUMBING',hp:1.15,immune:{numb:1},cost:{clam:2,meat:1}},
+  figpie:  {name:'GLOWCAP PIE',    desc:'CANNOT BE BLIGHTED',     immune:{blight:1}, cost:{fig:2,glowcap:1}},
 };
 const MEAL_IDS=Object.keys(MEALS);
 // ── Creatures for the terrarium: four per biome, the fourth rare
@@ -247,7 +254,10 @@ const CREATURES=[];
  [['CINDER BUG','beetle','#6a3a3a'],['ASH MOTH','moth','#b0a8a0'],['MAGMA NEWT','frog','#e2582e'],['EMBER SCARAB','beetle','#ff9a2e']],
  [['THORN BEETLE','beetle','#a8794a'],['DUNE HOPPER','hopper','#d9b06a'],['SAND SKINK','frog','#c9955a'],['SUN SCARAB','beetle','#ffe14d']],
  [['SNOW HOPPER','hopper','#e8f0f6'],['FROST MOTH','moth','#bfeaff'],['ICE NEWT','frog','#7fd6ff'],['AURORA FLY','moth','#b06ad8']],
- [['SPARK FLY','hopper','#ffe14d'],['CLOUD MOTH','moth','#c8c8f0'],['STORM SKINK','frog','#6a70b8'],['THUNDER STAG','beetle','#a8a8ff']]]
+ [['SPARK FLY','hopper','#ffe14d'],['CLOUD MOTH','moth','#c8c8f0'],['STORM SKINK','frog','#6a70b8'],['THUNDER STAG','beetle','#a8a8ff']],
+ [['BOG FLY','hopper','#8a9a4a'],['MIRE MOTH','moth','#a8b890'],['MUD TOAD','frog','#7a6a4a'],['LANTERN BUG','beetle','#e8f070']],
+ [['SHELL BEETLE','beetle','#e8c8a0'],['SEA MOTH','moth','#bfe0ff'],['TIDE NEWT','frog','#3a9ac8'],['PEARL STAG','beetle','#f8f0ff']],
+ [['RELIC BEETLE','beetle','#8a7a6a'],['DUSK MOTH','moth','#c88aa8'],['STONE NEWT','frog','#9a8aaa'],['STAR SCARAB','beetle','#b8a8ff']]]
  .forEach((row,bi)=>row.forEach(([name,type,col],k)=>CREATURES.push({id:'c'+bi+k,name,type,col,biome:bi,rare:k===3})));
 const BUG_BONUS=[.003,.006];             // share of health or attack per species: common, rare
 function bugBonus(){let hp=0,atk=0;CREATURES.forEach((c,i)=>{if(!SAVE.bugs[c.id])return;if(c.rare){hp+=BUG_BONUS[1];atk+=BUG_BONUS[1];}else if(i%2)atk+=BUG_BONUS[0];else hp+=BUG_BONUS[0];});return{hp,atk};}
@@ -514,7 +524,7 @@ const RIGS={
 };
 // ── Third body: the Snapjaw, a small pack hunter. Its colours follow the biome.
 function smallSpr(p,flash){
-  const key=`sm:${p.hx}:${p.hy}:${p.jaw}:${p.tail}:${p.kind|0}`, c=['#7aa84a','#a8503a','#c9a05a','#a8c8dc','#6a70b8'][p.kind|0];
+  const key=`sm:${p.hx}:${p.hy}:${p.jaw}:${p.tail}:${p.kind|0}`, c=['#7aa84a','#a8503a','#c9a05a','#a8c8dc','#6a70b8','#6a7a4a','#c8a87a','#8a7a9a'][p.kind|0];
   const s=shapeSpr(key,MS_W,MS_H,{1:c,2:shade(c,.45),3:'!#141826',4:'!#ffe14d',5:'#f0ead8',6:shade(c,-.35),7:'!#141826'},a=>{
     a.off(MS_OX,MS_OY);const hx=p.hx,hy=p.hy,t=p.tail;
     a.poly([[34,38],[46,36],[54,40+t],[46,41],[34,43]],1);                       // tail
@@ -1214,7 +1224,7 @@ function rollLoot(){
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
-const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'&&!S.exp?'hunt':S.tab==='forge'?(S.fpick?'forge':'page'):null;
+const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?(S.fpick?'forge':'page'):null;
 const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
 function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
 function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fpick=false;S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
@@ -1582,12 +1592,16 @@ function drawCamp(){
       g.restore();S.scrMax.hunt=Math.max(0,total-(bot-top)+2);
       if(S.scrMax.hunt>0){const hh=bot-top,bh=Math.max(10,hh*hh/(total+2)),by=top+(hh-bh)*(S.scr.hunt||0)/S.scrMax.hunt;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }else{
-      EXPED.forEach((id,i)=>{const D=MONSTERS[id],y=14+i*32,ok=unlocked(id),ing=BIOME_ING[D.biome];
+      const top=13,bot=LH-20,nb=B.length;g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();      // the list scrolls
+      EXPED.forEach((id,i)=>{const D=MONSTERS[id],y=14+i*32-(S.scr.exp||0),ok=unlocked(id),ing=BIOME_ING[D.biome];if(y+29<top||y>bot)return;
         panel(4,y,120,29);g.drawImage(bgFor(D.biome),20,L.ground-16,36,27,5,y+1,36,27);
         text(BIOME_NAME[D.biome],45,y+3,'#ffe14d');g.drawImage(lootSpr(ing[0]),0,0,12,12,45,y+10,9,9);g.drawImage(lootSpr(ing[1]),0,0,12,12,56,y+10,9,9);
         const n=CREATURES.filter(c=>c.biome===D.biome&&SAVE.bugs[c.id]).length;text('BUGS '+n+'/4',W-7,y+12,n===4?'#4cd964':'#8a93b0',{al:2});
         if(ok){smallBtn(B,'gather:'+id,44,y+18,38,'GATHER','#2f8f4a',()=>startGather(D.biome));smallBtn(B,'pack:'+id,84,y+18,38,'PACK HUNT','#a8502a',()=>toPrep(null,id));}
-        else{g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text('BEAT THE '+D.name,W/2,y+16,'#c8d0e8',{al:1});}});
+        else{g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text(D.rank===1?'UNLOCK THE '+D.name:lockText(id),W/2,y+16,'#c8d0e8',{al:1});}});
+      g.restore();for(let k=B.length-1;k>=nb;k--)if(B[k].y<top||B[k].y+B[k].h>bot+2)B.splice(k,1);          // only buttons fully in view can be tapped
+      const tot=EXPED.length*32+2;S.scrMax.exp=Math.max(0,tot-(bot-top));
+      if(S.scrMax.exp>0){const hh=bot-top,bh=Math.max(10,hh*hh/tot),by=top+(hh-bh)*(S.scr.exp||0)/S.scrMax.exp;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }
   }else if(S.tab==='forge'){
     text('FORGE',W-4,3,'#8a93b0',{al:2});
@@ -1633,8 +1647,8 @@ function drawCamp(){
     g.fillStyle='#1c2134';g.fillRect(3,14,W-6,30);g.drawImage(lootSpr('potion'),5,16);text('POTIONS',19,16,'#e8f0fc');text('*'+SAVE.potions,19+textW('POTIONS')+5,16,'#ffe14d');
     text('UP TO '+POT_CARRY+' COME ON A HUNT',19,24,'#8a93b0');costRow(POT_COST,19,33);smallBtn(B,'cook:brew',W-34,30,30,'BREW',affords(POT_COST)?'#2f8f4a':'#3a4060',brew,affords(POT_COST));
     text('PANTRY',5,49,'#8a93b0');
-    Object.keys(ING).forEach((id,i)=>{const x=4+(i%2)*62,y=57+(i>>1)*11,n=SAVE.bag[id]||0;g.drawImage(lootSpr(id),0,0,12,12,x,y-2,9,9);text(ING[id][0],x+11,y,n?'#e8f0fc':'#5a6080');text(''+n,x+59,y,n?'#ffe14d':'#5a6080',{al:2});});
-    const my=57+6*11+4;text('MEALS ARE CHOSEN ON THE PREP',W/2,my,'#8a93b0',{al:1});text('SCREEN, BEFORE EACH HUNT',W/2,my+7,'#8a93b0',{al:1});
+    Object.keys(ING).forEach((id,i)=>{const x=4+(i%2)*62,y=57+(i>>1)*10,n=SAVE.bag[id]||0;g.drawImage(lootSpr(id),0,0,12,12,x,y-2,9,9);text(ING[id][0],x+11,y,n?'#e8f0fc':'#5a6080');text(''+n,x+59,y,n?'#ffe14d':'#5a6080',{al:2});});
+    const my=57+Math.ceil(Object.keys(ING).length/2)*10+2;text('MEALS ARE CHOSEN ON THE PREP',W/2,my,'#8a93b0',{al:1});text('SCREEN, BEFORE EACH HUNT',W/2,my+7,'#8a93b0',{al:1});
     if(LH-20-my>=30){const k=MEAL_IDS[Math.floor(S.t/2.5)%MEAL_IDS.length],M=MEALS[k];text(M.name,W/2,my+18,'#ffe14d',{al:1});text(M.desc,W/2,my+25,'#4cd964',{al:1});}
   }else if(S.tab==='quest'){
     text('QUESTS',W-4,3,'#8a93b0',{al:2});
@@ -1658,15 +1672,15 @@ function drawCamp(){
     if(!SAVE.wins.fern&&y+10<LH-21)text('MORE QUESTS AFTER THE FERNWING',W/2,y+3,'#5a6080',{al:1});
   }else{
     text('TERRARIUM',W-4,3,'#8a93b0',{al:2});
-    const have=CREATURES.filter(c=>SAVE.bugs[c.id]).length,bb=bugBonus(),th=Math.max(46,Math.min(84,LH-20-14-90));
+    const have=CREATURES.filter(c=>SAVE.bugs[c.id]).length,bb=bugBonus(),th=Math.max(40,Math.min(84,LH-20-14-9-8*12-3));
     g.fillStyle='#000';g.fillRect(3,13,W-6,th+2);g.fillStyle='#16303a';g.fillRect(4,14,W-8,th);g.fillStyle='#1d4048';g.fillRect(4,14,W-8,th>>1);g.fillStyle='#3a5a3a';g.fillRect(4,14+th-8,W-8,8);
     for(let x=10;x<W-8;x+=17){g.fillStyle='#2f6d4a';g.fillRect(x,14+th-14-(x%3)*3,1,7+(x%3)*3);g.fillRect(x+1,14+th-11,1,4);}
     g.fillStyle='rgba(255,255,255,.12)';g.fillRect(6,16,2,th-6);
     CREATURES.forEach((c,i)=>{if(!SAVE.bugs[c.id])return;const sp=.25+hash2(i,1,4)*.5,ph=hash2(i,2,4)*6.3,fly=c.type==='moth',x=60+50*Math.sin(S.t*sp+ph),f=Math.floor(S.t*(fly?8:3)+i)%2;
       const y=fly?14+10+(th-34)*(0.5+0.5*Math.sin(S.t*sp*1.7+ph*2)):14+th-12-(c.type==='hopper'?Math.abs(Math.sin(S.t*3+ph))*8:0);g.drawImage(bugSpr(i,f),Math.round(x),Math.round(y));});
     if(!have)text('CATCH ONE ON A GATHER RUN',W/2,14+th/2,'#8a93b0',{al:1});
-    let y=18+th;text('CAUGHT '+have+'/'+CREATURES.length,5,y,'#e8f0fc');text('HP +'+(bb.hp*100).toFixed(1)+'% ATK +'+(bb.atk*100).toFixed(1)+'%',W-5,y,'#4cd964',{al:2});y+=9;
-    for(let bi=0;bi<5;bi++){text(BIOME_NAME[bi].slice(0,6),5,y+3,'#8a93b0');CREATURES.forEach((c,i)=>{if(c.biome!==bi)return;const k=i%4,x=44+k*20,got=!!SAVE.bugs[c.id];
+    let y=18+th;text('CAUGHT '+have+'/'+CREATURES.length,5,y,'#e8f0fc');text('HP+'+(bb.hp*100).toFixed(1)+'% ATK+'+(bb.atk*100).toFixed(1)+'%',W-5,y,'#4cd964',{al:2});y+=9;
+    for(let bi=0;bi<8;bi++){text(BIOME_NAME[bi].slice(0,6),5,y+2,'#8a93b0');CREATURES.forEach((c,i)=>{if(c.biome!==bi)return;const k=i%4,x=44+k*20,got=!!SAVE.bugs[c.id];
       g.fillStyle=c.rare?'#3a3010':'#1c2134';g.fillRect(x,y,18,11);if(got)g.drawImage(bugSpr(i,0),x+3,y+1);else text('?',x+8,y+3,'#3a4060');
       B.push({id:'bug:'+c.id,x,y,w:18,h:11,fn:()=>toast(got?c.name+(c.rare?' (RARE)':''):'NOT CAUGHT YET',got?c.col:'#8a93b0')});});y+=12;}
   }
@@ -1760,7 +1774,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);
