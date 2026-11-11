@@ -162,12 +162,22 @@ The camp has five tabs: HUNT, FORGE, COOK, QUEST and BUGS.
   - **Main story (10 chapters):** the first chapters are the tutorial (hunt, gather, forge, eat). The lore: monsters are acting strangely, a faint glow is found on them, and every trail leads to the peaks and to an elder being the elders call the Hollow Star. The last chapter is "to be continued".
   - **Side quests (10):** one-off goals, open after the Fernwing.
   - **Daily (3) and weekly (1):** drawn from pools by the date, and reset with it.
-- **Companion (Pip):** joins when the Emberwing chapter is claimed. One role per hunt, chosen in prep: fighter (a hit for 20 x attack every 3s), healer (30% of health once, below 40%), gatherer (one more of each common drop and two of the biome's ingredient), or resting.
+- **Companion (Pip):** joins when the Emberwing chapter is claimed. Pip does not level up; it gets stronger through its own gear, like the hunter (v0.13.0).
+  - **Pip's gear:** a weapon (attack, plus the monster's element or status, like the hunter's) and a vest (care, which scales the support roles), forged from each monster's scales, claws and wings. Starts with a twig and a scarf. Pip's look follows its gear: the fang it carries and its scarf change colour. Pip's gear has no upgrade levels.
+  - **Roles,** one per hunt, chosen in prep:
+
+| Role | What Pip does |
+|---|---|
+| Fighter | a hit every 3s for 20 x Pip's attack, with its element bonus, building its status |
+| Healer | once below 40% health, heals 30% x care |
+| Trapper | pins the monster in a net at 8s and every 20s after, for 2.5s x care |
+| Scout | adds half again x care to the perfect-dodge and perfect-guard windows, shows each hit's ring sooner, and names the coming move |
+| Gatherer | one more of each common drop, and 2 x care of the biome's ingredient |
+| Resting | stays at camp |
 
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
-- **Companion design**, to be workshopped next.
 - **More expedition biomes** for the swamp, coast and ruins.
 - **Variants and ranks**, once there are more monsters.
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.

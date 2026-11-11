@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.12.0';
+const VER='0.13.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -39,7 +39,7 @@ const UP_MAX=5, UP_STEP=.08;                             // upgrades: each level
 const WTYPES={
   gs:{name:'GREATSWORD', hold:'charge',tip:'HOLD: CHARGE A HEAVY HIT',dmg:[15,17,27],dur:[.32,.32,.48],hit:[.12,.12,.2], heavy:[0,40,85,150],stunTap:3,stunAll:0,stunHeavy:1,  counter:120,cstun:40,dodge:25},
   db:{name:'DUAL BLADES',hold:'flurry',tip:'HOLD: KEEP SLASHING',     dmg:[7,7,12],  dur:[.14,.14,.2], hit:[.04,.04,.07],                    stunTap:1,stunAll:0,stunHeavy:1,  counter:100,cstun:30,dodge:15},
-  hm:{name:'HAMMER',     hold:'charge',tip:'HOLD: CHARGE. BIG STUN',  dmg:[21,23,35],dur:[.44,.44,.62],hit:[.18,.18,.28],heavy:[0,45,95,165],stunTap:8,stunAll:4,stunHeavy:1.6,counter:120,cstun:60,dodge:25},
+  hm:{name:'HAMMER',     hold:'charge',tip:'HOLD: CHARGE. BIG STUN',  dmg:[20,22,34],dur:[.44,.44,.62],hit:[.18,.18,.28],heavy:[0,45,95,165],stunTap:8,stunAll:4,stunHeavy:1.6,counter:120,cstun:60,dodge:25},
   ln:{name:'LANCE',      hold:'guard', tip:'HOLD: GUARD HITS',        dmg:[11,12,17],dur:[.22,.22,.32],hit:[.08,.08,.12],                    stunTap:2,stunAll:0,stunHeavy:1,  counter:130,cstun:40,dodge:25},
 };
 const WT=['gs','db','hm','ln'], FLURRY_COST=4, FLURRY_BONUS=1.2;
@@ -181,17 +181,17 @@ const EXPED=['fern','tusk','ember','frost','storm'];     // the five biomes with
 // ── Perks, carried by armor and charms ──
 const PERKS={
   tireless:{name:'TIRELESS',  desc:'DODGE COST -40%'},
-  guardian:{name:'GUARDIAN',  desc:'1 IN 4 HITS HALVED'},
+  guardian:{name:'GUARDIAN',  desc:'SOME HITS HALVED'},
   might:   {name:'MIGHT',     desc:'ATTACK +10%'},
   nimble:  {name:'NIMBLE',    desc:'EASIER PERFECTS'},
-  keenedge:{name:'KEEN EDGE', desc:'20% CRITICAL HITS'},
-  keeneye: {name:'KEEN EYE',  desc:'CIRCLES 40% SLOWER'},
+  keenedge:{name:'KEEN EDGE', desc:'20% CRIT HITS'},
+  keeneye: {name:'KEEN EYE',  desc:'SLOWER CIRCLES'},
   bludgeon:{name:'BLUDGEONER',desc:'STUN BUILDS +40%'},
-  breaker: {name:'BREAKER',   desc:'BREAKS NEED 2 HITS'},
-  herbal:  {name:'HERBALIST', desc:'+1 POTION, HEALS +50%'},
-  fortune: {name:'FORTUNE',   desc:'MORE LOOT PER HUNT'},
+  breaker: {name:'BREAKER',   desc:'BREAK IN 2 HITS'},
+  herbal:  {name:'HERBALIST', desc:'+1 POTION +HEAL'},
+  fortune: {name:'FORTUNE',   desc:'MORE LOOT'},
   quick:   {name:'QUICK DRAW',desc:'CHARGE 30% FASTER'},
-  riposte: {name:'RIPOSTE',   desc:'COUNTER DAMAGE +40%'},
+  riposte: {name:'RIPOSTE',   desc:'COUNTER +40%'},
   weakspot:{name:'WEAK SPOT', desc:'HEAD DAMAGE +25%'},
 };
 // ── Gear. One weapon, one armor and one charm are worn at a time. Built from the roster.
@@ -210,8 +210,15 @@ Object.assign(GEAR,{
   relic_riposte:{slot:'charm',tier:'relic',name:'RIPOSTE CHARM',   perk:'riposte',cost:{gem:1,e_wing:1,t_spike:1}},
   relic_weak:   {slot:'charm',tier:'relic',name:'WEAK SPOT CHARM', perk:'weakspot',cost:{gem:1,f_horn:1,e_horn:1}},
 });
-const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather']},
-  ...HUNTS.map(id=>({title:MONSTERS[id].name,mon:id,ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch']})),
+// ── Pip's gear: a weapon (attack, and the monster's element or status) and a vest (care: how much its support roles do)
+GEAR.pip_fang={slot:'pweapon',tier:'iron',name:'PIP TWIG',patk:1,free:true};
+GEAR.pip_vest={slot:'parmor',tier:'iron',name:'PIP SCARF',care:1,free:true};
+HUNTS.forEach(id=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat;
+  GEAR[id+'_pw']={slot:'pweapon',tier:id,name:D.short+' PIP FANG',patk:T.atk,elem:D.wElem,status:D.wStatus,cost:{[m.scale]:2,[m.claw]:2}};
+  GEAR[id+'_pa']={slot:'parmor',tier:id,name:D.short+' PIP VEST',care:+(1+.025*(D.L+1)).toFixed(3),cost:{[m.scale]:3,[m.wings]:1}};});
+const pipSlot=G=>G.slot==='pweapon'||G.slot==='parmor';
+const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather','pip_fang','pip_vest']},
+  ...HUNTS.map(id=>({title:MONSTERS[id].name,mon:id,ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch',id+'_pw',id+'_pa']})),
   {title:'RELICS',ids:['relic_quick','relic_riposte','relic_weak']}];
 // ── Pantry: two ingredients per biome (the second is the scarcer one), and meat from pack hunts
 const ING={herb:['HERB','#4cd964','#2f8f4a','leaf'],honey:['HONEY','#ffc83d','#c98a1a','drop'],pepper:['PEPPER','#e2483d','#4cd964','fruit'],ashroot:['ASH ROOT','#a89080','#6a5a50','root'],
@@ -524,8 +531,10 @@ function smallSpr(p,flash){
   return flash?whiteSpr(key,s):s;
 }
 RIGS.small={spr:smallSpr,head:p=>[13+p.hx,27+p.hy],mouth:p=>[8+p.hx,33+p.hy],pos:{head:p=>[14+p.hx,30+p.hy],tail:p=>[48,39+p.tail],wings:p=>[29,38],body:p=>[29,40]}};
-const palSpr=f=>shapeSpr('pal:'+f,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:'#e2483d',5:'#3a9a88'},a=>{a.off(1,1);
-  a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);});
+const palCols=()=>{const w=GEAR[SAVE.eq.pweapon]||GEAR.pip_fang,a=GEAR[SAVE.eq.parmor]||GEAR.pip_vest,D=MONSTERS[a.tier];return[w.tier==='iron'?'#c8a070':weaponCol(SAVE.eq.pweapon),D?D.look.b:'#e2483d'];};
+const palSpr=f=>{const [wc,vc]=palCols();return shapeSpr('pal:'+f+wc+vc,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:vc,5:'#3a9a88',6:wc},a=>{a.off(1,1);
+  a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);
+  a.poly([[12,9],[14,1],[15,2],[13,10]],6);});};                                   // the fang it carries
 const mSprite=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.look,lk:D.id,fxc:D.fxc[0]},p),flash);
 const POSE0={hx:0,hy:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0};
 
@@ -590,9 +599,11 @@ const bugSpr=(i,f)=>{const c=CREATURES[i];return shapeSpr('bug:'+i+':'+(f|0),12,
   else if(c.type==='moth'){if(f){a.poly([[0,2],[4,3],[4,6],[1,6]],1);a.poly([[10,2],[6,3],[6,6],[9,6]],1);}else{a.poly([[1,0],[4,3],[4,6],[0,8]],1);a.poly([[9,0],[6,3],[6,6],[10,8]],1);}a.rect(4,2,2,6,2);}
   else if(c.type==='frog'){a.ell(5,6,4,2,1);a.px(3,3,1);a.px(7,3,1);a.px(3,4,3);a.px(7,4,3);a.rect(0,7+f,2,1,2);a.rect(9,7+f,2,1,2);}
   else{a.poly([[1,5],[6,3],[9,5],[6,7]],1);a.px(8,4,3);a.rect(2,7-f*2,1,2+f*2,2);a.rect(4,7,1,2,2);a.px(9,2,2);}});};
-const gearSpr=id=>{const G=GEAR[id],col=G.slot==='armor'?armorCol(id)[0]:G.slot==='charm'?'#4cc9ff':weaponCol(id);
+const gearSpr=id=>{const G=GEAR[id],col=G.slot==='armor'?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?'#4cc9ff':weaponCol(id);
   return shapeSpr('gear:'+id,12,12,{1:col,2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);
     if(G.slot==='armor'){a.poly([[1,1],[4,1],[5,2],[6,1],[9,1],[10,4],[8,5],[8,10],[2,10],[2,5],[0,4]],1);a.rect(2,7,7,1,2);}
+    else if(G.slot==='pweapon'){a.poly([[3,0],[8,1],[6,10],[5,10]],1);a.rect(2,0,7,2,2);}
+    else if(G.slot==='parmor'){a.poly([[0,2],[10,2],[9,5],[1,5]],1);a.poly([[6,5],[9,5],[8,10],[6,10]],1);a.rect(0,2,10,1,3);}
     else if(G.slot==='charm'){a.poly([[3,0],[7,0],[5,3]],3);a.ell(5,6,3,3,2);a.ell(5,6,2,2,1);}
     else if(G.wt==='gs'){a.poly([[9,0],[10,1],[4,7],[3,6]],1);a.poly([[1,5],[5,9],[4,10],[0,6]],2);a.rect(0,8,2,2,2);}
     else if(G.wt==='db'){a.poly([[4,0],[5,1],[1,6],[0,5]],1);a.poly([[10,3],[10,5],[4,10],[3,9]],1);a.rect(0,6,2,2,2);a.rect(2,9,2,2,2);}
@@ -642,8 +653,8 @@ function loadSave(){
   if(!v){v={};try{const old=JSON.parse(localStorage.getItem('mh_proto_bag'));if(old)v.bag=old;}catch(e){}}   // loot from the first prototypes carries over
   v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.lv=v.lv||{};v.dry=v.dry||{};v.eq=Object.assign({weapon:'iron_gs',armor:'leather',charm:null},v.eq);delete v.eq.coat;
   for(const [o,n] of Object.entries(OLD_IDS)){if(v.own[o]){delete v.own[o];v.own[n]=true;}for(const sl in v.eq)if(v.eq[sl]===o)v.eq[sl]=n;}
-  v.own.leather=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
-  for(const sl of ['weapon','armor','charm'])if(v.eq[sl]&&!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]={weapon:'iron_gs',armor:'leather',charm:null}[sl];
+  v.own.leather=v.own.pip_fang=v.own.pip_vest=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
+  const DEF={weapon:'iron_gs',armor:'leather',charm:null,pweapon:'pip_fang',parmor:'pip_vest'};for(const sl in DEF)if(!v.eq[sl]||!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]=DEF[sl];
   if(v.potions==null)v.potions=POT_START;v.bugs=v.bugs||{};v.story=v.story||{i:0,p:0};v.side=v.side||{};v.daily=v.daily||{key:'',q:[]};v.weekly=v.weekly||{key:'',q:[]};v.packs=v.packs||0;v.role=v.role||'fighter';
   return v;
 }
@@ -654,7 +665,7 @@ const lvOf=id=>SAVE.lv[id]||0;
 const gearAtk=id=>+(GEAR[id].atk*(1+UP_STEP*lvOf(id))).toFixed(3), gearHp=id=>Math.round(GEAR[id].hp*(1+UP_STEP*lvOf(id)));
 // Cost of the next upgrade level, or null at the top (charms have no levels). Levels 4 and 5 need scales from the next monster up.
 function upCost(id){
-  const G=GEAR[id],Lv=lvOf(id)+1; if(Lv>UP_MAX||G.slot==='charm'||!SAVE.own[id])return null;
+  const G=GEAR[id],Lv=lvOf(id)+1; if(Lv>UP_MAX||G.slot==='charm'||pipSlot(G)||!SAVE.own[id])return null;
   const ti=Math.max(0,HUNTS.indexOf(G.tier)),m=MONSTERS[HUNTS[ti]].mat,N=MONSTERS[HUNTS[ti+1]];   // iron and leather use Fernwing materials; later levels need the next monster in the order
   const part=G.slot==='armor'?m.wings:m[{gs:'head',db:'wings',hm:'tail',ln:'wings'}[G.wt]];
   if(Lv<=2)return{[m.scale]:2+Lv,[m.claw]:Lv};
@@ -675,6 +686,8 @@ function gearStats(meal){
     atk:+(gearAtk(e.weapon)*(perks.might?1.1:1)*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(gearHp(e.armor)*(M.hp||1)*(1+bb.hp)),
     resist:(MONSTERS[GEAR[e.armor].tier]||{}).elem||null,perks,qteSlow:perks.keeneye?1.4:1,qteHits:perks.breaker?2:3};
 }
+// Pip's numbers, from its gear
+function palStats(){const e=SAVE.eq,w=GEAR[e.pweapon]||GEAR.pip_fang,a=GEAR[e.parmor]||GEAR.pip_vest;return{atk:w.patk,elem:w.elem||null,status:w.status||null,care:a.care};}
 const canAfford=id=>Object.entries(GEAR[id].cost||{}).every(([k,n])=>(SAVE.bag[k]||0)>=n);
 // Ranks: three wins in a rank open the next. The apex rank needs three of rank 6, and the elder needs all four apex monsters.
 const RANK_NEED=3, RANKS=8;
@@ -705,7 +718,8 @@ function newHunt(id,o){
        potions:Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
        immune:M.immune||{},wear:M.wear||1,regen:M.regen||1,healMul:M.heal||1,luck:M.luck||1,chargeSlow:M.chargeSlow||1};
   S.m=freshMonster(D,gs.status);
-  S.pal=o.role&&o.role!=='rest'&&SAVE.pal?{role:o.role,t:PAL.every,used:false,hop:0}:null;
+  S.pal=o.role&&o.role!=='rest'&&SAVE.pal?Object.assign({role:o.role,t:PAL.every,trapT:PAL.trapFirst,used:false,hop:0,sb:0},palStats()):null;
+  if(S.pal&&S.pal.status)S.pal.sNeed=STATUS[S.pal.status].need;
   S.qte=null;
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
   S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0,qteHit:0,qteMiss:0};
@@ -718,15 +732,21 @@ function mKill(){
   S.slow=1.2;S.endT=0;h.state='win';h.t=0;
 }
 // ── Companion: Pip. One role per hunt.
-const PAL={every:3,dmg:20,healAt:.4,heal:.3};
-const ROLES={fighter:['FIGHTER','JOINS THE ATTACK'],healer:['HEALER','HEALS YOU ONCE WHEN LOW'],gatherer:['GATHERER','BRINGS BACK MORE LOOT'],rest:['RESTING','STAYS AT CAMP']};
+const PAL={every:3,dmg:20,healAt:.4,heal:.3,trapFirst:8,trapEvery:20,trap:2.5,scout:.5,scoutSee:1.4};
+const ROLES={fighter:['FIGHTER','JOINS THE ATTACK'],healer:['HEALER','HEALS ONCE WHEN LOW'],trapper:['TRAPPER','PINS IT DOWN AT TIMES'],
+  scout:['SCOUT','EASIER PERFECT DODGES'],gatherer:['GATHERER','BRINGS BACK MORE LOOT'],rest:['RESTING','STAYS AT CAMP']};
+const scoutBonus=()=>S.pal&&S.pal.role==='scout'?PERFECT_WIN*PAL.scout*S.pal.care:0;   // seconds added to the perfect window
 function palUpdate(dt){
-  const P=S.pal,h=S.h,m=S.m; if(!P||h.state==='dead'||h.state==='win'||m.state==='dead')return; if(P.hop>0)P.hop-=dt;
-  if(P.role==='fighter'&&(P.t-=dt)<=0&&!mAir()&&m.state!=='evade'&&!(m.enter>0)){P.t=PAL.every;P.hop=.4;const d=Math.round(PAL.dmg*h.atk),b=partPos('body',mPose());
-    m.hp-=d;S.stats.dealt+=d;S.stats.pal=(S.stats.pal||0)+d;m.flash=.06;addNum(b.x+rnd(-8,8),b.y+8,''+d,'#7fe0c0',.6);sfx('hit');if(m.hp<=0)mKill();}
-  if(P.role==='healer'&&!P.used&&h.hp<h.max*PAL.healAt){P.used=true;P.hop=.5;const v=Math.round(h.max*PAL.heal);h.hp=Math.min(h.max,h.hp+v);addNum(L.hx+8,L.hFeet-40,'PIP +'+v,'#4cd964',1.2);sfx('heal');}
+  const P=S.pal,h=S.h,m=S.m,D=S.def; if(!P||h.state==='dead'||h.state==='win'||m.state==='dead')return; if(P.hop>0)P.hop-=dt;
+  const reach=!mAir()&&m.state!=='evade'&&!(m.enter>0);
+  if(P.role==='fighter'&&(P.t-=dt)<=0&&reach){P.t=PAL.every;P.hop=.4;const weak=P.elem&&P.elem===D.weak,d=Math.round(PAL.dmg*P.atk*(weak?ELEM_BONUS:1)*(m.state==='shell'?SHELL.dmg:1)),b=partPos('body',mPose());
+    m.hp-=d;m.lastHit=S.clock;S.stats.dealt+=d;S.stats.pal=(S.stats.pal||0)+d;m.flash=.06;addNum(b.x+rnd(-8,8),b.y+8,''+d,weak?ELEM[P.elem][1]:'#7fe0c0',.6);sfx('hit');if(m.hp<=0){mKill();return;}
+    const st=P.status;if(st&&m.state!=='sleep'&&(P.sb+=PAL.dmg*STATUS_RATE*(st===D.weakSt?STATUS_WEAK:st===D.resSt?STATUS_RES:1))>=P.sNeed){P.sb=0;P.sNeed*=STATUS_GROW;procStatus(st,P.atk,mPose());}}
+  if(P.role==='healer'&&!P.used&&h.hp<h.max*PAL.healAt){P.used=true;P.hop=.5;const v=Math.round(h.max*PAL.heal*P.care);h.hp=Math.min(h.max,h.hp+v);addNum(L.hx+8,L.hFeet-40,'PIP +'+v,'#4cd964',1.2);sfx('heal');}
+  if(P.role==='trapper'&&(P.trapT-=dt)<=0&&reach&&(m.state==='idle'||m.state==='attack'||m.state==='recover')){         // a net that holds the monster where it stands
+    P.trapT=PAL.trapEvery;P.hop=.5;S.stats.traps=(S.stats.traps||0)+1;mStagger(PAL.trap*P.care);m.stunned=false;S.qte=S.qte;
+    const b=partPos('body',mPose());addNum(b.x,b.y-26,'PINNED!','#7fe0c0',1.2);S.fx.push({kind:'ring',x:b.x,y:L.mFeet,t:0,life:.35,col:'#7fe0c0'});sfx('brk');}
 }
-
 // ── Layout (depends on LH) ──
 const HUD_B=26; let HUD_T=21;             // the top HUD grows a row for a monster with its own meter
 const L={}; function layout(){
@@ -905,15 +925,15 @@ function mHit(i){
   if(h.state==='dead'||h.state==='win'||h.state==='counter')return;
   const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
     for(let k=0;k<10;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-50,50),vy:rnd(-70,-10),life:.5,col:'#ffe14d',g:60});};
-  if(h.state==='dodge'&&h.t<DODGE_IFR+(P.nimble?.06:0)){
+  if(h.state==='dodge'&&h.t<DODGE_IFR+(P.nimble?.06:0)+scoutBonus()){
     S.stats.dodges++;
-    if(h.t<=PERFECT_WIN+(P.nimble?.1:0))perfect('PERFECT!');
+    if(h.t<=PERFECT_WIN+(P.nimble?.1:0)+scoutBonus())perfect('PERFECT!');
     else addNum(hc.x+6,hc.y-20,'DODGE','#c8d0e8',.7);
     return;
   }
   if(h.inv>0)return;
   if(h.state==='guard'){                                                        // lance
-    if(h.t<=GUARD_PERFECT){S.stats.dodges++;perfect('PERFECT GUARD!');return;}
+    if(h.t<=GUARD_PERFECT+scoutBonus()){S.stats.dodges++;perfect('PERFECT GUARD!');return;}
     if(h.st>=GUARD_COST){h.st-=GUARD_COST;h.stDelay=.8;const chip=Math.max(1,Math.round(dmg*GUARD_CHIP));h.hp-=chip;S.stats.taken+=chip;S.stats.guards=(S.stats.guards||0)+1;
       addNum(hc.x+6,hc.y-20,'GUARD '+chip,'#c8d0e8',.8);S.shake=Math.max(S.shake,.15);sfx('hit');buzz(20);
       if(h.hp<=0){h.hp=0;h.state='dead';h.t=0;S.endT=0;S.fail='YOU FAINTED';sfx('lose');}
@@ -941,6 +961,16 @@ function hunterX(){const h=S.h;
   return 0;
 }
 function addNum(x,y,txt,col,life){S.nums.push({x,y,txt,col,t:0,life:life||.8});}
+// A status built up on the monster takes effect. atk scales blast damage.
+function procStatus(stt,atk,pose){
+  const m=S.m,T=STATUS[stt];S.stats.procs=(S.stats.procs||0)+1;const b=partPos('body',pose);
+  if(stt==='poison'){m.mpoison=T.time;m.mpT=0;addNum(b.x,b.y-28,'POISONED!',T.col,1.3);}
+  else if(stt==='para'){mStagger(T.time);m.stunned=false;addNum(b.x,b.y-28,'PARALYSED!',T.col,1.3);}
+  else if(stt==='sleep'){m.state='sleep';m.t=0;S.qte=null;addNum(b.x,b.y-28,'ASLEEP!',T.col,1.3);}
+  else{const d=Math.round(T.dmg*atk);m.hp-=d;S.stats.dealt+=d;S.stats.statusDmg=(S.stats.statusDmg||0)+d;addNum(b.x,b.y-28,'BLAST! '+d,T.col,1.3);S.fx.push({kind:'ring',x:b.x,y:b.y,t:0,life:.35,col:T.col});S.shake=.6;S.stop=.12;
+    for(let k=0;k<18;k++)S.pt.push({x:b.x,y:b.y,vx:rnd(-110,110),vy:rnd(-120,40),life:rnd(.3,.6),col:k%2?'#ff9a2e':'#ffd34d',g:120});if(m.hp<=0)mKill();}
+  sfx('brk');buzz(80);
+}
 function dealDamage(base,part,heavy,stun,pierce){
   const m=S.m,h=S.h; if(m.state==='dead')return;
   const pose=mPose();
@@ -971,13 +1001,7 @@ function dealDamage(base,part,heavy,stun,pierce){
   const stt=h.g.status;                                                         // the weapon's status builds with every hit
   if(asleep&&m.hp>0){m.state='idle';m.wait=.7;addNum(pp.x,pp.y-24,'WAKE-UP HIT!',STATUS.sleep.col,1.2);S.shake=.6;}
   if(stt&&h.blight<=0&&m.hp>0&&!asleep&&m.state!=='sleep'&&(m.sb+=base*STATUS_RATE*(stt===S.def.weakSt?STATUS_WEAK:stt===S.def.resSt?STATUS_RES:1))>=m.sNeed){
-    const T=STATUS[stt];m.sb=0;m.sNeed*=STATUS_GROW;S.stats.procs=(S.stats.procs||0)+1;const b=partPos('body',pose);
-    if(stt==='poison'){m.mpoison=T.time;m.mpT=0;addNum(b.x,b.y-28,'POISONED!',T.col,1.3);}
-    else if(stt==='para'){mStagger(T.time);m.stunned=false;addNum(b.x,b.y-28,'PARALYSED!',T.col,1.3);}
-    else if(stt==='sleep'){m.state='sleep';m.t=0;S.qte=null;addNum(b.x,b.y-28,'ASLEEP!',T.col,1.3);}
-    else{const d=Math.round(T.dmg*h.atk);m.hp-=d;S.stats.dealt+=d;S.stats.statusDmg=(S.stats.statusDmg||0)+d;addNum(b.x,b.y-28,'BLAST! '+d,T.col,1.3);S.fx.push({kind:'ring',x:b.x,y:b.y,t:0,life:.35,col:T.col});S.shake=.6;S.stop=.12;
-      for(let k=0;k<18;k++)S.pt.push({x:b.x,y:b.y,vx:rnd(-110,110),vy:rnd(-120,40),life:rnd(.3,.6),col:k%2?'#ff9a2e':'#ffd34d',g:120});}
-    sfx('brk');buzz(80);
+    m.sb=0;m.sNeed*=STATUS_GROW;procStatus(stt,h.atk,pose);
   }
   if(m.hp<=0){mKill();return;}
   if(stun&&!m.stunned&&(m.stun+=stun)>=m.stunMax){                               // stun meter full: the monster goes down
@@ -1168,7 +1192,7 @@ function rollLoot(){
   for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
   const lucky=h.g.perks.fortune, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
   if(lucky)for(const d of out)d.n++;
-  if(S.pal&&S.pal.role==='gatherer'){for(const d of out)d.n++;add(BIOME_ING[D.biome][0],2);}
+  if(S.pal&&S.pal.role==='gatherer'){for(const d of out)d.n++;add(BIOME_ING[D.biome][0],Math.floor(2*S.pal.care));}
   let unlock='';
   if(D.small){SAVE.packs++;qEvent('small');}
   else{
@@ -1190,7 +1214,7 @@ function rollLoot(){
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
-const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'&&!S.exp?'hunt':S.tab==='forge'&&S.fpick?'forge':null;
+const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'&&!S.exp?'hunt':S.tab==='forge'?(S.fpick?'forge':'page'):null;
 const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
 function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
 function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fpick=false;S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
@@ -1243,7 +1267,7 @@ function claim(q){
 // ── Kitchen ──
 function brew(){if(!affords(POT_COST)){toast('NEEDS 3 HERBS','#ff6a4d');sfx('miss');return;}for(const [k,n] of Object.entries(POT_COST))SAVE.bag[k]-=n;SAVE.potions++;toast('POTION BREWED','#4cd964');sfx('heal');save();}
 // ── Prep: the screen before a hunt ──
-const ROLE_IDS=['fighter','healer','gatherer','rest'];
+const ROLE_IDS=['fighter','healer','trapper','scout','gatherer','rest'];
 function toPrep(id,small){S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.prep={id,small:small==null?null:small,meal:-1};}
 function prepStart(){
   const P=S.prep,meal=P.meal>=0?MEAL_IDS[P.meal]:null;
@@ -1405,7 +1429,9 @@ function drawWorld(){
     const heavy=ATTACKS[m.atk].heavy, col=heavy?'#ff4030':'#ffb020';
     if(m.t<m.hits[0]&&!mAir()){const bx=clamp(hp.x+2,6,W-8),by=Math.max(HUD_T+2,hp.y-24+(Math.floor(S.clock*8)%2));
       g.fillStyle=OUTLINE;g.fillRect(bx-3,by-1,7,12);g.fillStyle=col;g.fillRect(bx-2,by,5,10);g.fillStyle='#fff';g.fillRect(bx,by+1,1,5);g.fillRect(bx,by+7,1,2);}
-    for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.9){const now=d<PERFECT_WIN;ring(hcx,hcy,9+d*30,now?'#ffffff':col);if(now)ring(hcx,hcy,10+d*30,'#ff4030');}}
+    const see=S.pal&&S.pal.role==='scout'?PAL.scoutSee:.9;                     // a scout spots each hit coming sooner
+    if(see>1&&m.t<m.hits[0])text(m.atk.toUpperCase(),hcx,L.hy-14,'#7fe0c0',{al:1,out:OUTLINE});
+    for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<see){const now=d<PERFECT_WIN;ring(hcx,hcy,9+d*30,now?'#ffffff':col);if(now)ring(hcx,hcy,10+d*30,'#ff4030');}}
     ring(hcx,hcy,9,'rgba(255,255,255,.55)');
     if(aPose()==='burrow'&&mAir()){for(let k=0;k<3;k++){g.fillStyle=BIOMES[S.def.biome].speck;g.fillRect(Math.round(hcx+8+rnd(-10,10)),Math.round(L.hFeet+rnd(-2,3)),2,1);}}
     if(aPose()==='dive'&&mAir())shadow(hcx+14,L.hFeet+1,Math.round(lerp(4,26,m.t/m.hits[0])),4);
@@ -1572,18 +1598,21 @@ function drawCamp(){
           g.fillStyle=i===S.fpage?'#232a4a':'#1c2134';g.fillRect(4,y,118,12);text(P.title,8,y+3,D&&!unlocked(P.mon)?'#5a6080':'#e8f0fc');
           if(D){const wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];text(wk[0],W-28,y+3,wk[1],{al:2});}
           text(have+'/'+P.ids.length,W-9,y+3,have===P.ids.length?'#4cd964':'#8a93b0',{al:2});if(can){g.fillStyle='#4cd964';g.fillRect(5,y+4,2,4);}
-          const cy=y+6;if(cy>top&&cy<bot)B.push({id:'pick:'+i,x:4,y:Math.max(top,y),w:118,h:12,fn:()=>{S.fpage=i;S.fpick=false;sfx('charge',1);}});}
+          const cy=y+6;if(cy>top&&cy<bot)B.push({id:'pick:'+i,x:4,y:Math.max(top,y),w:118,h:12,fn:()=>{S.fpage=i;S.fpick=false;S.scr.page=0;sfx('charge',1);}});}
         y+=13;});
       g.restore();const total=FORGE_PAGES.length*13;S.scrMax.forge=Math.max(0,total-(bot-top)+2);
       if(S.scrMax.forge>0){const hh=bot-top,bh=Math.max(10,hh*hh/total),by=top+(hh-bh)*(S.scr.forge||0)/S.scrMax.forge;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }else{
     g.fillStyle='#232a4a';g.fillRect(3,14,W-6,11);text('<',9,17,'#fff');text('>',W-12,17,'#fff');text(pg.title,W/2,17,'#ffe14d',{al:1});
     B.push({id:'page:pick',x:31,y:12,w:W-62,h:15,fn:()=>{S.fpick=true;S.scr.forge=clamp(S.fpage*13-40,0,1e4);sfx('charge',1);}});
-    B.push({id:'page:prev',x:0,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+n-1)%n;sfx('charge',1);}});B.push({id:'page:next',x:W-30,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+1)%n;sfx('charge',1);}});
-    pg.ids.forEach((id,i)=>{const G=GEAR[id],y=27+i*24,own=!!SAVE.own[id],on=eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2,loose=G.slot==='charm'||G.slot==='coat';
+    B.push({id:'page:prev',x:0,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+n-1)%n;S.scr.page=0;sfx('charge',1);}});B.push({id:'page:next',x:W-30,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+1)%n;S.scr.page=0;sfx('charge',1);}});
+    const ptop=26,pbot=LH-20,rows=[];g.save();g.beginPath();g.rect(0,ptop,W,pbot-ptop);g.clip();          // the rows scroll when they do not fit
+    pg.ids.forEach((id,i)=>{const G=GEAR[id],y=27+i*24-(S.scr.page||0),own=!!SAVE.own[id],on=eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2,loose=G.slot==='charm',pip=pipSlot(G);
+      if(y+23<ptop||y>pbot)return;
       g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);
       g.drawImage(gearSpr(id),5,y+2);text(G.name+(lv?'+'+lv:''),19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');
-      if(G.slot==='weapon'){const d=G.free&&alt?WTYPES[G.wt].tip:'ATK *'+gearAtk(id).toFixed(2);text(d,19,y+9,'#4cd964');if(G.elem){const ex=19+textW(d)+5;text(ELEM[G.elem][0],ex,y+9,ELEM[G.elem][1]);if(G.status)text(STATUS[G.status].name,ex+textW(ELEM[G.elem][0])+4,y+9,STATUS[G.status].col);}}
+      if(pip){const d=G.slot==='pweapon'?'PIP ATK *'+G.patk.toFixed(2):'PIP CARE *'+G.care.toFixed(2);text(d,19,y+9,'#7fe0c0');const wk=G.elem?ELEM[G.elem]:G.status?[STATUS[G.status].name,STATUS[G.status].col]:null;if(wk)text(wk[0],19+textW(d)+5,y+9,wk[1]);}
+      else if(G.slot==='weapon'){const d=G.free&&alt?WTYPES[G.wt].tip:'ATK *'+gearAtk(id).toFixed(2);text(d,19,y+9,'#4cd964');if(G.elem){const ex=19+textW(d)+5;text(ELEM[G.elem][0],ex,y+9,ELEM[G.elem][1]);if(G.status)text(STATUS[G.status].name,ex+textW(ELEM[G.elem][0])+4,y+9,STATUS[G.status].col);}}
       else if(G.slot==='armor'){const d='HP '+gearHp(id)+'  ',el=(MONSTERS[G.tier]||{}).elem;text(d,19,y+9,'#4cd964');      // armor line takes turns: perk, then resistance
         if(el&&(alt||!G.perk)){text('RESISTS',19+textW(d)+4,y+9,'#4cd964');text(ELEM[el][0],19+textW(d)+4+textW('RESISTS')+4,y+9,ELEM[el][1]);}else if(G.perk)text(PERKS[G.perk].desc,19+textW(d)+4,y+9,'#4cd964');}
       else if(G.slot==='coat'){text('BUILDS',19,y+9,'#4cd964');text(STATUS[G.status].name,19+textW('BUILDS')+4,y+9,STATUS[G.status].col);}
@@ -1591,11 +1620,13 @@ function drawCamp(){
       const costRow=(cost,gap)=>{let cx=19;for(const [k,n] of Object.entries(cost)){const have=Math.min(99,SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,cx,y+14,9,9);text(t,cx+10,y+16,have>=n?'#4cd964':'#ff6a4d');cx+=10+textW(t)+gap;}};
       if(!own)costRow(G.cost,4);
       else if(uc){costRow(uc,2);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
-        B.push({id:'up:'+id,x:W-34,y:y+11,w:31,h:12,fn:()=>upgradeTap(id)});}
-      else text(loose?(on?'EQUIPPED':'OWNED'):'MAX LEVEL',19,y+16,on||!loose?'#ffe14d':'#5a6080');
+        if(y+11>=ptop&&y+23<=pbot)B.push({id:'up:'+id,x:W-34,y:y+11,w:31,h:12,fn:()=>upgradeTap(id)});}
+      else text(loose||pip?(on?'EQUIPPED':'OWNED'):'MAX LEVEL',19,y+16,on||!(loose||pip)?'#ffe14d':'#5a6080');
       const lab=on?(loose?'OFF':'ON'):own?'EQUIP':'CRAFT', bc=on?'#8a6a20':own?'#2a6aa8':can?'#2f8f4a':'#3a4060';
       g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,own||can?'#fff':'#8a93b0',{al:1});
-      B.push({id:'forge:'+id,x:3,y,w:W-6,h:23,fn:()=>forgeTap(id)});});
+      const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-6,h:bh,fn:()=>forgeTap(id)});});
+    g.restore();S.scrMax.page=Math.max(0,pg.ids.length*24+1-(pbot-ptop));
+    if(S.scrMax.page>0){const hh=pbot-ptop,tot=pg.ids.length*24+1,bh=Math.max(10,hh*hh/tot),by=ptop+(hh-bh)*(S.scr.page||0)/S.scrMax.page;g.fillStyle='#3a4060';g.fillRect(W-2,ptop,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }
   }else if(S.tab==='cook'){
     text('KITCHEN',W-4,3,'#8a93b0',{al:2});
@@ -1670,7 +1701,7 @@ function drawPrep(){
   else{text('NO MEAL',W/2,y+9,'#e8f0fc',{al:1});text('TAP THE ARROWS TO PICK ONE',W/2,y+18,'#8a93b0',{al:1});}
   // companion
   y+=37;
-  if(SAVE.pal){g.fillStyle='#232a4a';g.fillRect(3,y-2,W-6,24);g.drawImage(palSpr(Math.floor(S.t*4)%2),5,y+2);text('PIP',24,y,'#7fe0c0');const R=ROLES[SAVE.role];text(R[0],W/2+6,y+1,'#ffe14d',{al:1});text(R[1],W/2+6,y+11,'#8a93b0',{al:1});
+  if(SAVE.pal){g.fillStyle='#232a4a';g.fillRect(3,y-2,W-6,30);g.drawImage(palSpr(Math.floor(S.t*4)%2),5,y+2);text('PIP',5,y+16,'#7fe0c0');{const ps=palStats();text('ATK *'+ps.atk.toFixed(2)+'  CARE *'+ps.care.toFixed(2),W/2+8,y+20,'#7fe0c0',{al:1});}const R=ROLES[SAVE.role];text(R[0],W/2+8,y+1,'#ffe14d',{al:1});text(R[1],W/2+8,y+10,'#8a93b0',{al:1});
     const rn=ROLE_IDS.length,ri=ROLE_IDS.indexOf(SAVE.role);smallBtn(B,'prep:rnext',W-17,y+1,13,'>','#2a6aa8',()=>{SAVE.role=ROLE_IDS[(ri+1)%rn];sfx('charge',1);});}
   const by=LH-18;smallBtn(B,'prep:back',4,by,34,'BACK','#3a4060',()=>toCamp('hunt'));smallBtn(B,'prep:start',42,by,W-46,D.small?'START PACK HUNT':'START HUNT',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',prepStart);
   if(S.toast){const tw=textW(S.toast.txt)+10;g.fillStyle='#000';g.fillRect((W-tw)/2-1,by-17,tw+2,13);g.fillStyle='#1c2134';g.fillRect((W-tw)/2,by-16,tw,11);text(S.toast.txt,W/2,by-13,S.toast.col,{al:1});}
@@ -1729,7 +1760,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);
