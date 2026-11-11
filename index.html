@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.11.0';
+const VER='0.12.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -48,42 +48,55 @@ const QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
 const PARTS=['head','wings','tail'];
 const EVADE_DUR=1;
 // wind: seconds of warning before the first hit. hits: offsets after the wind-up. rec: opening afterwards.
-// pose: the animation it plays. status: what a landed hit leaves on the hunter. fx: what appears at the hit. proj: colour of a thrown projectile.
+// pose: the animation it plays. st: a landed hit leaves the monster's own status on the hunter. fx: what appears at the hit.
+// The library is shared; every monster draws its own set of six or seven from it.
 const ATTACKS={
-  // shared basics
   bite:  {pose:'lunge', wind:.8,  hits:[0],        after:.3,  rec:.9,  dmg:14},
   dbl:   {pose:'lunge', wind:.75, hits:[0,.55],    after:.3,  rec:1.1, dmg:13},
+  tri:   {pose:'lunge', wind:.7,  hits:[0,.45,.9], after:.3,  rec:1.3, dmg:9},
+  peck:  {pose:'lunge', wind:.6,  hits:[0,.3,.6],  after:.3,  rec:1.1, dmg:8},
   sweep: {pose:'sweep', wind:1.15,hits:[0],        after:.35, rec:1.0, dmg:18},
-  // Fernwing
-  spit:  {pose:'spit',  wind:.95, hits:[0],        after:.3,  rec:.9,  dmg:10, status:'poison', proj:'#7ad84a'},
-  spit2: {pose:'spit',  wind:.9,  hits:[0,.6],     after:.3,  rec:1.1, dmg:9,  status:'poison', proj:'#7ad84a'},
-  glide: {pose:'dive',  wind:1.7, hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true},
-  // Tuskhide
+  spin:  {pose:'spin',  wind:1.0, hits:[0,.45],    after:.35, rec:1.2, dmg:13},
+  slam:  {pose:'slam',  wind:1.0, hits:[0],        after:.4,  rec:1.0, dmg:20},
   gore:  {pose:'gore',  wind:.85, hits:[0],        after:.35, rec:1.0, dmg:15},
   gore2: {pose:'gore',  wind:.8,  hits:[0,.6],     after:.35, rec:1.2, dmg:13},
   rush:  {pose:'rush',  wind:1.25,hits:[0],        after:.35, rec:1.7, dmg:20, heavy:true},
   stomp: {pose:'stomp', wind:1.1, hits:[0,.55],    after:.35, rec:1.3, dmg:12, fx:'ring'},
   rock:  {pose:'spit',  wind:1.2, hits:[0],        after:.3,  rec:1.1, dmg:22, heavy:true, proj:'#8a6a48', big:true},
-  // Emberwing
-  slam:  {pose:'slam',  wind:1.0, hits:[0],        after:.4,  rec:1.0, dmg:20},
-  flame: {pose:'breath',wind:1.3, hits:[0,.5],     after:.35, rec:1.2, dmg:12, status:'burn'},
-  volley:{pose:'spit',  wind:.9,  hits:[0,.4,.8],  after:.3,  rec:1.2, dmg:9,  status:'burn', proj:'#ff9a2e'},
-  fdive: {pose:'dive',  wind:1.7, hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true, status:'burn', fx:'blast'},
-  // Frostmaw
-  maul:  {pose:'lunge', wind:.75, hits:[0,.5],     after:.3,  rec:1.1, dmg:13},
-  maul3: {pose:'lunge', wind:.7,  hits:[0,.45,.9], after:.3,  rec:1.3, dmg:9},
-  charge:{pose:'rush',  wind:1.15,hits:[0],        after:.35, rec:1.5, dmg:20, heavy:true},
-  frost: {pose:'breath',wind:1.3, hits:[0,.5],     after:.35, rec:1.2, dmg:10, status:'freeze'},
-  icicle:{pose:'skycall',wind:1.0,hits:[0,.42,.84],after:.3,  rec:1.2, dmg:10, fx:'icicle'},
-  leap:  {pose:'dive',  wind:1.6, hits:[0],        after:.3,  rec:1.7, dmg:28, heavy:true, fx:'ring'},
-  // Stormwing
+  spit:  {pose:'spit',  wind:.95, hits:[0],        after:.3,  rec:.9,  dmg:10, st:true},
+  spit2: {pose:'spit',  wind:.9,  hits:[0,.6],     after:.3,  rec:1.1, dmg:9,  st:true},
+  volley:{pose:'spit',  wind:.9,  hits:[0,.4,.8],  after:.3,  rec:1.2, dmg:9,  st:true},
+  breath:{pose:'breath',wind:1.3, hits:[0,.5],     after:.35, rec:1.2, dmg:12, st:true},
   clap:  {pose:'clap',  wind:1.0, hits:[0],        after:.35, rec:1.0, dmg:18, fx:'ring'},
-  bolt:  {pose:'skycall',wind:.95,hits:[0,.42,.84],after:.3,  rec:1.2, dmg:9,  fx:'bolt'},
-  hover: {pose:'hover', wind:1.2, hits:[0,.35,.7,1.05],after:.4,rec:1.4,dmg:8, fx:'bolt'},
-  tdive: {pose:'dive',  wind:1.6, hits:[0],        after:.3,  rec:1.6, dmg:28, heavy:true, fx:'bolt'},
+  sky:   {pose:'skycall',wind:.95,hits:[0,.42,.84],after:.3,  rec:1.2, dmg:9,  fx:'sky'},
+  hover: {pose:'hover', wind:1.2, hits:[0,.35,.7,1.05],after:.4,rec:1.4,dmg:8, fx:'sky'},
+  dive:  {pose:'dive',  wind:1.7, hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true},
+  pounce:{pose:'dive',  wind:1.35,hits:[0],        after:.3,  rec:1.4, dmg:24, heavy:true},
+  leap:  {pose:'dive',  wind:1.6, hits:[0],        after:.3,  rec:1.7, dmg:28, heavy:true, fx:'ring'},
+  blastdive:{pose:'dive',wind:1.7,hits:[0],        after:.3,  rec:1.7, dmg:30, heavy:true, st:true, fx:'blast'},
+  skydive:{pose:'dive', wind:1.6, hits:[0],        after:.3,  rec:1.6, dmg:28, heavy:true, fx:'sky'},
+  erupt: {pose:'burrow',wind:1.5, hits:[0],        after:.4,  rec:1.5, dmg:26, heavy:true, fx:'ring'},
+  // the elder's own
+  starfall:{pose:'skycall',wind:1.0,hits:[0,.35,.7,1.05,1.4],after:.3,rec:1.3,dmg:10,fx:'sky',st:true},
+  beam:  {pose:'breath',wind:1.4, hits:[0,.4,.8],  after:.35, rec:1.3, dmg:12, st:true},
+  comet: {pose:'spit',  wind:1.1, hits:[0,.5,1.0], after:.3,  rec:1.2, dmg:14, big:true, st:true},
+  nova:  {pose:'clap',  wind:1.6, hits:[0,.6],     after:.4,  rec:1.4, dmg:22, heavy:true, fx:'ring'},
+  eclipse:{pose:'dive', wind:1.8, hits:[0],        after:.3,  rec:1.8, dmg:34, heavy:true, fx:'ring'},
 };
 // ── Statuses the hunter can pick up ──
 const POISON={time:6,tick:.6,dmg:.015}, BURN={time:6,tick:.5,dmg:.02,roll:3}, FREEZE={time:2.4,tap:.35,immune:6};
+const WET={time:7,regen:.4};             // soaked: stamina comes back slowly
+const BLIGHT={time:8};                   // the weapon's element or status does nothing
+const BLEED={time:10,tick:.5,dmg:.02,still:1.5};   // hurts while acting; standing still this long stops it
+const STENCH={time:9,roll:4.5};          // no potions; each roll shakes some off
+const NUMB={time:1.4,immune:6};          // cannot act
+const MUD={time:9,cost:1.8};             // dodging costs more; one roll shakes it off
+// What each status says as the hunt opens, and what it is called when it lands
+const INFLICT={poison:['POISON SPIT: POTIONS CURE IT','POISONED','#7ad84a'],burn:['ON FIRE? ROLL TO PUT IT OUT','ON FIRE! ROLL!','#ff9a2e'],freeze:['FROZEN? TAP TO BREAK FREE','FROZEN! TAP!','#7fd6ff'],
+  wet:['SOAKED: STAMINA IS SLOW','SOAKED','#4c9cff'],blight:['BLIGHT DULLS YOUR ELEMENT','BLIGHTED','#e0508a'],bleed:['BLEEDING? STAND STILL','BLEEDING! HOLD STILL','#e2483d'],
+  stench:['STENCH: NO POTIONS. ROLL','STENCH! ROLL','#a8a84a'],numb:['ITS VENOM NUMBS: DODGE IT','NUMBED','#ffe14d'],mud:['MUDDY? ROLL IT OFF','MUDDY: ROLL','#a8794a']};
+const TRAIT_TIP={armor:'ARMORED: STRIKE AS IT TIRES',charge:'CHARGES UP: STUN OR COUNTER',shell:'IN ITS SHELL? WAIT IT OUT',burrow:'IT DIVES UNDER: READ THE RING',regen:'IT HEALS: KEEP HITTING',frenzy:'FASTER AS IT WEAKENS'};
+const SHELL={time:2.2,chance:.3,dmg:.25,wear:2}, REGEN={after:3,rate:.008}, FRENZY=.25;
 // ── Signature mechanics ──
 // ── Statuses a weapon can build on the monster. need: build-up to trigger (base damage x STATUS_RATE per hit), growing each time.
 const STATUS={poison:{name:'POISON',col:'#b06ad8',need:220,time:8,tick:.5,dmg:12},   // damage per tick, times the weapon's attack
@@ -95,39 +108,76 @@ const STATUS_RATE=.5, STATUS_GROW=1.4, STATUS_WEAK=1.5, STATUS_RES=.5;   // buil
 const SHARP={max:100,wear:.07,hi:60,lo:25,bonus:1.1,dull:.75,time:1.3};
 // ── Rare drop: each monster has one. Chance per win, more per broken part, and a little more for every win without one.
 const RARE={base:.03,part:.03,pity:.005};
-const ARMOR=[.6,1.4];                    // Tuskhide: damage while its hide is up, and while it is winded
+const ARMOR=[.6,1.4];                    // armored monsters: damage while the hide is up, and while winded
 const CHARGE={rate:8,speed:.8,dmg:1.25,counter:35};   // Stormwing: charge per second, and what overcharge does
-// ── Monsters. speed: wind-up multiplier per phase. qteTime: seconds a weak-point circle takes to close.
-//    evadeCd: seconds between its dodges per phase. pre: prefix of its material ids. weak: element that hurts it more.
-const ELEM={nature:['NATURE','#4cd964'],earth:['EARTH','#d9a05a'],fire:['FIRE','#ff7a2e'],ice:['ICE','#7fd6ff'],thunder:['THUNDER','#ffe14d']};
-const MONSTERS={
-  fern:{name:'FERNWING',short:'FERN',rig:'wyvern',kind:0,biome:0,stars:1,elem:'nature',weak:'fire',rareName:'HEARTLEAF',pre:'',
-    hp:3100,dmg:1,speed:[1,.88,.78],qteTime:.5,evadeCd:[3.4,2.6,1.9],stunMax:100,blood:'#3f9e8a',breath:['#ff9a2e','#ffd34d','#e2483d'],
-    sig:'poison',tip:'POISON SPIT: POTIONS CURE IT',
-    pools:[['bite','bite','sweep','spit'],['bite','sweep','dbl','spit','spit2'],['sweep','dbl','spit2','spit2','glide','glide']]},
-  tusk:{name:'TUSKHIDE',short:'TUSK',rig:'brute',kind:0,biome:2,stars:2,needs:'fern',elem:'earth',weak:'nature',rareName:'IVORY CORE',pre:'t_',
-    hp:4700,dmg:1.25,speed:[.95,.85,.76],qteTime:.45,evadeCd:[4,3,2.4],stunMax:115,blood:'#b08a5a',breath:['#e0c89a','#f2dca0','#c9955a'],
-    sig:'armor',tip:'ARMORED: STRIKE AS IT TIRES',
-    pools:[['gore','gore','rush','stomp'],['gore','gore2','rush','stomp','rock'],['gore2','rush','rush','stomp','rock','rock']]},
-  ember:{name:'EMBERWING',short:'EMBER',rig:'wyvern',kind:1,biome:1,stars:3,needs:'tusk',elem:'fire',weak:'earth',rareName:'MAGMA HEART',pre:'e_',
-    hp:6200,dmg:1.5,speed:[.9,.8,.7],qteTime:.38,evadeCd:[3,2.2,1.6],stunMax:130,blood:'#b8402e',breath:['#ff9a2e','#ffd34d','#e2483d'],
-    sig:'burn',tip:'ON FIRE? ROLL TO PUT IT OUT',
-    pools:[['bite','slam','slam','flame'],['slam','flame','flame','volley','dbl'],['slam','flame','volley','volley','fdive','fdive']]},
-  frost:{name:'FROSTMAW',short:'FROST',rig:'brute',kind:1,biome:3,stars:4,needs:'ember',elem:'ice',weak:'fire',rareName:'RIME HEART',pre:'f_',
-    hp:8000,dmg:1.8,speed:[.86,.76,.66],qteTime:.34,evadeCd:[3,2.2,1.6],stunMax:150,blood:'#9fd8f0',breath:['#bfeaff','#ffffff','#7fd6ff'],
-    sig:'freeze',tip:'FROZEN? TAP TO BREAK FREE',
-    pools:[['maul','maul','charge','icicle'],['maul','charge','frost','icicle','icicle'],['maul3','frost','frost','charge','leap','icicle']]},
-  storm:{name:'STORMWING',short:'STORM',rig:'wyvern',kind:2,biome:4,stars:5,needs:'frost',elem:'thunder',weak:'ice',rareName:'STORM CORE',pre:'s_',
-    hp:10000,dmg:2.1,speed:[.82,.72,.62],qteTime:.3,evadeCd:[2.6,1.9,1.4],stunMax:170,blood:'#6a6ad8',breath:['#ffe14d','#ffffff','#a8a8ff'],
-    sig:'charge',tip:'CHARGES UP: STUN OR COUNTER',
-    pools:[['bite','sweep','clap','bolt'],['sweep','clap','bolt','bolt','hover'],['clap','bolt','hover','hover','tdive','tdive','dbl']]},
-};
-const HUNTS=['fern','tusk','ember','frost','storm'];
-// Each monster is weak to one status and shrugs off the one it uses itself
-Object.assign(MONSTERS.fern,{weakSt:'sleep',resSt:'poison'});Object.assign(MONSTERS.tusk,{weakSt:'poison',resSt:null});Object.assign(MONSTERS.ember,{weakSt:'para',resSt:'blast'});
-Object.assign(MONSTERS.frost,{weakSt:'blast',resSt:'sleep'});Object.assign(MONSTERS.storm,{weakSt:'sleep',resSt:'para'});
-for(const id of HUNTS){const D=MONSTERS[id],q=D.pre;D.id=id;D.mat={scale:q+'scale',claw:q+'claw',head:q+'horn',wings:q+'wing',tail:q+'spike',rare:q+'rare'};
-  D.loot={common:[[D.mat.scale,2,4],[D.mat.claw,1,2]],parts:{head:D.mat.head,wings:D.mat.wings,tail:D.mat.tail}};}
+// ── Elements ──
+const ELEM={nature:['NATURE','#4cd964'],earth:['EARTH','#d9a05a'],fire:['FIRE','#ff7a2e'],ice:['ICE','#7fd6ff'],thunder:['THUNDER','#ffe14d'],water:['WATER','#4c9cff'],dragon:['DRAGON','#e0508a']};
+const FXC={nature:['#7ad84a','#c8f08a','#3a9a3a'],earth:['#e0c89a','#f2dca0','#c9955a'],fire:['#ff9a2e','#ffd34d','#e2483d'],ice:['#bfeaff','#ffffff','#7fd6ff'],
+  thunder:['#ffe14d','#ffffff','#a8a8ff'],water:['#4c9cff','#bfe0ff','#2a6ac8'],dragon:['#e0508a','#ffb0d0','#7a2a6a']};
+// ── The roster, in hunting order: 30 monsters in six ranks of five, four apex monsters (rank 7), and the elder (rank 8).
+// id | name | short name for gear | body | biome | its element | what its weapons carry (an element or a status) | weak element | weak status |
+// status it inflicts | trait | moves (the last is its biggest) | colours: body, belly, bone, dark | look flags
+const ROSTER=`
+fern|FERNWING|FERN|wyvern|0|nature|nature|fire|sleep|poison||bite,sweep,dbl,spit,spit2,dive|3f9e8a,d9c88e,e8e2cc,2c7366|
+quill|QUILLBEAK|QUILL|raptor|0|nature|sleep|fire|poison|bleed||peck,bite,sweep,spit,spit2,pounce|6a9a4a,e8dca0,e0a03a,3f6a34|
+mud|MUDCLAW|MUD|crab|5|water|water|thunder|para|mud|shell|dbl,gore,sweep,spit,stomp,rush|7a6a4a,c8b890,e8e2cc,4a3f2c|
+dust|DUSTFANG|DUST|raptor|2|earth|para|water|sleep|numb||peck,bite,sweep,spit,clap,pounce|c9a05a,f2dca0,6a4a2c,8a6a34|
+tusk|TUSKHIDE|TUSK|brute|2|earth|earth|nature|poison||armor|gore,gore2,rush,stomp,rock,leap|a8794a,e0c89a,f0ead8,7a5434|tusk
+bog|BOGMAW|BOG|serpent|5|water|poison|thunder|blast|poison|burrow|bite,slam,sweep,breath,spit2,erupt|4a7a5a,c8d8a0,e8e2cc,2c4a3a|
+ember|EMBERWING|EMBER|wyvern|1|fire|fire|water|para|burn||bite,slam,breath,volley,dbl,blastdive|b8402e,f0b070,4a3c48,6a1f24|big,club,hot
+thorn|THORNBACK|THORN|brute|0|nature|nature|fire|blast|bleed|regen|gore,rush,stomp,spit,gore2,leap|5a8a4a,d9c88e,e8e2cc,34582c|
+shell|SHELLSNAP|SHELL|crab|6|water|sleep|thunder|poison|wet|shell|dbl,sweep,gore,volley,spin,rush|4a8ab8,e8dcc0,f0ead8,2a5a80|
+gust|GUSTRAPTOR|GUST|raptor|4|thunder|thunder|ice|sleep||frenzy|peck,bite,clap,sky,sweep,pounce|8a8ad0,e8e8f8,ffe14d,4a4a90|
+eel|SANDEEL|EEL|serpent|2|earth|earth|water|para|mud|burrow|bite,sweep,slam,spit,rock,erupt|c9a05a,f2e2b0,8a6a34,8a6a34|
+cinder|CINDERHIDE|CINDER|brute|1|fire|blast|water|sleep|burn|armor|gore,gore2,rush,breath,rock,leap|5a3a3a,ff9a4d,2a1a1e,3a2426|hot
+rime|RIMEWING|RIME|wyvern|3|ice|ice|fire|blast|freeze||bite,sweep,dbl,breath,sky,dive|9fd0ea,f4fbff,e8f8ff,5a98c0|big
+sting|VENOMSTING|STING|crab|5|nature|poison|fire|para|poison|frenzy|dbl,slam,gore,spit2,sweep,rush|7a4a8a,d8c0e0,c8f08a,4a2c5a|
+plume|PLUMECREST|PLUME|raptor|6|water|water|thunder|blast|wet||peck,sweep,bite,volley,clap,pounce|3a9ac8,f0f0e0,ff7aa8,2a6a90|
+frost|FROSTMAW|FROST|brute|3|ice|ice|fire|blast|freeze||dbl,tri,rush,breath,sky,leap|d2e6f2,f4fbff,6cc4f0,9fbcd0|coldeye
+tide|TIDECOIL|TIDE|serpent|6|water|water|thunder|poison|wet|burrow|bite,slam,spin,breath,volley,erupt|3a7ac8,bfe0ff,f0ead8,2a4a90|
+volt|VOLTWING|VOLT|wyvern|4|thunder|para|ice|sleep|numb|frenzy|bite,dbl,sweep,spit2,sky,hover|d8c83a,f8f4c0,4a50a8,8a7a1a|club
+magma|MAGMACLAW|MAGMA|crab|1|fire|fire|water|sleep|burn|shell|gore,dbl,stomp,volley,spin,rush|3a2a2e,ff7a2e,ffd34d,221a1e|hot
+dread|DREADBEAK|DREAD|raptor|7|dragon|dragon|thunder|blast|blight||peck,tri,sweep,breath,clap,pounce|4a2a4a,c8a0b8,e0508a,2a1a2e|
+icehide|ICEHIDE|ICE|brute|3|ice|sleep|fire|para|freeze|armor|gore2,rush,stomp,breath,sky,leap|8ab8d8,e8f4fa,ffffff,5a88a8|tusk
+mire|MIREFANG|MIRE|serpent|5|nature|nature|fire|blast|stench|regen|bite,sweep,slam,spit2,breath,rush|5a5a3a,b8c890,c8f08a,3a3a22|
+obsid|OBSIDWING|OBSID|wyvern|1|fire|blast|dragon|poison|burn|frenzy|tri,slam,spin,volley,breath,blastdive|2e2a3a,ff7a2e,8a8aa0,1a1826|big,club,hot
+cryst|CRYSTALBACK|CRYST|crab|7|earth|earth|ice|blast|bleed|shell|dbl,gore,spin,spit,stomp,rush|8a7ab8,e0d8f0,bfeaff,5a4a88|
+temp|TEMPESTBEAK|TEMP|raptor|4|thunder|thunder|earth|sleep|numb|frenzy|peck,tri,spit,sky,clap,pounce|3a3f7a,c8c8f0,ffe14d,23265a|
+abyss|ABYSSCOIL|ABYSS|serpent|6|water|water|thunder|para|wet|burrow|dbl,spin,slam,breath,spit2,erupt|1e2a5a,7fd6ff,bfeaff,12183a|
+ruin|RUINHORN|RUIN|brute|7|dragon|dragon|ice|poison|blight|armor|gore,gore2,rush,breath,sky,leap|4a3a4a,c8a0b8,e0508a,2e222e|
+storm|STORMWING|STORM|wyvern|4|thunder|thunder|ice|sleep||charge|bite,sweep,clap,sky,hover,skydive,dbl|4a50a8,c8c8f0,ffe14d,262a66|big,club
+dusk|DUSKSTING|DUSK|crab|7|dragon|para|fire|blast|stench|shell|dbl,slam,spin,spit2,volley,rush|3a2a4a,b890c8,e0508a,221a2e|
+aurora|AURORAWING|AURORA|wyvern|3|ice|ice|fire|para|freeze|regen|bite,sweep,dbl,breath,sky,hover|6ad8c0,f0f8ff,b06ad8,3a9a98|big
+gloom|GLOOMTUSK|GLOOM|brute|7|dragon|dragon|ice|blast|blight|armor|gore2,rush,stomp,breath,sky,leap,rock|2a2230,e0508a,ffb0d0,18141c|tusk,glow
+reaver|TIDEREAVER|REAVER|serpent|6|water|water|dragon|sleep|wet|burrow|bite,spin,slam,breath,volley,erupt,rush|123a5a,4cc9ff,e8f8ff,0a2238|glow
+pyre|PYRECLAW|PYRE|crab|1|fire|blast|water|para|burn|shell|dbl,gore,spin,volley,stomp,rush,blastdive|5a1a14,ffd34d,ff9a2e,2e0e0c|glow,hot
+render|SKYRENDER|RENDER|wyvern|4|thunder|thunder|ice|poison|numb|charge|dbl,tri,clap,sky,hover,skydive,spit2|e8e8f8,ffe14d,4a50a8,a8a8d8|big,club,glow
+star|THE HOLLOW STAR|STAR|wyvern|8|dragon|dragon|ice|blast|blight|charge|dbl,slam,starfall,beam,comet,nova,eclipse|1a1630,8a7ad8,f0e8ff,0e0c1e|big,elder,glow
+`.trim().split('\n').map(r=>r.split('|'));
+const OLD_PRE={fern:'',tusk:'t_',ember:'e_',frost:'f_',storm:'s_'};   // material ids from before the roster grew
+const PART_NAMES={wyvern:['SCALE','CLAW','HORN','WING','TAIL'],brute:['HIDE','CLAW','HORN','SPINE','TAIL'],serpent:['SCALE','FANG','CREST','FIN','TAIL'],
+  raptor:['PLUME','TALON','BEAK','CREST','TAIL'],crab:['SHELL','PINCER','FEELER','PLATE','STING']};
+const gearLevel=L=>({atk:+(1.3+.06*L).toFixed(2),hp:140+8*L});     // what a monster's gear is worth, by its place in the order
+const MONSTERS={}, HUNTS=[];
+ROSTER.forEach((r,i)=>{
+  const [id,name,short,rig,biome,elem,w,weak,weakSt,inflict,trait,moves,cols,flags]=r, c=cols.split(',').map(x=>'#'+x), f={};(flags||'').split(',').forEach(k=>{if(k)f[k]=1;});
+  const rank=i<30?1+(i/5|0):i<34?7:8, L=i<30?i:i<34?31:33, t=L/29, m=moves.split(','), q=id in OLD_PRE?OLD_PRE[id]:id+'_';
+  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.8;dmg*=1.12;} if(trait==='armor')hp=Math.round(hp*.9/50)*50;
+  const s0=1-.2*t, e0=3.4-t;
+  const D=MONSTERS[id]={id,name,short,rig,biome:+biome,rank,stars:rank,L,elem,weak,weakSt,inflict:inflict||null,trait:trait||null,
+    resSt:STATUS[w]?w:STATUS[inflict]?inflict:null,wElem:ELEM[w]?w:null,wStatus:STATUS[w]?w:null,
+    look:{b:c[0],u:c[1],h:c[2],d:c[3],f}, hp,dmg:+dmg.toFixed(2),speed:[+s0.toFixed(3),+(s0-.12).toFixed(3),+(s0-.22).toFixed(3)],qteTime:+(.5-.22*t).toFixed(3),
+    evadeCd:[+e0.toFixed(2),+(e0*.76).toFixed(2),+(e0*.56).toFixed(2)],stunMax:100+3*L,blood:c[0],fxc:FXC[elem],moves:m,time:rank===8?240:rank===7?180:HUNT_TIME,
+    pools:[[m[0],m[0],m[1],m[2],m[3]],[m[0],m[1],m[2],m[3],m[3],m[4]],[m[1],m[2],m[3],m[4],m[4],...m.slice(5),...m.slice(5)]],
+    tip:TRAIT_TIP[trait]||(INFLICT[inflict]||['A STRAIGHT FIGHT'])[0], tip2:trait&&inflict?INFLICT[inflict][0]:''};
+  if(D.resSt===D.weakSt)D.resSt=null;
+  const P=PART_NAMES[rig];
+  D.mat={scale:q+'scale',claw:q+'claw',head:q+'horn',wings:q+'wing',tail:q+'spike',rare:q+'rare'};
+  D.matName={scale:short+' '+P[0],claw:short+' '+P[1],head:short+' '+(rig==='brute'&&f.tusk?'TUSK':P[2]),wings:short+' '+P[3],tail:short+' '+P[4],rare:short+' CORE'};
+  D.loot={common:[[D.mat.scale,2,4],[D.mat.claw,1,2]],parts:{head:D.mat.head,wings:D.mat.wings,tail:D.mat.tail}};
+  HUNTS.push(id);
+});
+const EXPED=['fern','tusk','ember','frost','storm'];     // the five biomes with expeditions, by the monster that opens each
 // ── Perks, carried by armor and charms ──
 const PERKS={
   tireless:{name:'TIRELESS',  desc:'DODGE COST -40%'},
@@ -144,31 +194,24 @@ const PERKS={
   riposte: {name:'RIPOSTE',   desc:'COUNTER DAMAGE +40%'},
   weakspot:{name:'WEAK SPOT', desc:'HEAD DAMAGE +25%'},
 };
-// ── Gear. One weapon, one armor and one charm are worn at a time. Built from the tables above.
-const TIERS={iron:{atk:1,hp:100},fern:{atk:1.3,hp:140,ar:'tireless',ch:'keeneye'},tusk:{atk:1.5,hp:170,ar:'guardian',ch:'bludgeon'},ember:{atk:1.75,hp:200,ar:'might',ch:'breaker'},
-  frost:{atk:2.05,hp:240,ar:'nimble',ch:'herbal'},storm:{atk:2.4,hp:290,ar:'keenedge',ch:'fortune'}};
+// ── Gear. One weapon, one armor and one charm are worn at a time. Built from the roster.
+// A monster's weapons carry its element or its status, never both. Its armor and charm carry one perk each, by its place in the order.
+const APERK=['tireless','guardian','might','nimble','keenedge','herbal','bludgeon','keeneye','fortune','breaker'];
+const CPERK=['keeneye','bludgeon','breaker','herbal','fortune','tireless','guardian','might','nimble','keenedge'];
 const WCOST={gs:{scale:5,claw:2,head:1},db:{scale:4,claw:4,wings:1},hm:{scale:5,claw:2,tail:1},ln:{scale:6,claw:1,wings:1}};
 const GEAR={leather:{slot:'armor',tier:'iron',name:'LEATHER ARMOR',hp:100}};
 for(const wt of WT)GEAR['iron_'+wt]={slot:'weapon',tier:'iron',wt,name:'IRON '+WTYPES[wt].name,atk:1,free:true};
-HUNTS.forEach((id,i)=>{const D=MONSTERS[id],T=TIERS[id],m=D.mat,cost=c=>Object.fromEntries(Object.entries(c).map(([k,n])=>[m[k],n]));
-  for(const wt of WT)GEAR[id+'_'+wt]={slot:'weapon',tier:id,wt,name:D.short+' '+WTYPES[wt].name,atk:T.atk,elem:D.elem,cost:cost(WCOST[wt])};
-  GEAR[id+'_ar']={slot:'armor',tier:id,name:D.short+(id==='ember'?' PLATE':' MAIL'),hp:T.hp,perk:T.ar,cost:cost({scale:7,claw:2,wings:1})};
-  GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[T.ch].name+' CHARM',perk:T.ch,cost:cost(i<2?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
+HUNTS.forEach((id,i)=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat,cost=c=>Object.fromEntries(Object.entries(c).map(([k,n])=>[m[k],n]));
+  for(const wt of WT)GEAR[id+'_'+wt]={slot:'weapon',tier:id,wt,name:D.short+' '+WTYPES[wt].name,atk:T.atk,elem:D.wElem,status:D.wStatus,cost:cost(WCOST[wt])};
+  GEAR[id+'_ar']={slot:'armor',tier:id,name:D.short+' MAIL',hp:T.hp,perk:APERK[i%10],cost:cost({scale:7,claw:2,wings:1})};
+  GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[CPERK[i%10]].name+' CHARM',perk:CPERK[i%10],cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
 Object.assign(GEAR,{
   relic_quick:  {slot:'charm',tier:'relic',name:'QUICK DRAW CHARM',perk:'quick',  cost:{gem:1,t_horn:1,claw:4}},
   relic_riposte:{slot:'charm',tier:'relic',name:'RIPOSTE CHARM',   perk:'riposte',cost:{gem:1,e_wing:1,t_spike:1}},
   relic_weak:   {slot:'charm',tier:'relic',name:'WEAK SPOT CHARM', perk:'weakspot',cost:{gem:1,f_horn:1,e_horn:1}},
 });
-// Coatings: the status a hunter's weapon builds, whatever the weapon. One is worn at a time.
-Object.assign(GEAR,{
-  coat_poison:{slot:'coat',tier:'coat',name:'POISON COATING',status:'poison',cost:{horn:1,claw:4}},
-  coat_sleep: {slot:'coat',tier:'coat',name:'SLEEP COATING', status:'sleep', cost:{t_horn:1,t_claw:4}},
-  coat_blast: {slot:'coat',tier:'coat',name:'BLAST COATING', status:'blast', cost:{e_horn:1,e_claw:4}},
-  coat_para:  {slot:'coat',tier:'coat',name:'PARA COATING',  status:'para',  cost:{f_horn:1,f_claw:4}},
-});
 const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather']},
-  ...HUNTS.map(id=>({title:MONSTERS[id].name+' GEAR',ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch']})),
-  {title:'COATINGS',ids:['coat_poison','coat_sleep','coat_blast','coat_para']},
+  ...HUNTS.map(id=>({title:MONSTERS[id].name,mon:id,ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch']})),
   {title:'RELICS',ids:['relic_quick','relic_riposte','relic_weak']}];
 // ── Pantry: two ingredients per biome (the second is the scarcer one), and meat from pack hunts
 const ING={herb:['HERB','#4cd964','#2f8f4a','leaf'],honey:['HONEY','#ffc83d','#c98a1a','drop'],pepper:['PEPPER','#e2483d','#4cd964','fruit'],ashroot:['ASH ROOT','#a89080','#6a5a50','root'],
@@ -206,13 +249,18 @@ const STORY=[
   {t:'THE SHY THIEF',     d:['WELCOME TO HOLLOWROOT CAMP.','A FERNWING IS IN THE HERB','GARDEN. ODD: THEY ARE SHY.'],goal:['hunt','fern',1],rw:{potion:2}},
   {t:'STOCK THE PANTRY',  d:['THE COOK WANTS HER HERBS','BACK. TRY A GATHER RUN: OPEN','HUNT, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
   {t:'A PROPER EDGE',     d:['THAT IRON WILL NOT LAST.','FORGE OR UPGRADE SOMETHING','AT THE FORGE.'],goal:['craft',null,1],rw:{scale:3}},
-  {t:'TROUBLE IN THE SAND',d:['A TUSKHIDE IS FLATTENING','CARAVANS. THEY ARE GRUMPY,','NEVER RECKLESS. VERY ODD.'],goal:['hunt','tusk',1],rw:{meat:3}},
+  {t:'WORD GETS AROUND',  d:['FOUR MORE BEASTS ARE ACTING','UP NEARBY. BEAT ANY THREE','IN RANK 1 TO EARN RANK 2.'],goal:['rank',2,1],rw:{meat:3}},
   {t:'EAT FIRST',         d:['NEVER HUNT HUNGRY. PICK A','DISH ON THE PREP SCREEN','BEFORE YOUR NEXT HUNT.'],goal:['meal',null,1],rw:{honey:2}},
   {t:'SMOKE ON THE RIDGE',d:['AN EMBERWING LEFT ITS NEST,','AND ITS SCALES SHED A FAINT','GLOW. NOBODY HAS SEEN THAT.'],goal:['hunt','ember',1],rw:{pal:1}},
   {t:'A SINGED LITTLE FRIEND',d:['A SCORCHED CRITTER TRAILED','YOU BACK. THE COOK CALLS IT','PIP. TAKE PIP ON A HUNT.'],goal:['pal',null,1],rw:{potion:2}},
-  {t:'THE COLD SNAP',     d:['THE GLOW IS ON THE SNOW TOO.','A FROSTMAW HAS LEFT ITS CAVE','AND THE TRAIL LEADS UPHILL.'],goal:['hunt','frost',1],rw:{gem:1}},
+  {t:'THE GLOW',          d:['EVERY BEAST YOU BRING DOWN','SHEDS THE SAME FAINT GLOW.','REACH RANK 3.'],goal:['rank',3,1],rw:{gem:1}},
+  {t:'THE COLD SNAP',     d:['THE GLOW IS ON THE SNOW TOO,','AND THE TRAIL CLIMBS.','REACH RANK 4.'],goal:['rank',4,1],rw:{gem:1}},
+  {t:'OLD STONES',        d:['THE RUINS IN THE EAST HUM AT','NIGHT. THE ELDERS ARE UNEASY.','REACH RANK 5.'],goal:['rank',5,1],rw:{gem:1}},
+  {t:'THE HIGH TRAIL',    d:['THE GLOW IS THICKEST AT THE','PEAKS. ONLY THE BEST HUNT','THERE. REACH RANK 6.'],goal:['rank',6,1],rw:{gem:2}},
   {t:'EYE OF THE STORM',  d:['EVERY TRAIL OF GLOW ENDS AT','THE PEAKS. A STORMWING','CIRCLES THERE, ON GUARD.'],goal:['hunt','storm',1],rw:{gem:2}},
-  {t:'THE HOLLOW STAR',   d:['THE GLOW FALLS FROM THE SKY.','THE ELDERS NAME ITS SOURCE:','THE HOLLOW STAR. IT STIRS...'],goal:['never',null,1],rw:{}},
+  {t:'FOUR HERALDS',      d:['FOUR GREAT BEASTS HAVE RISEN,','SOAKED IN GLOW. THEY GUARD','THE WAY UP. BEAT ALL FOUR.'],goal:['apex',null,4],rw:{gem:3}},
+  {t:'THE HOLLOW STAR',   d:['THE GLOW FALLS FROM THE SKY.','ITS SOURCE HAS COME DOWN TO','THE PEAK. END THIS, HUNTER.'],goal:['hunt','star',1],rw:{gem:5}},
+  {t:'QUIET SKIES',       d:['THE GLOW IS FADING AND THE','BEASTS ARE CALM AGAIN. THE','COOK HAS MADE YOU A FEAST.'],goal:['done',null,1],rw:{}},
 ];
 const SIDES=[
   {id:'tails', goal:['tail',null,3],   rw:{gem:1}},    {id:'hammer',goal:['weapon','hm',2],rw:{herb:5}},
@@ -226,7 +274,7 @@ const DAILIES=[{goal:['hunt',null,2],rw:{potion:2}},{goal:['gather',null,2],rw:{
 const WEEKLIES=[{goal:['hunt',null,10],rw:{gem:2,potion:3}},{goal:['break',null,12],rw:{gem:2,potion:3}},{goal:['catch',null,8],rw:{gem:2,potion:3}},{goal:['perfect',null,25],rw:{gem:2,potion:3}}];
 function goalText(q){const [k,a,n]=q,s=n>1?'S':'';return{hunt:MONSTERS[a]?'HUNT THE '+MONSTERS[a].name:'WIN '+n+' HUNT'+s,gather:'GO ON '+n+' GATHER RUN'+s,craft:'FORGE OR UPGRADE GEAR',meal:'EAT '+n+' MEAL'+s,
   pal:'HUNT WITH PIP',tail:'BREAK '+n+' TAIL'+s,break:'BREAK '+n+' PART'+s,weapon:'WIN '+n+' WITH '+(WTYPES[a]?WTYPES[a].name:''),perfect:n+' PERFECT DODGES',catch:'CATCH '+n+' CREATURE'+s,
-  small:'CLEAR '+n+' PACK HUNT'+s,fast:'WIN A HUNT IN 45S',allbreak:'BREAK ALL 3 PARTS',never:'TO BE CONTINUED'}[k];}
+  small:'CLEAR '+n+' PACK HUNT'+s,fast:'WIN A HUNT IN 45S',allbreak:'BREAK ALL 3 PARTS',rank:'REACH '+rankName(a),apex:'BEAT THE 4 APEX MONSTERS',done:'THE END, FOR NOW'}[k];}
 const OLD_IDS={iron:'iron_gs',fblade:'fern_gs',eblade:'ember_gs',fmail:'fern_ar',eplate:'ember_ar',keen:'fern_ch',breaker:'ember_ch'};   // ids from v0.6
 
 // ── Helpers ──
@@ -297,14 +345,14 @@ function text(str,x,y,col,o){
 function bar(x,y,w,h,f,col,back){g.fillStyle='#000';g.fillRect(x-1,y-1,w+2,h+2);g.fillStyle=back;g.fillRect(x,y,w,h);const fw=Math.round(w*clamp(f,0,1));if(fw>0){g.fillStyle=col;g.fillRect(x,y,fw,h);g.fillStyle=shade(col,.35);g.fillRect(x,y,fw,1);}}
 function ring(cx,cy,r,col){g.fillStyle=col;const n=Math.max(12,Math.round(r*5));for(let i=0;i<n;i++){const a=i/n*Math.PI*2;g.fillRect(Math.round(cx+Math.cos(a)*r),Math.round(cy+Math.sin(a)*r*.55),1,1);}}
 
-// ── Monster: the Fernwing, a forest wyvern ──
+// ── Monster bodies. Each takes the same pose inputs and a look: colours (b body, u belly, h bone, d dark) and flags.
+// Palette slots: 1 body, 2 belly, 3 pupil, 4 eye, 5 bone, 6 dark, 7 mouth, 8 glow.
+const mouthCol=p=>{const g=p.look.f.hot?Math.max(1,p.glow):p.glow;return !g?'!#141826':p.fxc==='#ff9a2e'?['!#ff9a2e','!#ffd34d','!#fff6c0'][g-1]:'!'+p.fxc;};
+const lookPal=p=>{const K=p.look;return{1:K.b,2:K.u,3:'!#141826',4:p.rage?(K.f.big||K.f.glow?'!#ffffff':'!#ff4030'):K.f.coldeye?'!#2a6aa8':'!#ffe14d',5:K.h,6:K.d,7:mouthCol(p),8:'!'+K.u};};
+const poseKey=p=>`${p.lk}:${p.hx}:${p.hy}:${p.jaw}:${p.wing}:${p.tail}:${p.horn?1:0}:${p.spike?1:0}:${p.glow}:${p.rage}:${p.torn?1:0}`;
 const MS_W=88, MS_H=68, MS_OX=8, MS_OY=8;      // sprite size and the margin the head and wings move in
 function wyvernSpr(p,flash){
-  const key=`wy:${p.hx}:${p.hy}:${p.jaw}:${p.wing}:${p.tail}:${p.horn?1:0}:${p.spike?1:0}:${p.glow}:${p.rage}:${p.torn?1:0}:${p.kind|0}`;
-  const E=p.kind>0, mouth=['!#141826','!#ff9a2e','!#ffd34d','!#fff6c0'][p.kind===1?Math.max(1,p.glow):p.glow];   // the Emberwing's mouth always glows
-  const pal=[{1:'#3f9e8a',2:'#d9c88e',3:'!#141826',4:p.rage?'!#ff4030':'!#ffe14d',5:'#e8e2cc',6:'#2c7366',7:mouth},
-             {1:'#b8402e',2:'#f0b070',3:'!#141826',4:p.rage?'!#ffffff':'!#ffe14d',5:'#4a3c48',6:'#6a1f24',7:mouth},
-             {1:'#4a50a8',2:'#c8c8f0',3:'!#141826',4:p.rage?'!#ffffff':'!#ffe14d',5:'#ffe14d',6:'#262a66',7:mouth}][p.kind|0];
+  const key='wy:'+poseKey(p), F=p.look.f, E=F.big, pal=lookPal(p);
   const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
     a.off(MS_OX,MS_OY);
     const hx=p.hx,hy=p.hy,t=p.tail;
@@ -312,10 +360,12 @@ function wyvernSpr(p,flash){
     if(p.wing===0)a.poly([[44,20],[60,2],[74,6],[70,14],[62,12],[58,24]],6);
     else if(p.wing===1)a.poly([[44,20],[56,-6],[76,-4],[70,6],[62,4],[58,24]],6);
     else a.poly([[44,24],[62,28],[76,38],[66,36],[58,34]],6);
+    if(F.elder){if(p.wing===2)a.poly([[40,22],[60,20],[80,30],[70,32],[56,30]],6);else a.poly([[40,18],[52,-8],[84,-6],[78,6],[68,2],[56,22]],6);}   // a second pair of wings
     a.poly([[46,30],[64,34],[75,42+t],[62,38+t/2],[48,38]],1);                 // tail
-    if(p.spike){if(E)a.ell(73,42+t,4,4,5);else a.poly([[70,36+t],[76,42+t],[69,44+t]],5);}
+    if(p.spike){if(F.club)a.ell(73,42+t,4,4,F.glow?8:5);else a.poly([[70,36+t],[76,42+t],[69,44+t]],5);}
     a.rect(38,40,4,12,6); a.rect(37,50,6,3,5);                                  // back leg
     a.ell(38,30,13,9,1); a.ell(36,34,9,5,2);                                    // body, belly
+    if(F.elder){a.ell(36,33,5,3,8);for(const [x,y] of [[30,27],[42,27],[46,31],[34,24],[40,36]])a.px(x,y,8);}   // a hollow, starlit chest
     a.poly([[30,24],[22+hx,14+hy],[18+hx,16+hy],[26,30]],1);                    // neck
     a.ell(16+hx,14+hy,8,6,1);                                                   // head
     a.poly([[4+hx,14+hy],[12+hx,10+hy],[12+hx,20+hy],[3+hx,18+hy]],1);          // snout
@@ -325,6 +375,7 @@ function wyvernSpr(p,flash){
     if(p.horn){if(E){a.poly([[18+hx,9+hy],[32+hx,4+hy],[30+hx,-2+hy],[28+hx,3+hy],[22+hx,11+hy]],5);a.poly([[14+hx,8+hy],[16+hx,-2+hy],[20+hx,-4+hy],[19+hx,9+hy]],5);}
       else{a.poly([[18+hx,9+hy],[28+hx,2+hy],[22+hx,11+hy]],5);a.poly([[15+hx,8+hy],[20+hx,1+hy],[19+hx,9+hy]],5);}}
     else{a.rect(19+hx,8+hy,3,2,5);a.rect(15+hx,7+hy,2,2,5);}                     // broken stumps
+    if(F.elder&&p.horn){a.poly([[20+hx,11+hy],[38+hx,8+hy],[40+hx,2+hy],[36+hx,6+hy],[22+hx,9+hy]],8);}
     a.px(13+hx,12+hy,4);a.px(14+hx,12+hy,4);a.px(13+hx,13+hy,3);                // eye
     // near wing
     if(p.wing===0){a.poly([[34,22],[44,4],[54,8],[46,26]],6);a.poly([[44,4],[40,0],[46,3]],5);}
@@ -332,7 +383,7 @@ function wyvernSpr(p,flash){
     else a.poly([[34,24],[48,30],[60,46],[50,42],[40,34]],6);
     if(p.torn)for(const[x,y]of p.wing===0?[[44,11],[45,12],[45,13],[49,15],[50,16],[42,18],[43,19],[50,9],[47,21],[47,22]]:p.wing===1?[[44,3],[45,4],[45,5],[50,1],[51,2],[42,11],[43,12],[47,14],[47,15],[52,8]]:[[44,30],[45,31],[48,34],[49,35],[52,39],[53,40],[46,36]])a.px(x,y,0);
     a.rect(30,38,4,14,1); a.rect(29,50,6,3,5);                                  // front leg
-    for(let i=0;i<4;i++)a.poly([[34+i*5,21],[36+i*5,E?13+(i%2)*2:17],[38+i*5,21]],5);        // back ridge
+    for(let i=0;i<4;i++)a.poly([[34+i*5,21],[36+i*5,E?13+(i%2)*2:17],[38+i*5,21]],F.glow?8:5);        // back ridge
   });
   return flash?whiteSpr(key,s):s;
 }
@@ -340,24 +391,21 @@ function wyvernSpr(p,flash){
 // ── Second body: a four-legged brute (Tuskhide, Frostmaw). Same pose inputs as the wyvern.
 //    wing 1 = bristling (wary), torn = back spines broken.
 function bruteSpr(p,flash){
-  const key=`br:${p.hx}:${p.hy}:${p.jaw}:${p.wing}:${p.tail}:${p.horn?1:0}:${p.spike?1:0}:${p.glow}:${p.rage}:${p.torn?1:0}:${p.kind|0}`;
-  const mouth=['!#141826','!#ff9a2e','!#ffd34d','!#fff6c0'][p.glow];
-  const pal=[{1:'#a8794a',2:'#e0c89a',3:'!#141826',4:p.rage?'!#ff4030':'!#ffe14d',5:'#f0ead8',6:'#7a5434',7:mouth},
-             {1:'#d2e6f2',2:'#f4fbff',3:'!#141826',4:p.rage?'!#ff4030':'!#2a6aa8',5:'#6cc4f0',6:'#9fbcd0',7:p.glow?'!#bfeaff':mouth}][p.kind|0];
+  const key='br:'+poseKey(p), F=p.look.f, pal=lookPal(p);
   const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
     a.off(MS_OX,MS_OY-5);
     const hx=p.hx,hy=p.hy,t=p.tail,up=p.wing===1?3:0;
     a.ell(54,48,7,9,6); a.rect(50,50,10,9,6);                                    // back leg
     a.poly([[60,30],[72,33],[77,39+t],[70,42+t],[58,40]],1);                     // tail
-    if(p.spike){if(p.kind)a.poly([[72,36+t],[80,40+t],[72,45+t]],5);else a.ell(76,41+t,4,4,6);}
+    if(p.spike){if(!F.tusk)a.poly([[72,36+t],[80,40+t],[72,45+t]],5);else a.ell(76,41+t,4,4,6);}
     a.ell(42,32,24,18,1); a.ell(48,22,16,10,6);                                  // body, hump
-    for(let i=0;i<6;i++){const x=30+i*7;if(p.torn)a.rect(x+2,13,3,3,5);else a.poly([[x,16-(i%2)*2],[x+4,4+(i%2)*3-up],[x+7,17]],5);}   // back spines
+    for(let i=0;i<6;i++){const x=30+i*7;if(p.torn)a.rect(x+2,13,3,3,5);else a.poly([[x,16-(i%2)*2],[x+4,4+(i%2)*3-up],[x+7,17]],F.glow?8:5);}   // back spines
     a.poly([[26,22],[16+hx,24+hy],[16+hx,44+hy],[30,46]],1);                     // neck
     a.ell(16+hx,34+hy,12,10,1);                                                  // head
     if(p.jaw>0)a.poly([[7+hx,40+hy],[18+hx,41+hy],[17+hx,42+hy+p.jaw],[8+hx,41+hy+p.jaw]],7);
     a.poly([[6+hx,39+hy+p.jaw],[18+hx,41+hy+p.jaw],[16+hx,46+hy+p.jaw],[7+hx,44+hy+p.jaw]],2);   // jaw
     a.px(9+hx,39+hy,5);a.px(12+hx,39+hy,5);a.px(15+hx,40+hy,5);                  // fangs
-    if(p.kind===0){if(p.horn){a.poly([[8+hx,40+hy],[0+hx,36+hy],[-3+hx,28+hy],[1+hx,33+hy],[10+hx,37+hy]],5);a.poly([[14+hx,41+hy],[8+hx,44+hy],[3+hx,40+hy],[9+hx,41+hy]],5);}   // tusks
+    if(F.tusk){if(p.horn){a.poly([[8+hx,40+hy],[0+hx,36+hy],[-3+hx,28+hy],[1+hx,33+hy],[10+hx,37+hy]],5);a.poly([[14+hx,41+hy],[8+hx,44+hy],[3+hx,40+hy],[9+hx,41+hy]],5);}   // tusks
       else a.rect(6+hx,38+hy,3,3,5);
       a.poly([[20+hx,25+hy],[25+hx,18+hy],[26+hx,26+hy]],6);}                     // ear
     else{if(p.horn){a.poly([[10+hx,26+hy],[2+hx,13+hy],[6+hx,26+hy]],5);a.poly([[22+hx,24+hy],[31+hx,10+hy],[26+hx,26+hy]],5);}
@@ -369,12 +417,93 @@ function bruteSpr(p,flash){
   });
   return flash?whiteSpr(key,s):s;
 }
+// ── Serpent: a coiled leviathan. wing = the fin along its neck (1 raised).
+function serpentSpr(p,flash){
+  const key='se:'+poseKey(p), F=p.look.f, pal=lookPal(p);
+  const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
+    a.off(MS_OX,MS_OY);const hx=p.hx,hy=p.hy,t=p.tail;
+    a.poly([[58,42],[70,38],[78,28+t],[82,32+t],[76,44],[62,50]],1);              // tail, rising behind
+    if(p.spike)a.poly([[76,26+t],[86,22+t],[84,34+t]],F.glow?8:5);
+    a.ell(56,46,14,7,6);a.ell(54,44,13,6,1);                                     // rear coil
+    a.ell(34,47,15,6,1);a.ell(34,49,11,3,2);                                     // front coil, belly
+    a.poly([[25,45],[19+hx,22+hy],[30+hx,19+hy],[40,43]],1);                     // neck
+    a.poly([[27,45],[22+hx,26+hy],[26+hx,25+hy],[32,45]],2);                     // throat
+    if(p.torn){a.rect(33,28,3,3,6);a.rect(37,34,3,3,6);}                          // fin
+    else if(p.wing===1)a.poly([[30+hx/2,22+hy/2],[46,6],[48,22],[42,38]],F.glow?8:6);
+    else if(p.wing===2)a.poly([[32,28],[42,26],[42,38]],6);
+    else a.poly([[31+hx/2,24+hy/2],[43,15],[44,26],[41,38]],6);
+    a.ell(21+hx,17+hy,8,6,1);                                                    // head
+    a.poly([[7+hx,17+hy],[15+hx,12+hy],[15+hx,22+hy],[8+hx,21+hy]],1);           // snout
+    if(p.jaw>0)a.poly([[8+hx,21+hy],[16+hx,21+hy],[16+hx,22+hy+p.jaw],[9+hx,21+hy+p.jaw]],7);
+    a.poly([[8+hx,21+hy+p.jaw],[17+hx,21+hy+p.jaw],[16+hx,24+hy+p.jaw],[10+hx,24+hy+p.jaw]],2);   // jaw
+    a.px(9+hx,20+hy,5);a.px(12+hx,20+hy,5);
+    if(p.horn){a.poly([[22+hx,11+hy],[34+hx,5+hy],[27+hx,14+hy]],5);a.poly([[18+hx,10+hy],[24+hx,3+hy],[23+hx,11+hy]],5);}   // crest
+    else{a.rect(22+hx,10+hy,3,2,5);a.rect(18+hx,9+hy,2,2,5);}
+    a.px(17+hx,15+hy,4);a.px(18+hx,15+hy,4);a.px(17+hx,16+hy,3);
+  });
+  return flash?whiteSpr(key,s):s;
+}
+// ── Raptor: a big beaked biped. wing = its arm feathers (1 flared).
+function raptorSpr(p,flash){
+  const key='ra:'+poseKey(p), F=p.look.f, pal=lookPal(p);
+  const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
+    a.off(MS_OX,MS_OY);const hx=p.hx,hy=p.hy,t=p.tail;
+    a.poly([[50,32],[66,28],[80,24+t],[78,31+t],[62,38],[50,42]],1);              // tail
+    if(p.spike)a.poly([[76,20+t],[86,22+t],[84,30+t],[78,31+t]],6);
+    a.rect(44,40,4,12,6);a.rect(40,51,9,2,5);                                    // far leg
+    a.ell(42,33,13,10,1);a.ell(37,37,8,6,2);                                     // body, belly
+    if(p.torn){a.rect(44,30,3,3,6);a.rect(49,33,3,3,6);}                          // arm feathers
+    else if(p.wing===1)a.poly([[40,27],[56,10],[62,16],[60,24],[48,34]],F.glow?8:6);
+    else if(p.wing===2)a.poly([[40,30],[52,36],[58,46],[48,42]],6);
+    else a.poly([[40,27],[54,28],[56,38],[44,38]],6);
+    a.poly([[31,27],[23+hx,16+hy],[30+hx,13+hy],[40,25]],1);                     // neck
+    a.ell(24+hx,12+hy,7,6,1);                                                    // head
+    a.poly([[7+hx,13+hy],[18+hx,8+hy],[18+hx,15+hy]],5);                         // beak
+    if(p.jaw>0)a.poly([[10+hx,15+hy],[18+hx,15+hy],[18+hx,16+hy+p.jaw]],7);
+    a.poly([[10+hx,16+hy+p.jaw],[18+hx,15+hy+p.jaw],[18+hx,19+hy+p.jaw]],5);
+    if(p.horn)a.poly([[23+hx,7+hy],[34+hx,-2+hy],[33+hx,4+hy],[40+hx,3+hy],[30+hx,11+hy]],6);   // crest
+    else a.rect(25+hx,5+hy,4,2,6);
+    a.px(20+hx,10+hy,4);a.px(21+hx,10+hy,4);a.px(20+hx,11+hy,3);
+    a.rect(36,40,4,12,1);a.rect(32,51,9,2,5);                                    // near leg
+  });
+  return flash?whiteSpr(key,s):s;
+}
+// ── Crab: a shelled crawler with one great claw and a stinger. wing = its shell plates (1 bristling).
+function crabSpr(p,flash){
+  const key='cr:'+poseKey(p), F=p.look.f, pal=lookPal(p);
+  const s=shapeSpr(key,MS_W,MS_H,pal,a=>{
+    a.off(MS_OX,MS_OY);const hx=p.hx,hy=p.hy,t=p.tail,up=p.wing===1?3:0;
+    a.poly([[60,30],[70,22+t],[74,12+t],[79,16+t],[75,28+t],[66,38]],1);          // stinger tail
+    if(p.spike)a.poly([[73,10+t],[83,5+t],[80,17+t]],F.glow?8:5);
+    for(let i=0;i<3;i++)a.poly([[40+i*8,42],[44+i*8,52],[46+i*8,52],[44+i*8,42]],6);   // far legs
+    a.ell(46,34,20,12,1);                                                        // shell
+    a.ell(48,29,15,8,6);
+    for(let i=0;i<4;i++){const x=36+i*7;if(p.torn)a.rect(x+1,22,3,2,5);else a.poly([[x,23],[x+3,15-(i%2)*2-up],[x+6,23]],F.glow?8:5);}   // plates
+    a.ell(27+hx/2,39+hy/2,8,6,2);                                                // face
+    if(p.horn){a.rect(22+hx,25+hy,2,9,1);a.rect(29+hx,24+hy,2,10,1);a.px(22+hx,24+hy,4);a.px(29+hx,23+hy,4);a.px(23+hx,24+hy,3);a.px(30+hx,23+hy,3);}   // eye stalks
+    else{a.rect(22+hx,32+hy,2,2,1);a.rect(29+hx,32+hy,2,2,1);}
+    for(let i=0;i<3;i++)a.poly([[34+i*8,44],[30+i*8,53],[32+i*8,53],[37+i*8,45]],1);   // near legs
+    a.poly([[30,38],[14+hx,31+hy],[14+hx,41+hy],[30,45]],1);                      // claw arm
+    a.ell(11+hx,36+hy,8,6,1);                                                    // the great claw
+    if(p.jaw>0)a.poly([[2+hx,35+hy],[11+hx,36+hy],[3+hx,37+hy+p.jaw]],7);
+    a.poly([[2+hx,37+hy+p.jaw],[12+hx,37+hy+p.jaw],[10+hx,42+hy+p.jaw],[4+hx,41+hy+p.jaw]],5);
+    a.poly([[2+hx,31+hy],[10+hx,30+hy],[4+hx,35+hy]],5);
+    a.ell(21,47,4,3,6);                                                          // small claw
+  });
+  return flash?whiteSpr(key,s):s;
+}
 // Where things are on each body, in sprite pixels: head (for the "!" and stars), mouth (breath), and each part
 const RIGS={
   wyvern:{spr:wyvernSpr,head:p=>[12+p.hx,14+p.hy],mouth:p=>[4+p.hx,20+p.hy],
     pos:{head:p=>[14+p.hx,14+p.hy],tail:p=>[66,40+p.tail],wings:p=>[[46,14],[48,7],[49,34]][p.wing],body:p=>[36,30]}},
   brute:{spr:bruteSpr,head:p=>[14+p.hx,24+p.hy],mouth:p=>[4+p.hx,37+p.hy],
     pos:{head:p=>[14+p.hx,29+p.hy],tail:p=>[73,35+p.tail],wings:p=>[48,7],body:p=>[42,28]}},
+  serpent:{spr:serpentSpr,head:p=>[18+p.hx,13+p.hy],mouth:p=>[8+p.hx,22+p.hy],
+    pos:{head:p=>[20+p.hx,16+p.hy],tail:p=>[78,32+p.tail],wings:p=>[[41,24],[44,16],[40,32]][p.wing],body:p=>[40,45]}},
+  raptor:{spr:raptorSpr,head:p=>[22+p.hx,8+p.hy],mouth:p=>[9+p.hx,15+p.hy],
+    pos:{head:p=>[23+p.hx,11+p.hy],tail:p=>[76,28+p.tail],wings:p=>[[48,32],[54,20],[50,40]][p.wing],body:p=>[42,34]}},
+  crab:{spr:crabSpr,head:p=>[24+p.hx,22+p.hy],mouth:p=>[4+p.hx,37+p.hy],
+    pos:{head:p=>[26+p.hx,27+p.hy],tail:p=>[76,16+p.tail],wings:p=>[47,24],body:p=>[46,36]}},
 };
 // ── Third body: the Snapjaw, a small pack hunter. Its colours follow the biome.
 function smallSpr(p,flash){
@@ -397,20 +526,19 @@ function smallSpr(p,flash){
 RIGS.small={spr:smallSpr,head:p=>[13+p.hx,27+p.hy],mouth:p=>[8+p.hx,33+p.hy],pos:{head:p=>[14+p.hx,30+p.hy],tail:p=>[48,39+p.tail],wings:p=>[29,38],body:p=>[29,40]}};
 const palSpr=f=>shapeSpr('pal:'+f,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:'#e2483d',5:'#3a9a88'},a=>{a.off(1,1);
   a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);});
-const mSprite=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind},p),flash);
+const mSprite=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.look,lk:D.id,fxc:D.fxc[0]},p),flash);
 const POSE0={hx:0,hy:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0};
 
 // ── Hunter ──
 const HS_W=46, HS_H=42;
 const H_PAL={1:'#f0c098',2:'#8a3b2a',3:'#b0b8c8',4:'!#141826',5:'#dde4f0',6:'#6b4a2e',8:'!#ffe14d',9:'!#ff9a2e',10:'!#ffffff',11:'!#e2483d'};
-const ARMOR_COL={leather:['#8a3b2a','#b0b8c8','#6b4a2e'],fern_ar:['#2f8f7a','#d9c88e','#1f5a50'],tusk_ar:['#a8794a','#f0ead8','#6a4a2c'],
-  ember_ar:['#7a2a2a','#4a3c48','#2a1a1e'],frost_ar:['#b8d8ea','#6cc4f0','#6a8aa0'],storm_ar:['#4a50a8','#ffe14d','#262a66']};
-const TIER_COL={iron:'#dde4f0',fern:'#8fe8c8',tusk:'#e0c89a',ember:'#ff9a4d',frost:'#bfeaff',storm:'#ffe14d',relic:'#4cd9c0'};
+const armorCol=id=>{const D=MONSTERS[GEAR[id].tier];return D?[D.look.b,D.look.h,D.look.d]:['#8a3b2a','#b0b8c8','#6b4a2e'];};
+const weaponCol=id=>{const G=GEAR[id];return G.elem?ELEM[G.elem][1]:G.status?STATUS[G.status].col:G.tier==='relic'?'#4cd9c0':'#dde4f0';};
 function hunterSpr(p){
   const aq=Math.round(p.a*5);                                                    // weapon angle in 0.2 rad steps
   const eq=SAVE.eq, G=GEAR[eq.weapon], wt=G.wt, key=`hu:${p.kind}:${aq}:${p.bob}:${p.lean}:${p.glow}:${p.f}:${eq.weapon}:${eq.armor}:${p.guard|0}`;
-  const ar=ARMOR_COL[eq.armor];
-  const pal=Object.assign({},H_PAL,{2:ar[0],3:ar[1],6:ar[2],5:TIER_COL[G.tier]});
+  const ar=armorCol(eq.armor);
+  const pal=Object.assign({},H_PAL,{2:ar[0],3:ar[1],6:ar[2],5:weaponCol(eq.weapon)});
   return shapeSpr(key,HS_W,HS_H,pal,a=>{
     a.off(4,2);
     if(p.kind==='roll'){
@@ -447,13 +575,10 @@ const LOOT={
   wing: {name:'WING MEMBRANE',pal:{1:'#2c7366',2:'#e8e2cc'},draw:a=>{a.poly([[0,9],[2,1],[10,0],[8,5],[6,4],[5,8],[3,7]],1);a.rect(1,0,2,3,2);}},
   gem:  {name:'WYVERN GEM', pal:{1:'#4cd9c0',2:'!#e8fffb'}, draw:a=>{a.poly([[5,0],[10,4],[5,10],[0,4]],1);a.px(4,3,2);a.px(5,2,2);}},
 };
-for(const [q,rows] of [
-  ['t_',[['scale','TUSK HIDE',{1:'#a8794a',2:'#7a5434'}],['claw','TUSK CLAW',{1:'#f0ead8',2:'#7a5434'}],['horn','GREAT TUSK',{1:'#f0ead8',2:'#c8b890'}],['wing','BACK SPINE',{1:'#f0ead8',2:'#a8794a'}],['spike','MACE TAIL',{1:'#7a5434',2:'#a8794a'}]]],
-  ['e_',[['scale','EMBER SCALE',{1:'#b8402e',2:'#6a1f24'}],['claw','EMBER CLAW',{1:'#4a3c48',2:'#6a1f24'}],['horn','EMBER HORN',{1:'#4a3c48',2:'#6a5a6a'}],['wing','EMBER WING',{1:'#6a1f24',2:'#4a3c48'}],['spike','CLUB TAIL',{1:'#4a3c48',2:'#b8402e'}]]],
-  ['f_',[['scale','FROST HIDE',{1:'#d2e6f2',2:'#9fbcd0'}],['claw','ICE CLAW',{1:'#6cc4f0',2:'#9fbcd0'}],['horn','FROST HORN',{1:'#6cc4f0',2:'#d2e6f2'}],['wing','ICE SPINE',{1:'#6cc4f0',2:'#9fbcd0'}],['spike','FROST TAIL',{1:'#6cc4f0',2:'#d2e6f2'}]]],
-  ['s_',[['scale','STORM SCALE',{1:'#4a50a8',2:'#262a66'}],['claw','STORM CLAW',{1:'#ffe14d',2:'#262a66'}],['horn','STORM HORN',{1:'#ffe14d',2:'#c8a020'}],['wing','STORM WING',{1:'#262a66',2:'#ffe14d'}],['spike','STORM TAIL',{1:'#ffe14d',2:'#4a50a8'}]]]])
-  for(const [k,name,pal] of rows)LOOT[q+k]={name,pal,draw:LOOT[k].draw};
-for(const id of HUNTS){const D=MONSTERS[id];LOOT[D.mat.rare]={name:D.rareName,rare:true,pal:{1:ELEM[D.elem][1],2:'!#ffffff',3:D.blood},draw:a=>{a.poly([[5,0],[7,3],[10,4],[8,7],[9,10],[5,8],[1,10],[2,7],[0,4],[3,3]],1);a.ell(5,5,2,2,3);a.px(4,4,2);a.px(5,4,2);}};}
+{const base={scale:LOOT.scale.draw,claw:LOOT.claw.draw,head:LOOT.horn.draw,wings:LOOT.wing.draw,tail:LOOT.spike.draw};
+  for(const id of HUNTS){const D=MONSTERS[id],K=D.look,pal={scale:{1:K.b,2:K.d},claw:{1:K.h,2:K.d},head:{1:K.h,2:shade(K.h,-.3)},wings:{1:K.d,2:K.h},tail:{1:K.h,2:K.b}};
+    for(const k in base)LOOT[D.mat[k]]={name:D.matName[k],pal:pal[k],draw:base[k]};
+    LOOT[D.mat.rare]={name:D.matName.rare,rare:true,pal:{1:ELEM[D.elem][1],2:'!#ffffff',3:K.b},draw:a=>{a.poly([[5,0],[7,3],[10,4],[8,7],[9,10],[5,8],[1,10],[2,7],[0,4],[3,3]],1);a.ell(5,5,2,2,3);a.px(4,4,2);a.px(5,4,2);}};}}
 const ING_SHAPE={leaf:a=>{a.poly([[1,9],[2,3],[6,0],[9,1],[8,6],[4,9]],1);a.px(3,7,2);a.px(4,6,2);a.px(5,5,2);a.px(6,4,2);a.px(7,3,2);},
   drop:a=>{a.poly([[5,0],[8,5],[8,8],[5,10],[2,8],[2,5]],1);a.rect(4,6,2,2,2);},fruit:a=>{a.ell(5,6,4,4,1);a.rect(4,0,2,3,2);},
   root:a=>{a.poly([[2,0],[5,1],[8,9],[6,10],[1,3]],1);a.px(3,3,2);a.px(5,6,2);},fish:a=>{a.poly([[0,5],[3,2],[7,3],[10,1],[9,5],[10,9],[7,7],[3,8]],1);a.px(2,4,2);},
@@ -465,11 +590,10 @@ const bugSpr=(i,f)=>{const c=CREATURES[i];return shapeSpr('bug:'+i+':'+(f|0),12,
   else if(c.type==='moth'){if(f){a.poly([[0,2],[4,3],[4,6],[1,6]],1);a.poly([[10,2],[6,3],[6,6],[9,6]],1);}else{a.poly([[1,0],[4,3],[4,6],[0,8]],1);a.poly([[9,0],[6,3],[6,6],[10,8]],1);}a.rect(4,2,2,6,2);}
   else if(c.type==='frog'){a.ell(5,6,4,2,1);a.px(3,3,1);a.px(7,3,1);a.px(3,4,3);a.px(7,4,3);a.rect(0,7+f,2,1,2);a.rect(9,7+f,2,1,2);}
   else{a.poly([[1,5],[6,3],[9,5],[6,7]],1);a.px(8,4,3);a.rect(2,7-f*2,1,2+f*2,2);a.rect(4,7,1,2,2);a.px(9,2,2);}});};
-const gearSpr=id=>{const G=GEAR[id],col=G.slot==='armor'?ARMOR_COL[id][0]:G.slot==='charm'?'#4cc9ff':G.slot==='coat'?STATUS[G.status].col:TIER_COL[G.tier];
+const gearSpr=id=>{const G=GEAR[id],col=G.slot==='armor'?armorCol(id)[0]:G.slot==='charm'?'#4cc9ff':weaponCol(id);
   return shapeSpr('gear:'+id,12,12,{1:col,2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);
     if(G.slot==='armor'){a.poly([[1,1],[4,1],[5,2],[6,1],[9,1],[10,4],[8,5],[8,10],[2,10],[2,5],[0,4]],1);a.rect(2,7,7,1,2);}
     else if(G.slot==='charm'){a.poly([[3,0],[7,0],[5,3]],3);a.ell(5,6,3,3,2);a.ell(5,6,2,2,1);}
-    else if(G.slot==='coat'){a.rect(4,0,3,2,2);a.rect(3,2,5,2,3);a.poly([[2,4],[9,4],[10,10],[1,10]],3);a.poly([[2,6],[9,6],[9,9],[2,9]],1);}
     else if(G.wt==='gs'){a.poly([[9,0],[10,1],[4,7],[3,6]],1);a.poly([[1,5],[5,9],[4,10],[0,6]],2);a.rect(0,8,2,2,2);}
     else if(G.wt==='db'){a.poly([[4,0],[5,1],[1,6],[0,5]],1);a.poly([[10,3],[10,5],[4,10],[3,9]],1);a.rect(0,6,2,2,2);a.rect(2,9,2,2,2);}
     else if(G.wt==='hm'){a.poly([[1,9],[2,10],[7,5],[6,4]],2);a.rect(5,0,6,5,1);}
@@ -516,10 +640,10 @@ const SAVE_KEY='mh_save_v1';
 function loadSave(){
   let v=null; try{v=JSON.parse(localStorage.getItem(SAVE_KEY));}catch(e){}
   if(!v){v={};try{const old=JSON.parse(localStorage.getItem('mh_proto_bag'));if(old)v.bag=old;}catch(e){}}   // loot from the first prototypes carries over
-  v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.lv=v.lv||{};v.dry=v.dry||{};v.eq=Object.assign({weapon:'iron_gs',armor:'leather',charm:null,coat:null},v.eq);
+  v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.lv=v.lv||{};v.dry=v.dry||{};v.eq=Object.assign({weapon:'iron_gs',armor:'leather',charm:null},v.eq);delete v.eq.coat;
   for(const [o,n] of Object.entries(OLD_IDS)){if(v.own[o]){delete v.own[o];v.own[n]=true;}for(const sl in v.eq)if(v.eq[sl]===o)v.eq[sl]=n;}
   v.own.leather=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
-  for(const sl of ['weapon','armor','charm','coat'])if(v.eq[sl]&&!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]={weapon:'iron_gs',armor:'leather',charm:null,coat:null}[sl];
+  for(const sl of ['weapon','armor','charm'])if(v.eq[sl]&&!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]={weapon:'iron_gs',armor:'leather',charm:null}[sl];
   if(v.potions==null)v.potions=POT_START;v.bugs=v.bugs||{};v.story=v.story||{i:0,p:0};v.side=v.side||{};v.daily=v.daily||{key:'',q:[]};v.weekly=v.weekly||{key:'',q:[]};v.packs=v.packs||0;v.role=v.role||'fighter';
   return v;
 }
@@ -530,8 +654,8 @@ const lvOf=id=>SAVE.lv[id]||0;
 const gearAtk=id=>+(GEAR[id].atk*(1+UP_STEP*lvOf(id))).toFixed(3), gearHp=id=>Math.round(GEAR[id].hp*(1+UP_STEP*lvOf(id)));
 // Cost of the next upgrade level, or null at the top (charms have no levels). Levels 4 and 5 need scales from the next monster up.
 function upCost(id){
-  const G=GEAR[id],Lv=lvOf(id)+1; if(Lv>UP_MAX||G.slot==='charm'||G.slot==='coat'||!SAVE.own[id])return null;
-  const ti=Math.max(0,HUNTS.indexOf(G.tier)),m=MONSTERS[HUNTS[ti]].mat,N=MONSTERS[HUNTS[ti+1]];   // iron and leather use Fernwing materials
+  const G=GEAR[id],Lv=lvOf(id)+1; if(Lv>UP_MAX||G.slot==='charm'||!SAVE.own[id])return null;
+  const ti=Math.max(0,HUNTS.indexOf(G.tier)),m=MONSTERS[HUNTS[ti]].mat,N=MONSTERS[HUNTS[ti+1]];   // iron and leather use Fernwing materials; later levels need the next monster in the order
   const part=G.slot==='armor'?m.wings:m[{gs:'head',db:'wings',hm:'tail',ln:'wings'}[G.wt]];
   if(Lv<=2)return{[m.scale]:2+Lv,[m.claw]:Lv};
   if(Lv===3)return{[m.scale]:5,[m.claw]:2,[part]:1};
@@ -547,32 +671,38 @@ function upgradeTap(id){
 // What the worn gear adds up to, with the terrarium's bonus and an optional meal on top
 function gearStats(meal){
   const e=SAVE.eq,w=GEAR[e.weapon],perks={},M=MEALS[meal]||{},bb=bugBonus();for(const sl of ['armor','charm']){const G=GEAR[e[sl]];if(G&&G.perk)perks[G.perk]=true;}
-  return{wt:w.wt,W:WTYPES[w.wt],elem:w.elem||null,status:(GEAR[e.coat]||{}).status||null,meal:M,
+  return{wt:w.wt,W:WTYPES[w.wt],elem:w.elem||null,status:w.status||null,meal:M,
     atk:+(gearAtk(e.weapon)*(perks.might?1.1:1)*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(gearHp(e.armor)*(M.hp||1)*(1+bb.hp)),
     resist:(MONSTERS[GEAR[e.armor].tier]||{}).elem||null,perks,qteSlow:perks.keeneye?1.4:1,qteHits:perks.breaker?2:3};
 }
 const canAfford=id=>Object.entries(GEAR[id].cost||{}).every(([k,n])=>(SAVE.bag[k]||0)>=n);
-const unlocked=id=>!MONSTERS[id].needs||(SAVE.wins[MONSTERS[id].needs]||0)>0||(SAVE.wins[id]||0)>0;
+// Ranks: three wins in a rank open the next. The apex rank needs three of rank 6, and the elder needs all four apex monsters.
+const RANK_NEED=3, RANKS=8;
+const rankWins=r=>HUNTS.filter(id=>MONSTERS[id].rank===r&&SAVE.wins[id]).length;
+const rankOpen=r=>r<=1?true:r===8?rankWins(7)>=4:rankWins(r-1)>=RANK_NEED;
+const unlocked=id=>id==='fern'||(SAVE.wins[id]||0)>0||(MONSTERS[id].rank===1?!!SAVE.wins.fern:rankOpen(MONSTERS[id].rank));
+const lockText=id=>{const r=MONSTERS[id].rank;return r===1?'BEAT THE FERNWING FIRST':r===8?'BEAT ALL FOUR APEX':'WIN '+RANK_NEED+' HUNTS IN RANK '+(r-1);};
+const rankName=r=>r===7?'APEX':r===8?'ELDER':'RANK '+r;
 
 // A pack of three small monsters for a biome: the short hunts
-function smallDef(bi){
-  const B=HUNTS.map(k=>MONSTERS[k]).find(m=>m.biome===bi);
-  return{id:'small',small:true,biome:bi,base:B,name:'SNAPJAW',rig:'small',kind:bi,elem:B.elem,weak:B.weak,weakSt:null,resSt:null,hp:Math.round(B.hp*.13),dmg:B.dmg*.7,
-    speed:[1,1,1],qteTime:0,evadeCd:[1e9,1e9,1e9],stunMax:60,blood:'#c8b890',breath:B.breath,sig:null,tip:'A PACK OF THREE',pack:3,stars:0,
+function smallDef(mid){
+  const B=MONSTERS[mid],bi=B.biome;
+  return{id:'small',small:true,biome:bi,base:B,name:'SNAPJAW',rig:'small',kind:bi,look:{},inflict:null,trait:null,fxc:B.fxc,time:HUNT_TIME,tip2:'',elem:B.elem,weak:B.weak,weakSt:null,resSt:null,hp:Math.round(B.hp*.13),dmg:B.dmg*.7,
+    speed:[1,1,1],qteTime:0,evadeCd:[1e9,1e9,1e9],stunMax:60,blood:'#c8b890',tip:'A PACK OF THREE',pack:3,stars:0,
     pools:[['bite','bite','dbl'],['bite','bite','dbl'],['bite','bite','dbl']],loot:{common:[[B.mat.scale,1,2],[B.mat.claw,1,1],['meat',2,3]],parts:{}},mat:B.mat};
 }
 function freshMonster(D,status){
   return{hp:D.hp,max:D.hp,phase:0,state:'idle',t:0,wait:1.6,atk:null,hits:[],hi:0,dur:0,rec:0,flash:0,last:'',roarDue:false,staggerDur:0,stun:0,stunMax:D.stunMax,stunned:false,evadeCd:D.small?1e9:4,charge:0,over:false,
-    sb:0,sNeed:status?STATUS[status].need:0,mpoison:0,mpT:0,enter:0,
+    sb:0,sNeed:status?STATUS[status].need:0,mpoison:0,mpT:0,enter:0,lastHit:0,
     parts:{head:{hits:0,broken:false},wings:{hits:0,broken:false},tail:{hits:0,broken:false}},qteT:QTE_FIRST,qteLast:PARTS[(Math.random()*3)|0]};
 }
 // o.meal: a meal eaten for this hunt. o.role: what the companion does. o.small: a biome, for a pack hunt.
 function newHunt(id,o){
   o=o||{}; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
   S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0;
-  S.mode='hunt'; S.t=0; S.timeLeft=HUNT_TIME; S.clock=0; HUD_T=D.sig==='charge'?27:21;
+  S.mode='hunt'; S.t=0; S.timeLeft=D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,flurry:false,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
-       potions:Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,counter:0,target:'body',hitDone:false,drank:false,
+       potions:Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
        immune:M.immune||{},wear:M.wear||1,regen:M.regen||1,healMul:M.heal||1,luck:M.luck||1,chargeSlow:M.chargeSlow||1};
   S.m=freshMonster(D,gs.status);
   S.pal=o.role&&o.role!=='rest'&&SAVE.pal?{role:o.role,t:PAL.every,used:false,hop:0}:null;
@@ -613,16 +743,20 @@ const L={}; function layout(){
 //  MONSTER
 // ═══════════════════════════════════════════════════
 const aPose=()=>ATTACKS[S.m.atk].pose;
-function mAir(){const m=S.m;if(m.state!=='attack'||aPose()!=='dive')return false;const h=m.hits[0];return m.t>h*.3&&m.t<h-.06;}
+function mAir(){const m=S.m;if(m.state!=='attack'||(aPose()!=='dive'&&aPose()!=='burrow'))return false;const h=m.hits[0];return m.t>h*.3&&m.t<h-.06;}
 // Pose and position offset for the current state
 function mPose(){
   const m=S.m, D=S.def, c=S.clock, p={hx:0,hy:0,jaw:0,wing:0,tail:0,glow:0,ox:0,oy:0};
   if(m.state==='idle'||m.state==='evade'){                                       // each monster carries itself differently
-    if(D.id==='fern'){const i=Math.sin(c*2.4);p.hy=i>.3?1:0;p.tail=i<-.3?-2:0;}                                          // alert, head bobbing
-    else if(D.id==='tusk'){const i=Math.sin(c*1.6);p.hy=3+(i>.7?2:0);p.hx=i>.7?-1:0;p.tail=Math.sin(c*5)>.8?-4:0;}       // head low, pawing the sand
-    else if(D.id==='ember'){const i=Math.sin(c*1.8);p.hx=Math.round(i*2);p.hy=i>0?-1:0;p.jaw=Math.sin(c*.9)>.75?2:0;p.glow=p.jaw?2:0;p.tail=Math.round(Math.sin(c*3)*2);}   // swaying, mouth flaring
-    else if(D.id==='frost'){const i=Math.sin(c*1.2);p.oy=i>0?1:0;p.hy=i>0?2:1;p.jaw=i>.85?1:0;}                          // slow, heavy breathing
-    else{p.oy=-4+Math.round(Math.sin(c*2.5)*2);p.wing=Math.sin(c*5)>0?0:2;p.tail=Math.round(Math.sin(c*4)*2);p.hy=-1;}   // hovering on beating wings
+    const rg=D.rig, k=(D.L||0)%3, i=Math.sin(c*(1.2+k*.5)+k);
+    if(D.small||rg==='raptor'){p.hy=i>.3?1:0;p.hx=Math.sin(c*3+k)>.85?-2:0;p.tail=Math.round(Math.sin(c*4)*2);}                 // twitchy, head darting
+    else if(rg==='brute'){if(D.trait==='armor'||k===0){p.hy=3+(i>.7?2:0);p.hx=i>.7?-1:0;p.tail=Math.sin(c*5)>.8?-4:0;}      // head low, pawing
+      else{p.oy=i>0?1:0;p.hy=i>0?2:1;p.jaw=i>.85?1:0;}}                                                                    // slow, heavy breathing
+    else if(rg==='serpent'){p.hx=Math.round(Math.sin(c*1.6)*3);p.hy=Math.round(Math.cos(c*1.6)*2);p.tail=Math.round(Math.sin(c*2.4)*3);p.wing=i>.6?1:0;}   // swaying, fin flicking
+    else if(rg==='crab'){p.hx=Math.sin(c*6+k)>.7?-2:0;p.jaw=Math.sin(c*2.2)>.5?2:0;p.tail=Math.round(Math.sin(c*2)*3);p.oy=i>.8?1:0;}   // claws snapping, tail curling
+    else if(D.trait==='charge'||D.look.f.elder){p.oy=-4+Math.round(Math.sin(c*2.5)*2);p.wing=Math.sin(c*5)>0?0:2;p.tail=Math.round(Math.sin(c*4)*2);p.hy=-1;}   // hovering on beating wings
+    else if(D.look.f.hot){p.hx=Math.round(i*2);p.hy=i>0?-1:0;p.jaw=Math.sin(c*.9)>.75?2:0;p.glow=p.jaw?2:0;p.tail=Math.round(Math.sin(c*3)*2);}   // swaying, mouth flaring
+    else{p.hy=i>.3?1:0;p.tail=i<-.3?-2:0;p.hx=k===2&&i>.8?2:0;}                                                              // alert, head bobbing
   }
   if(m.state==='idle'&&mWary()){p.wing=1;p.hx=2;p.hy=2;p.oy=2;p.tail=-4;p.jaw=0;}  // wary: wings up or spines bristling, it will dodge the next hit
   else if(m.state==='evade'){const u=Math.sin(Math.PI*clamp(m.t/EVADE_DUR,0,1));p.ox=Math.round(16*u);p.oy=-Math.round(12*u);p.wing=Math.floor(m.t*8)%2?1:2;p.hx=2;}
@@ -644,7 +778,7 @@ function mPose(){
       else if(t<h0+.3){p.tail=8;p.ox=-12;p.hy=5;p.oy=2;}
     }else if(a==='breath'){
       if(t<h0-.08){const v=t/(h0-.08);p.hx=Math.round(4*ease(v));p.hy=-Math.round(7*ease(v));p.jaw=1;p.glow=1+Math.min(2,Math.floor(v*3));}
-      else if(t<hits[1]+.2){p.hx=-6;p.hy=4;p.jaw=3;p.glow=3;}
+      else if(t<hits[hits.length-1]+.2){p.hx=-6;p.hy=4;p.jaw=3;p.glow=3;}
     }else if(a==='spit'){                                                       // cheeks fill, then the head snaps forward to launch
       let snap=false;for(const h of hits)if(t>=h-PROJ_TIME&&t<h-PROJ_TIME+.18)snap=true;
       if(snap){p.hx=-6;p.hy=2;p.jaw=3;p.glow=3;}else if(t<hits[hits.length-1]-PROJ_TIME){p.hx=5;p.hy=-5;p.jaw=1;p.glow=2;}
@@ -659,6 +793,13 @@ function mPose(){
     }else if(a==='hover'){                                                      // climbs and rains bolts from above
       const last=hits[hits.length-1],v=t<last+.2?ease(t/(h0*.6)):1-ease((t-last-.2)/.25);
       p.oy=-Math.round(26*v);p.wing=(Math.floor(t*10)%2)?1:2;p.hy=4;p.jaw=2;p.glow=2;
+    }else if(a==='spin'){                                                       // whips round twice
+      if(near>=0){p.tail=8;p.ox=near%2?8:-12;p.hx=near%2?4:-4;p.wing=2;}
+      else{p.tail=-Math.round(8*u);p.ox=Math.round(4*u);p.hx=Math.round(3*u);p.hy=2;}
+    }else if(a==='burrow'){                                                     // sinks out of sight, then bursts up beside the hunter
+      if(t<h0*.3){p.oy=Math.round(46*ease(t/(h0*.3)));p.hy=4;}
+      else if(t<h0-.06){p.oy=60;p.ox=-22;}
+      else{p.ox=-22;p.oy=-Math.round(10*Math.max(0,1-(t-h0)/.25));p.hy=-6;p.jaw=3;p.wing=1;}
     }else if(a==='rush'){
       if(t<h0-.1){const v=ease(t/(h0-.1));p.ox=Math.round(9*v);p.hx=2;p.hy=3;p.oy=2;p.wing=1;}
       else{p.ox=-30;p.hx=-6;p.hy=2;p.jaw=1;}
@@ -673,10 +814,12 @@ function mPose(){
     const a=aPose();
     if(a==='dive')p.ox=-Math.round(24*(1-ease(m.t/m.rec*1.6)));
     if(a==='rush')p.ox=-Math.round(30*(1-ease(m.t/m.rec*1.6)));
+    if(a==='burrow')p.ox=-Math.round(22*(1-ease(m.t/m.rec*1.6)));
     p.hy=3;p.jaw=1;                                                             // panting: the opening
-    if(D.sig==='armor'){p.hy=7;p.jaw=2;p.oy=2;p.wing=2;}                         // the Tuskhide sags, winded
+    if(D.trait==='armor'){p.hy=7;p.jaw=2;p.oy=2;p.wing=2;}                         // the Tuskhide sags, winded
   }else if(m.state==='stagger'){if(!m.stunned&&m.staggerDur<1){p.hx=5;p.hy=-2;p.jaw=2;p.ox=4;return p;}p.hx=-2;p.hy=9;p.jaw=2;p.wing=2;p.tail=4;p.oy=3;}
   else if(m.state==='sleep'){p.hx=-2;p.hy=10;p.wing=2;p.tail=4;p.oy=3;}
+  else if(m.state==='shell'){p.hx=6;p.hy=8;p.oy=4;p.tail=2;p.wing=2;}              // tucked in
   else if(m.state==='roar'){p.hx=-3;p.hy=-8;p.jaw=3;p.wing=1;p.ox=Math.round(Math.sin(S.clock*60));}
   else if(m.state==='dead'){const u=ease(m.t/.8);p.hx=-2;p.hy=Math.round(11*u);p.jaw=2;p.wing=2;p.tail=Math.round(6*u);p.oy=Math.round(5*u);}
   if(m.enter>0)p.ox+=Math.round(70*m.enter/.5);                                   // the next of the pack runs in
@@ -695,14 +838,14 @@ const mWary=()=>{const m=S.m;return m.state==='idle'&&m.evadeCd<=0&&!m.roarDue;}
 function mStartAttack(){
   const m=S.m, pool=S.def.pools[m.phase]; let id;
   do{id=pool[(Math.random()*pool.length)|0];}while(id===m.last&&Math.random()<.7);
-  const A=ATTACKS[id], sp=S.def.speed[m.phase]*(m.over?CHARGE.speed:1), w=A.wind*sp;
+  const A=ATTACKS[id], sp=S.def.speed[m.phase]*(m.over?CHARGE.speed:1)*(S.def.trait==='frenzy'?1-FRENZY*(1-m.hp/m.max):1), w=A.wind*sp;
   m.state='attack';m.t=0;m.atk=id;m.last=id;m.hi=0;m.hits=A.hits.map(o=>w+o);m.dur=m.hits[m.hits.length-1]+A.after;m.rec=A.rec;
   sfx('warn');
 }
 function mStagger(d,stun){const m=S.m;if(m.state==='stagger'&&m.staggerDur-m.t>d)return;m.state='stagger';m.t=0;m.staggerDur=d;m.stunned=!!stun;}
 // Stormwing: knock its charge out. all=false only drains some.
 function mDischarge(amount){
-  const m=S.m; if(S.def.sig!=='charge'||m.state==='dead')return;
+  const m=S.m; if(S.def.trait!=='charge'||m.state==='dead')return;
   if(m.over){m.over=false;m.charge=0;const hp=mHeadPos(mPose());addNum(hp.x+10,hp.y-26,'DISCHARGED!','#7fd6ff',1.3);sfx('brk');mStagger(1.2);
     for(let k=0;k<16;k++)S.pt.push({x:hp.x+rnd(0,40),y:hp.y+rnd(0,30),vx:rnd(-90,90),vy:rnd(-90,30),life:rnd(.3,.6),col:k%2?'#ffe14d':'#ffffff',g:0});}
   else m.charge=amount?Math.max(0,m.charge-amount):0;
@@ -710,47 +853,54 @@ function mDischarge(amount){
 function mUpdate(dt){
   const m=S.m,D=S.def; m.t+=dt; if(m.flash>0)m.flash-=dt; if(m.enter>0)m.enter-=dt; if(m.evadeCd>0&&m.state!=='stagger')m.evadeCd-=dt;
   if(m.state==='dead')return;
-  if(D.sig==='charge'&&!m.over&&m.state!=='stagger'&&m.state!=='sleep'&&S.h.state!=='dead'&&(m.charge+=CHARGE.rate*dt*S.h.chargeSlow)>=100){m.charge=100;m.over=true;S.shake=.5;sfx('roar');
+  if(D.trait==='regen'&&m.hp<m.max&&m.mpoison<=0&&S.clock-m.lastHit>REGEN.after&&S.h.state!=='dead'){m.hp=Math.min(m.max,m.hp+m.max*REGEN.rate*dt);      // heals when left alone
+    if(Math.random()<.2){const b=partPos('body',mPose());S.pt.push({x:b.x+rnd(-20,20),y:b.y+rnd(-10,10),vx:0,vy:-30,life:.5,col:'#4cd964',g:0});}}
+  if(D.trait==='charge'&&!m.over&&m.state!=='stagger'&&m.state!=='sleep'&&S.h.state!=='dead'&&(m.charge+=CHARGE.rate*dt*S.h.chargeSlow)>=100){m.charge=100;m.over=true;S.shake=.5;sfx('roar');
     const hp=mHeadPos(mPose());addNum(hp.x+10,hp.y-26,'OVERCHARGED!','#ffe14d',1.4);}
   if(m.mpoison>0){m.mpoison-=dt;if((m.mpT+=dt)>=STATUS.poison.tick){m.mpT=0;const d=Math.min(m.hp-1,Math.round(STATUS.poison.dmg*S.h.atk));     // poison never lands the kill
       if(d>0){m.hp-=d;S.stats.dealt+=d;S.stats.statusDmg=(S.stats.statusDmg||0)+d;const b=partPos('body',mPose());addNum(b.x+rnd(-14,14),b.y-14,''+d,STATUS.poison.col,.6);}}}
   if(m.state==='idle'){
     if(m.roarDue){m.roarDue=false;m.state='roar';m.t=0;S.shake=.9;sfx('roar');buzz(200);
       addNum(W/2,L.ground-14,m.phase===2?'ENRAGED!':'ANGRY!','#ff6a4d',1.4);}
-    else if((m.wait-=dt)<=0&&S.h.state!=='dead')mStartAttack();
+    else if((m.wait-=dt)<=0&&S.h.state!=='dead'){
+      if(D.trait==='shell'&&m.last!=='shell'&&Math.random()<SHELL.chance){m.state='shell';m.t=0;m.last='shell';const b=partPos('body',mPose());addNum(b.x,b.y-24,'SHELL UP','#c8d0e8',1);}
+      else mStartAttack();}
   }else if(m.state==='attack'){
     while(m.hi<m.hits.length&&m.t>=m.hits[m.hi]){mHit(m.hi);m.hi++;if(m.state!=='attack')return;}
-    if(aPose()==='breath'&&m.t>m.hits[0]-.08&&m.t<m.hits[1]+.15){               // breath stream
-      const pz=mPose(),mo=rigPt(RIGS[D.rig].mouth(pz),pz);for(let i=0;i<3;i++)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-120,-70),vy:rnd(0,50),life:rnd(.25,.5),col:D.breath[i],g:-40});
+    if(aPose()==='breath'&&m.t>m.hits[0]-.08&&m.t<m.hits[m.hits.length-1]+.15){   // breath stream
+      const pz=mPose(),mo=rigPt(RIGS[D.rig].mouth(pz),pz);for(let i=0;i<3;i++)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-120,-70),vy:rnd(0,50),life:rnd(.25,.5),col:D.fxc[i],g:-40});
     }
     if(m.t>=m.dur){m.state='recover';m.t=0;
-      if(D.sig==='armor'){const b=partPos('body',mPose());addNum(b.x,b.y-22,'OPEN!','#4cd964',1);}}
+      if(D.trait==='armor'){const b=partPos('body',mPose());addNum(b.x,b.y-22,'OPEN!','#4cd964',1);}}
   }else if(m.state==='recover'){if(m.t>=m.rec){m.state='idle';m.wait=rnd(.5,1.1)*D.speed[m.phase];}}
   else if(m.state==='stagger'){if(m.t>=m.staggerDur){m.state='idle';m.wait=.5;m.stunned=false;}}
   else if(m.state==='sleep'){if(m.t>=STATUS.sleep.time){m.state='idle';m.wait=.5;}}
+  else if(m.state==='shell'){if(m.t>=SHELL.time){m.state='idle';m.wait=.2;}}
   else if(m.state==='evade'){if(m.t>=EVADE_DUR){m.state='idle';m.wait=m.phase?.15:.4;}}
   else if(m.state==='roar'){if(m.t>=1.2){m.state='idle';m.wait=.35;}}
 }
 // A status lands on the hunter
 function applyStatus(st){
-  const h=S.h; if(!st||h.state==='dead')return; const hc={x:L.hx+18,y:L.hFeet-18};
+  const h=S.h; if(!st||h.state==='dead')return; const hc={x:L.hx+18,y:L.hFeet-18}, I=INFLICT[st], say=()=>addNum(hc.x+6,hc.y-30,I[1],I[2],1.1);
   if(h.immune[st]){addNum(hc.x+6,hc.y-30,'IMMUNE','#4cd964',.8);return;}             // a meal can rule a status out
-  if(st==='poison'){if(h.poison<=0)addNum(hc.x+6,hc.y-30,'POISONED','#7ad84a',1);h.poison=POISON.time;}
-  else if(st==='burn'){if(h.burn<=0)addNum(hc.x+6,hc.y-30,'ON FIRE! ROLL!','#ff9a2e',1.2);h.burn=BURN.time;}
-  else if(st==='freeze'&&h.freezeImm<=0){h.state='frozen';h.t=0;h.frozen=FREEZE.time;h.freezeImm=FREEZE.immune;h.charge=0;h.lvl=0;h.buf=0;addNum(hc.x+6,hc.y-30,'FROZEN! TAP!','#7fd6ff',1.2);sfx('brk');}
+  if(st==='freeze'){if(h.freezeImm>0)return;h.state='frozen';h.t=0;h.frozen=FREEZE.time;h.freezeImm=FREEZE.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
+  if(st==='numb'){if(h.numbImm>0)return;h.state='numb';h.t=0;h.numb=NUMB.time;h.numbImm=NUMB.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
+  const T={poison:POISON,burn:BURN,wet:WET,blight:BLIGHT,bleed:BLEED,stench:STENCH,mud:MUD}[st]; if(!T)return;
+  if(h[st]<=0)say(); h[st]=T.time; if(st==='bleed')h.still=0;
 }
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
-  const m=S.m,h=S.h,A=ATTACKS[m.atk],a=A.pose; let dmg=A.dmg; if((a==='sweep'||a==='slam')&&m.parts.tail.broken)dmg*=.6;
+  const m=S.m,h=S.h,A=ATTACKS[m.atk],a=A.pose,D=S.def; let dmg=A.dmg; if((a==='sweep'||a==='slam'||a==='spin')&&m.parts.tail.broken)dmg*=.6;
   dmg=Math.round(dmg*S.def.dmg*(m.over?CHARGE.dmg:1));
   const hc={x:L.hx+18+hunterX(),y:L.hFeet-18}, dust=(n,col)=>{for(let k=0;k<n;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-50,0),life:rnd(.2,.5),col,g:150});};
   if(a==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:BIOMES[S.def.biome].speck,g:260});sfx('heavy');buzz(60);}
-  if(a==='sweep'||a==='rush')dust(12,'#d9c88e');
+  if(a==='sweep'||a==='rush'||a==='spin')dust(12,'#d9c88e');
+  if(a==='burrow'){S.shake=.5;dust(18,BIOMES[D.biome].speck);sfx('heavy');buzz(60);}
   if(a==='rush'||a==='slam'||a==='stomp'||a==='clap'){S.shake=Math.max(S.shake,.4);sfx('heavy');}
   if(a==='slam')dust(16,BIOMES[S.def.biome].speck);
-  if(a==='spit')for(let k=0;k<(A.big?14:8);k++)S.pt.push({x:hc.x,y:L.hFeet-4,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.2,.5),col:A.proj,g:260});
+  if(a==='spit')for(let k=0;k<(A.big?14:8);k++)S.pt.push({x:hc.x,y:L.hFeet-4,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.2,.5),col:A.proj||D.fxc[0],g:260});
   if(A.fx==='ring')S.fx.push({kind:'ring',x:L.mx+MS_OX+30,y:L.mFeet+2,t:0,life:.4});
-  if(A.fx==='bolt'||A.fx==='icicle'){S.fx.push({kind:A.fx,x:hc.x,y:L.hFeet,t:0});S.shake=Math.max(S.shake,.25);sfx('heavy');}
+  if(A.fx==='sky'){S.fx.push({kind:D.elem==='ice'?'icicle':'bolt',x:hc.x,y:L.hFeet,t:0,col:D.fxc[0]});S.shake=Math.max(S.shake,.25);sfx('heavy');}
   if(A.fx==='blast'){S.fx.push({kind:'ring',x:hc.x+10,y:L.hFeet,t:0,life:.4,col:'#ff9a2e'});for(let k=0;k<20;k++)S.pt.push({x:hc.x+rnd(-6,30),y:L.hFeet,vx:rnd(-70,70),vy:rnd(-130,-30),life:rnd(.3,.7),col:k%2?'#ff9a2e':'#ffd34d',g:200});}
   if(h.state==='dead'||h.state==='win'||h.state==='counter')return;
   const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
@@ -776,7 +926,7 @@ function mHit(i){
   S.shake=Math.max(S.shake,.35);S.stop=.06;addNum(hc.x+4,hc.y-18,''+dmg,'#ff6a4d',.9);sfx('hurt');buzz(80);
   for(let k=0;k<8;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-80,10),vy:rnd(-80,-10),life:.4,col:'#e2483d',g:220});
   if(h.hp<=0){h.hp=0;h.state='dead';S.endT=0;S.fail='YOU FAINTED';sfx('lose');return;}
-  applyStatus(A.status);
+  if(A.st)applyStatus(D.inflict);
 }
 
 // ═══════════════════════════════════════════════════
@@ -802,24 +952,25 @@ function dealDamage(base,part,heavy,stun,pierce){
     return;
   }
   if(m.state==='evade'&&m.t<EVADE_DUR-.2){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
-  const P=h.g.perks, weak=h.g.elem&&h.g.elem===S.def.weak, crit=P.keenedge&&Math.random()<CRIT[0];
+  const P=h.g.perks, weak=h.blight<=0&&h.g.elem&&h.g.elem===S.def.weak, shelled=m.state==='shell', crit=P.keenedge&&Math.random()<CRIT[0];
   let mult=1; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=P.weakspot?1.4:1.15; if(weak)mult*=ELEM_BONUS; if(crit)mult*=CRIT[1];
   if(stun&&P.bludgeon)stun*=1.4;
+  if(shelled&&!pierce)mult*=SHELL.dmg; m.lastHit=S.clock;
   const asleep=m.state==='sleep'; if(asleep)mult*=STATUS.sleep.wake;             // the hit that wakes it lands far harder
   const keen=h.sharp>=SHARP.hi, dull=h.sharp<SHARP.lo; mult*=keen?SHARP.bonus:dull?SHARP.dull:1;
-  const hide=S.def.sig==='armor'&&!pierce, open=m.state==='recover'||m.state==='stagger'||asleep; if(hide)mult*=ARMOR[open?1:0];   // Tuskhide: glancing blows until it is winded
+  const hide=S.def.trait==='armor'&&!pierce, open=m.state==='recover'||m.state==='stagger'||asleep; if(hide)mult*=ARMOR[open?1:0];   // Tuskhide: glancing blows until it is winded
   const dmg=Math.round(base*h.atk*mult*rnd(.92,1.08)), pp=partPos(part,pose);
   m.hp-=dmg;S.stats.dealt+=dmg;m.flash=.09;S.stop=Math.max(S.stop,heavy?.1:Math.min(.05,base*.0022));   // hitstop scales with the hit, so fast weapons do not lose more time to itS.shake=Math.max(S.shake,heavy?.4:.12);
-  addNum(pp.x+rnd(-6,6),pp.y-10,dmg+(crit?'!':''),(hide&&!open)||dull?'#8a93b0':crit?'#ff9a4d':weak?ELEM[h.g.elem][1]:heavy||mult>1.2?'#ffe14d':'#fff3a0',heavy||crit?1:.7);
+  addNum(pp.x+rnd(-6,6),pp.y-10,dmg+(crit?'!':''),(hide&&!open)||dull||(shelled&&!pierce)?'#8a93b0':crit?'#ff9a4d':weak?ELEM[h.g.elem][1]:heavy||mult>1.2?'#ffe14d':'#fff3a0',heavy||crit?1:.7);
   if(hide&&!open)for(let k=0;k<3;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-90,-20),life:.25,col:'#f2dca0',g:200});
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:heavy,flip:h.combo===1});
   for(let k=0;k<(heavy?12:5);k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-70,70),vy:rnd(-90,-10),life:rnd(.2,.5),col:k%2?'#fff':S.def.blood,g:240});
   sfx(heavy?'heavy':'hit');buzz(heavy?40:10);
-  const was=h.sharp; h.sharp=Math.max(0,h.sharp-base*SHARP.wear*h.wear);
+  const was=h.sharp; h.sharp=Math.max(0,h.sharp-base*SHARP.wear*h.wear*(shelled&&!pierce?SHELL.wear:1));
   if(was>=SHARP.lo&&h.sharp<SHARP.lo)addNum(L.hx+18,L.hFeet-40,'BLADE IS DULL!','#ff6a4d',1.2);
   const stt=h.g.status;                                                         // the weapon's status builds with every hit
   if(asleep&&m.hp>0){m.state='idle';m.wait=.7;addNum(pp.x,pp.y-24,'WAKE-UP HIT!',STATUS.sleep.col,1.2);S.shake=.6;}
-  if(stt&&m.hp>0&&!asleep&&m.state!=='sleep'&&(m.sb+=base*STATUS_RATE*(stt===S.def.weakSt?STATUS_WEAK:stt===S.def.resSt?STATUS_RES:1))>=m.sNeed){
+  if(stt&&h.blight<=0&&m.hp>0&&!asleep&&m.state!=='sleep'&&(m.sb+=base*STATUS_RATE*(stt===S.def.weakSt?STATUS_WEAK:stt===S.def.resSt?STATUS_RES:1))>=m.sNeed){
     const T=STATUS[stt];m.sb=0;m.sNeed*=STATUS_GROW;S.stats.procs=(S.stats.procs||0)+1;const b=partPos('body',pose);
     if(stt==='poison'){m.mpoison=T.time;m.mpT=0;addNum(b.x,b.y-28,'POISONED!',T.col,1.3);}
     else if(stt==='para'){mStagger(T.time);m.stunned=false;addNum(b.x,b.y-28,'PARALYSED!',T.col,1.3);}
@@ -843,7 +994,7 @@ function qteUpdate(dt){
     if(m.state==='dead'||h.state==='dead'){S.qte=null;return;}
     if(S.qte.t>=S.qteTime){const pp=partPos(S.qte.part,mPose());addNum(pp.x,pp.y-12,'TOO SLOW','#8a93b0',.6);S.stats.qteMiss++;S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);}
     return;}
-  const ok=(m.state==='idle'||m.state==='attack'||m.state==='recover'||m.state==='stagger')&&!mAir()&&h.state!=='dead'&&h.state!=='win';
+  const ok=(m.state==='idle'||m.state==='attack'||m.state==='recover'||m.state==='stagger'||m.state==='shell')&&!mAir()&&h.state!=='dead'&&h.state!=='win';
   if(!ok||(m.qteT-=dt)>0)return;
   const left=PARTS.filter(k=>!m.parts[k].broken); if(!left.length)return;
   let part=left[0];const i0=PARTS.indexOf(m.qteLast);for(let i=1;i<=PARTS.length;i++){const k=PARTS[(i0+i)%PARTS.length];if(!m.parts[k].broken){part=k;break;}}   // take turns, so every part gets its share
@@ -851,7 +1002,7 @@ function qteUpdate(dt){
 }
 // A tap at (x,y): does it land on the open weak point?
 function qteTap(x,y){
-  const q=S.qte,h=S.h,m=S.m; if(!q||h.state==='dead'||h.state==='win'||h.state==='hurt'||h.state==='frozen')return false;
+  const q=S.qte,h=S.h,m=S.m; if(!q||h.state==='dead'||h.state==='win'||h.state==='hurt'||h.state==='frozen'||h.state==='numb')return false;
   const pp=partPos(q.part,mPose()); if((x-pp.x)**2+(y-pp.y)**2>QTE_R*QTE_R)return false;
   S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);S.stats.qteHit++;
   const P=m.parts[q.part];P.hits++;
@@ -875,15 +1026,20 @@ function hStartAtk(part){const h=S.h;h.combo=(h.state==='atk'||h.comboT>0)?(h.co
 function hUpdate(dt){
   const h=S.h, W=h.g.W, P=h.g.perks, held=IN.down&&!IN.swiped; h.t+=dt;
   if(h.inv>0)h.inv-=dt; if(h.buff>0)h.buff-=dt; if(h.counter>0)h.counter-=dt; if(h.comboT>0)h.comboT-=dt; if(h.buf>0)h.buf-=dt;
-  if(h.stDelay>0)h.stDelay-=dt; else h.st=Math.min(100,h.st+32*dt*h.regen);
-  if(h.freezeImm>0)h.freezeImm-=dt;
-  if((h.poison>0||h.burn>0)&&h.state!=='dead'&&h.state!=='win'){                 // damage over time; it never lands the killing blow
+  if(h.stDelay>0)h.stDelay-=dt; else h.st=Math.min(100,h.st+32*dt*h.regen*(h.wet>0?WET.regen:1));
+  if(h.freezeImm>0)h.freezeImm-=dt; if(h.numbImm>0)h.numbImm-=dt;
+  for(const k of ['wet','blight','stench','mud'])if(h[k]>0)h[k]=Math.max(0,h[k]-dt);
+  if(h.bleed>0){h.bleed=Math.max(0,h.bleed-dt);const busy=h.state!=='idle'&&h.state!=='hurt';h.still=busy?0:h.still+dt;       // bleeding: only acting hurts, and standing still stops it
+    if(h.still>=BLEED.still){h.bleed=0;addNum(L.hx+18,L.hFeet-40,'BLEEDING STOPPED','#c8d0e8',.9);}}
+  const bleeding=h.bleed>0&&h.still===0;
+  if((h.poison>0||h.burn>0||bleeding)&&h.state!=='dead'&&h.state!=='win'){        // damage over time; it never lands the killing blow
     h.poison=Math.max(0,h.poison-dt);h.burn=Math.max(0,h.burn-dt);
-    if((h.dotT+=dt)>=(h.burn>0?BURN.tick:POISON.tick)){h.dotT=0;const d=Math.max(1,Math.round(h.max*((h.burn>0?BURN.dmg:0)+(h.poison>0?POISON.dmg:0))));
-      if(h.hp>1){const t=Math.min(d,h.hp-1);h.hp-=t;S.stats.taken+=t;S.stats.dot=(S.stats.dot||0)+t;addNum(L.hx+10+rnd(0,16),L.hFeet-30,''+t,h.burn>0?'#ff9a2e':'#7ad84a',.6);}}
-    if(Math.random()<.25)S.pt.push({x:L.hx+12+rnd(0,12)+hunterX(),y:L.hFeet-rnd(8,30),vx:rnd(-8,8),vy:rnd(-40,-15),life:.4,col:h.burn>0?(Math.random()<.5?'#ff9a2e':'#ffd34d'):'#7ad84a',g:-20});
+    if((h.dotT+=dt)>=(h.burn>0?BURN.tick:bleeding?BLEED.tick:POISON.tick)){h.dotT=0;const d=Math.max(1,Math.round(h.max*((h.burn>0?BURN.dmg:0)+(h.poison>0?POISON.dmg:0)+(bleeding?BLEED.dmg:0))));
+      if(h.hp>1){const t=Math.min(d,h.hp-1);h.hp-=t;S.stats.taken+=t;S.stats.dot=(S.stats.dot||0)+t;addNum(L.hx+10+rnd(0,16),L.hFeet-30,''+t,h.burn>0?'#ff9a2e':bleeding?'#e2483d':'#7ad84a',.6);}}
+    if(Math.random()<.25)S.pt.push({x:L.hx+12+rnd(0,12)+hunterX(),y:L.hFeet-rnd(8,30),vx:rnd(-8,8),vy:rnd(-40,-15),life:.4,col:h.burn>0?(Math.random()<.5?'#ff9a2e':'#ffd34d'):bleeding?'#e2483d':'#7ad84a',g:-20});
   }
   if(h.state==='frozen'){if((h.frozen-=dt)<=0){h.state='idle';h.inv=.5;iceBurst();}return;}
+  if(h.state==='numb'){if((h.numb-=dt)<=0){h.state='idle';h.inv=.4;}return;}
   if(h.state==='atk'){
     if(!h.hitDone&&h.t>=W.hit[h.combo]){h.hitDone=true;dealDamage(W.dmg[h.combo]*(h.flurry?FLURRY_BONUS:1),h.target,false,h.target==='head'?W.stunTap:W.stunAll);}
     if(h.state==='atk'&&W.hold==='guard'&&held&&h.hitDone&&S.clock-IN.downAt>.14){h.state='guard';h.t=0;}          // the lance can raise its shield mid-combo
@@ -923,26 +1079,31 @@ function hRelease(){const h=S.h;if(h.state!=='charge')return;
   if(h.lvl>0){h.state='heavy';h.t=0;h.hitDone=false;h.combo=2;sfx('swing');}else{h.state='idle';h.charge=0;}}
 // ── Player actions ──
 function actTap(part){const h=S.h;
+  if(h.state==='numb')return;
   if(h.state==='frozen'){h.frozen-=FREEZE.tap;S.shake=Math.max(S.shake,.1);sfx('hit');S.pt.push({x:L.hx+18+rnd(-8,8),y:L.hFeet-rnd(4,30),vx:rnd(-50,50),vy:rnd(-60,-10),life:.3,col:'#bfeaff',g:200});return;}   // struggle free
   if(h.state==='idle')hStartAtk(part);
   else if(h.state==='atk'||h.state==='dodge'||h.state==='heavy'){h.buf=.3;h.bufPart=part;}}
 function actCounter(){const h=S.h;
-  if(h.counter<=0||h.state==='frozen'||h.state==='hurt'||h.state==='dead'||h.state==='win')return false;
+  if(h.counter<=0||h.state==='frozen'||h.state==='numb'||h.state==='hurt'||h.state==='dead'||h.state==='win')return false;
   h.counter=0;h.state='counter';h.t=0;h.hitDone=false;h.charge=0;h.lvl=0;h.buf=0;h.combo=2;S.slow=0;S.stats.counters++;sfx('perfect');return true;}
 function actDodge(dir){const h=S.h;
   if(h.state==='frozen'){actTap();return;}
+  if(h.state==='numb')return;
   if(h.state==='hurt'||h.state==='dead'||h.state==='win'||h.state==='dodge'||h.state==='counter')return;
   if(h.state==='drink'&&h.drank)return;
-  const cost=h.g.W.dodge*(h.g.perks.tireless?.6:1);
+  const cost=h.g.W.dodge*(h.g.perks.tireless?.6:1)*(h.mud>0?MUD.cost:1);
   if(h.st<cost){addNum(L.hx+18,L.hFeet-34,'TIRED','#f5c542',.5);return;}
   h.st-=cost;h.stDelay=.6;h.state='dodge';h.t=0;h.dir=dir;h.charge=0;h.lvl=0;h.buf=0;sfx('dodge');
-  if(h.burn>0&&(h.burn-=BURN.roll)<=0){h.burn=0;addNum(L.hx+18,L.hFeet-40,'PUT OUT','#c8d0e8',.8);}}   // rolling smothers the flames
-function actSharpen(){const h=S.h;
+  if(h.burn>0&&(h.burn-=BURN.roll)<=0){h.burn=0;addNum(L.hx+18,L.hFeet-40,'PUT OUT','#c8d0e8',.8);}   // rolling smothers the flames
+  if(h.mud>0){h.mud=0;addNum(L.hx+18,L.hFeet-40,'SHAKEN OFF','#c8d0e8',.8);}
+  if(h.stench>0&&(h.stench-=STENCH.roll)<=0){h.stench=0;addNum(L.hx+18,L.hFeet-40,'AIRED OUT','#c8d0e8',.8);}}
+function actSharpen(){const h=S.h;if(h.state==='numb'||h.state==='frozen')return;
   if(!(h.state==='idle'||h.state==='atk'||h.state==='charge'||h.state==='guard'))return;
   if(h.sharp>=SHARP.max-1){sfx('miss');return;}
   h.state='sharpen';h.t=0;h.charge=0;h.lvl=0;h.buf=0;sfx('swing');}
 function actPotion(){const h=S.h;
   if(!(h.state==='idle'||h.state==='atk'||h.state==='charge'||h.state==='guard'))return;
+  if(h.stench>0){addNum(L.hx+18,L.hFeet-40,'TOO FOUL TO DRINK','#a8a84a',.8);sfx('miss');return;}
   if(h.potions<=0||(h.hp>=h.max&&h.poison<=0)){sfx('miss');return;}
   h.state='drink';h.t=0;h.drank=false;h.charge=0;h.lvl=0;h.buf=0;}
 
@@ -973,10 +1134,15 @@ function move(x,y){
   if(-dy>Math.abs(dx)*1.2)actPotion();else if(dy>Math.abs(dx)*1.2)actSharpen();else actDodge(dx<0?-1:1);
 }
 function release(){if(!IN.down)return;IN.down=false;if(S.mode==='hunt')hRelease();}
-cv.addEventListener('pointerdown',e=>{e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}const p=toLogical(e);if(press(p.x,p.y))IN.id=e.pointerId;});   // a weak-point tap with a second finger leaves a held charge alone
-cv.addEventListener('pointermove',e=>{if(e.pointerId!==IN.id)return;const p=toLogical(e);move(p.x,p.y);});
-cv.addEventListener('pointerup',e=>{if(e.pointerId===IN.id)release();});
-cv.addEventListener('pointercancel',e=>{if(e.pointerId===IN.id)release();});
+cv.addEventListener('pointerdown',e=>{e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}const p=toLogical(e);
+  if(S.mode==='camp'||S.mode==='prep'){IN.ui={x:p.x,y:p.y,s:scrollGet(),moved:false};IN.id=e.pointerId;return;}                // lists scroll, so a tap fires on release
+  if(press(p.x,p.y))IN.id=e.pointerId;});   // a weak-point tap with a second finger leaves a held charge alone
+cv.addEventListener('pointermove',e=>{if(e.pointerId!==IN.id)return;const p=toLogical(e);
+  if(IN.ui){const dy=p.y-IN.ui.y;if(Math.abs(dy)>4)IN.ui.moved=true;if(IN.ui.moved)scrollSet(IN.ui.s-dy);return;}
+  move(p.x,p.y);});
+cv.addEventListener('pointerup',e=>{if(e.pointerId!==IN.id)return;if(IN.ui){const u=IN.ui;IN.ui=null;if(!u.moved)press(u.x,u.y);return;}release();});
+cv.addEventListener('wheel',e=>{if(S.mode==='camp')scrollSet(scrollGet()+e.deltaY/3);},{passive:true});
+cv.addEventListener('pointercancel',e=>{if(e.pointerId===IN.id){IN.ui=null;release();}});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 // Keyboard: J or Space attack the head (hold to charge), K the tail, A/D or arrows dodge, W or Q potion
 addEventListener('keydown',e=>{
@@ -1000,7 +1166,7 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k===' '||k==='j'||k=
 function rollLoot(){
   const m=S.m,D=S.def,h=S.h,out=[],add=(id,n)=>{if(n>0)out.push({id,n});};
   for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
-  const lucky=h.g.perks.fortune, broke=PARTS.filter(k=>m.parts[k].broken), time=HUNT_TIME-S.timeLeft;
+  const lucky=h.g.perks.fortune, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
   if(lucky)for(const d of out)d.n++;
   if(S.pal&&S.pal.role==='gatherer'){for(const d of out)d.n++;add(BIOME_ING[D.biome][0],2);}
   let unlock='';
@@ -1010,8 +1176,9 @@ function rollLoot(){
     add('gem',Math.random()<(lucky?.16:.08)?1:0);
     const dry=SAVE.dry[D.id]||0, chance=(RARE.base+RARE.part*broke.length+RARE.pity*dry)*(lucky?2:1)*h.luck;
     if(Math.random()<chance){out.push({id:D.mat.rare,n:1,rare:true});SAVE.dry[D.id]=0;}else SAVE.dry[D.id]=dry+1;
+    if(D.rank===7)qEvent('apex');
     const first=!SAVE.wins[D.id]; SAVE.wins[D.id]=(SAVE.wins[D.id]||0)+1;
-    const next=first&&HUNTS.map(k=>MONSTERS[k]).find(x=>x.needs===D.id); unlock=next?next.name:'';
+    if(first){const r=D.rank;unlock=D.id==='fern'?'RANK 1 IS OPEN':r<RANKS&&rankOpen(r+1)&&(r===7?rankWins(7)===4:rankWins(r)===RANK_NEED)?rankName(r+1)+' IS OPEN':'';}
     qEvent('hunt',D.id);qEvent('weapon',h.g.wt);if(time<45)qEvent('fast');
     if(broke.length){qEvent('break',null,broke.length);if(m.parts.tail.broken)qEvent('tail');if(broke.length===3)qEvent('allbreak');}
   }
@@ -1022,12 +1189,16 @@ function rollLoot(){
   return{drops:out,bag:SAVE.bag,time,unlock};
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
-function toCamp(tab){S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
+// Which list, if any, the camp is showing: it scrolls
+const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'&&!S.exp?'hunt':S.tab==='forge'&&S.fpick?'forge':null;
+const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
+function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
+function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fpick=false;S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
 function toast(txt,col){S.toast={txt,col:col||'#fff',t:0};}
 function forgeTap(id){
   const G=GEAR[id],eq=SAVE.eq;
   if(SAVE.own[id]){
-    if(eq[G.slot]===id){if(G.slot!=='charm'&&G.slot!=='coat')return;eq[G.slot]=null;toast(G.slot==='charm'?'CHARM TAKEN OFF':'COATING WIPED OFF');}
+    if(eq[G.slot]===id){if(G.slot!=='charm')return;eq.charm=null;toast('CHARM TAKEN OFF');}
     else{eq[G.slot]=id;toast(G.name+' EQUIPPED','#4cc9ff');}
     sfx('charge',2);
   }else if(G.cost&&canAfford(id)){
@@ -1036,7 +1207,7 @@ function forgeTap(id){
   }else{toast('NOT ENOUGH MATERIALS','#ff6a4d');sfx('miss');return;}
   save();
 }
-function huntTap(id){if(!unlocked(id)){toast('BEAT '+MONSTERS[MONSTERS[id].needs].name+' FIRST','#ff6a4d');sfx('miss');return;}toPrep(id);}
+function huntTap(id){if(!unlocked(id)){toast(lockText(id),'#ff6a4d');sfx('miss');return;}toPrep(id);}
 // ── Quests ──
 const nowMs=()=>MH.fakeNow||Date.now();
 function dayKey(){const d=new Date(nowMs());return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
@@ -1051,7 +1222,8 @@ function ensureQuests(){
 // Every quest that can make progress right now: {kind, def, st}. st holds p (progress) and c (claimed).
 function quests(){
   ensureQuests(); const out=[];
-  if(SAVE.story.i<STORY.length)out.push({kind:'story',def:STORY[SAVE.story.i],st:SAVE.story});
+  if(SAVE.story.i<STORY.length){const def=STORY[SAVE.story.i],g=def.goal;if(g[0]==='rank')SAVE.story.p=rankOpen(g[1])?1:0;if(g[0]==='apex')SAVE.story.p=Math.max(SAVE.story.p,rankWins(7));if(g[0]==='done')SAVE.story.p=0;
+    out.push({kind:'story',def,st:SAVE.story});}
   SAVE.daily.q.forEach(st=>out.push({kind:'daily',def:DAILIES[st.k],st}));
   SAVE.weekly.q.forEach(st=>out.push({kind:'weekly',def:WEEKLIES[st.k],st}));
   if(SAVE.wins.fern)for(const def of SIDES){const st=SAVE.side[def.id]=SAVE.side[def.id]||{p:0,c:false};out.push({kind:'side',def,st});}
@@ -1139,6 +1311,10 @@ const BIOMES=[
   {sky:['#d98a4a','#f0bc7a','#fbe6b8'],hills:['#c9955a','#b07e48'],ground:['#d9b06a','#cba05c'],speck:'#f2dca0',rare:.95},   // 2 desert
   {sky:['#5a7cb0','#a8c4e0','#e8f2fa'],hills:['#c8d8e8','#a8bcd0'],ground:['#e8f0f6','#d6e2ec'],speck:'#ffffff',rare:.9},    // 3 tundra
   {sky:['#12162a','#2a3050','#4a5478'],hills:['#262c44','#1a1f33'],ground:['#3a4058','#30364c'],speck:'#7a84a8',rare:.95},   // 4 storm peaks
+  {sky:['#2a3a34','#4a6a54','#8aa87a'],hills:['#2f4a3a','#233a2e'],ground:['#3f5a3a','#34492f'],speck:'#7a9a5a',rare:.93},   // 5 swamp
+  {sky:['#4c9cdc','#8cc8f0','#e8f4f8'],hills:['#2a7ac8','#1e5a9a'],ground:['#e8d8a8','#dcc890'],speck:'#ffffff',rare:.95},   // 6 coast
+  {sky:['#2a1a3a','#5a3a6a','#c88aa8'],hills:['#3a2a4a','#2a1e38'],ground:['#5a5066','#4c4458'],speck:'#8a7a9a',rare:.94},   // 7 ruins
+  {sky:['#05040c','#0e0a20','#241a48'],hills:['#120e24','#0a0816'],ground:['#1a1630','#141026'],speck:'#8a7ad8',rare:.96},   // 8 the summit, under the Hollow Star
 ];
 let BG=null, BGS={};
 function bgFor(i){return BGS[i]||(BGS[i]=makeBg(i));}
@@ -1154,13 +1330,22 @@ function makeBg(bi){
   if(bi===3)for(let i=0;i<40;i++)R((hash2(i,3,5)*BW)|0,(hash2(i,4,5)*gt)|0,1,1,'#ffffff');                                       // snow
   if(bi===4){let x=30,y=0;while(y<gt-44){const nx=x+((hash2(y,x,9)*9)|0)-4;R(Math.min(x,nx),y,Math.abs(nx-x)+1,1,'#ffe14d');R(nx,y,1,5,'#fff6c0');x=nx;y+=5;}   // lightning
     [[20,gt*.2],[84,gt*.3],[56,gt*.12]].forEach(([cx,cy])=>{cy|=0;R(cx-16,cy,36,4,'#1c2036');R(cx-9,cy-3,22,3,'#1c2036');R(cx-12,cy+4,26,2,'#161a2c');});}
+  if(bi===8){for(let i=0;i<70;i++)R((hash2(i,1,11)*BW)|0,(hash2(i,2,11)*gt)|0,1,1,i%4?'#c8c0f0':'#ffffff');                       // stars, and the hollow ring
+    for(let a=0;a<120;a++){const an=a/120*6.283;R(96+Math.cos(an)*13,gt*.3+Math.sin(an)*13,2,2,'#f0e8ff');R(96+Math.cos(an)*16,gt*.3+Math.sin(an)*16,1,1,'#8a7ad8');}}
+  if(bi===7)for(let i=0;i<24;i++)R((hash2(i,5,13)*BW)|0,(hash2(i,6,13)*gt*.6)|0,1,1,'#f0d8e8');
+  if(bi===6){for(let y=-7;y<=7;y++)for(let x=-7;x<=7;x++)if(x*x+y*y<=49)R(30+x,(gt*.28|0)+y,1,1,'#fffbe8');[[70,gt*.2],[104,gt*.36]].forEach(([cx,cy])=>{cy|=0;R(cx-12,cy,26,3,'#ffffff');R(cx-6,cy-3,14,3,'#ffffff');});}
   for(let x=0;x<BW;x++){const h1=gt-38+Math.sin(x*.06)*8+Math.sin(x*.17+1)*4,h2=gt-22+Math.sin(x*.09+2)*6+Math.sin(x*.23)*3;
     R(x,h1,1,gt+4-h1,B.hills[0]);R(x,h2,1,gt+4-h2,B.hills[1]);}
   if(bi===0)[8,22,36,108,122].forEach((tx,k)=>{const base=gt-10+(k%2)*5;for(let j=0;j<18;j++){const w=(j>>1)+1;R(tx-w,base-18+j,w*2+1,1,j%5===0?'#1a4a30':'#1f5a38');}R(tx,base,2,4,'#4a2e1c');});
   if(bi===1||bi===4)[10,30,116].forEach((tx,k)=>{const base=gt-4+(k%2)*4;for(let j=0;j<20;j++){const w=(j>>2)+1;R(tx-w,base-20+j,w*2,1,bi===1?'#140b0e':'#10131f');}});   // rock spires
   if(bi===2)[12,34,112].forEach((tx,k)=>{const base=gt-2+(k%2)*4;R(tx,base-16,3,18,'#4a8a4a');R(tx-4,base-11,4,2,'#4a8a4a');R(tx-4,base-14,2,4,'#4a8a4a');R(tx+3,base-8,4,2,'#4a8a4a');R(tx+5,base-12,2,5,'#4a8a4a');R(tx,base-16,1,18,'#6aa86a');});   // cacti
   if(bi===3)[9,26,40,110,121].forEach((tx,k)=>{const base=gt+(k%2)*4,hh=14+(k%3)*5;for(let j=0;j<hh;j++){const w=(j/4|0)+1;R(tx-w,base-hh+j,w*2,1,'#8fc8e8');R(tx-w,base-hh+j,1,1,'#e8f8ff');}});   // ice spires
+  if(bi===5){[12,40,112].forEach((tx,k)=>{const base=gt+(k%2)*4;R(tx,base-28,2,30,'#1a2a22');R(tx-7,base-22,7,1,'#1a2a22');R(tx-7,base-26,1,4,'#1a2a22');R(tx+2,base-16,8,1,'#1a2a22');R(tx+9,base-21,1,5,'#1a2a22');});}   // drowned trees
+  if(bi===6){for(let x=0;x<BW;x+=2)R(x,gt-2+((x>>1)%3===0?1:0),2,1,'#ffffff');}                                                    // surf line
+  if(bi===7)[10,30,104,120].forEach((tx,k)=>{const base=gt+2+(k%2)*4,hh=18+(k%3)*9;R(tx-3,base-hh,7,hh,'#6a5a7a');R(tx-3,base-hh,2,hh,'#8a7a9a');R(tx-5,base-hh-3,11,3,'#8a7a9a');if(k%2)R(tx+1,base-hh-3,5,2,'#2a1a3a');});   // broken pillars
+  if(bi===8)[8,24,112,124].forEach((tx,k)=>{const base=gt+(k%2)*4;for(let j=0;j<26;j++){const w=(j>>2)+1;R(tx-w,base-26+j,w*2,1,'#0a0816');}});
   for(let y=gt;y<LH;y++)for(let x=0;x<BW;x++){const r=hash2(x>>1,y>>1,1+bi);R(x,y,1,1,r>B.rare?B.speck:(r>.5?B.ground[0]:B.ground[1]));}
+  if(bi===5)for(let i=0;i<5;i++){const px=(hash2(i,7,3)*(BW-30))|0,py=gt+10+((hash2(i,8,3)*(LH-gt-40))|0);for(let y=-3;y<=3;y++){const w=Math.round(12*Math.sqrt(1-y*y/9.5));R(px+12-w,py+y,w*2,1,y<0?'#2a4a5a':'#223c4a');}}   // pools
   return c;
 }
 function circ(cx,cy,r,col){g.fillStyle=col;const n=Math.max(16,Math.round(r*6));for(let i=0;i<n;i++){const a=i/n*Math.PI*2;g.fillRect(Math.round(cx+Math.cos(a)*r),Math.round(cy+Math.sin(a)*r),1,1);}}
@@ -1173,6 +1358,7 @@ function hunterPose(){
   else if(h.state==='charge'){p.a=-2.6+(h.lvl?Math.sin(S.clock*50)*.1:0);p.bob=1;p.lean=-1;p.glow=h.lvl===3?(Math.floor(S.clock*14)%2?3:2):h.lvl;}
   else if(h.state==='heavy'){p.a=lerp(-2.7,.9,h.t/.18);p.lean=2;p.bob=0;p.glow=h.lvl;}
   else if(h.state==='counter'){p.a=lerp(-2.7,.9,h.t/.2);p.lean=2;p.bob=0;p.glow=Math.floor(S.clock*20)%2?3:1;}
+  else if(h.state==='numb'){p.a=.3;p.lean=-1;p.bob=Math.floor(S.clock*20)%2;}
   else if(h.state==='guard'){p.a=-.5;p.guard=1;p.bob=0;if(h.t<=GUARD_PERFECT)p.glow=1;}
   else if(h.state==='dodge'){p.kind='roll';p.f=Math.floor(h.t*14)%2;}
   else if(h.state==='hurt'){p.a=-.4;p.lean=-1;p.bob=1;}
@@ -1193,17 +1379,21 @@ function drawWorld(){
   const dead=m.state==='dead';
   if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)){
     const ms=mSprite(S.def,{hx:p.hx,hy:p.hy,jaw:p.jaw,wing:p.wing,tail:p.tail&~1,horn:!m.parts.head.broken,spike:!m.parts.tail.broken,torn:m.parts.wings.broken,glow:p.glow,rage:m.phase>0?1:0},m.flash>0);
-    g.drawImage(ms,L.mx+p.ox,L.my+p.oy);
+    if(p.oy>4&&m.state==='attack'){g.save();g.beginPath();g.rect(-8,0,W+16,L.mFeet+3);g.clip();g.drawImage(ms,L.mx+p.ox,L.my+p.oy);g.restore();}   // sinking into the ground
+    else g.drawImage(ms,L.mx+p.ox,L.my+p.oy);
   }
   const hp=mHeadPos(p);
   if(m.state==='sleep')for(let i=0;i<3;i++){const u=(S.clock*.7+i/3)%1;text('Z',hp.x+6+u*14,hp.y-6-u*18,STATUS.sleep.col,{out:OUTLINE});}
   if(m.state==='stagger'){for(let i=0;i<(m.stunned?5:3);i++){const a=S.clock*5+i*2.1;g.fillStyle='#ffe14d';g.fillRect(Math.round(hp.x+4+Math.cos(a)*9),Math.round(hp.y-10+Math.sin(a)*3),2,2);}}
-  // idle life: dust, embers, mist and sparks
-  if(!dead&&!MH.manual){const mo=rigPt(RIGS[S.def.rig].mouth(p),p),id=S.def.id,r=Math.random();
-    if(id==='tusk'&&r<.06&&m.state==='idle')S.pt.push({x:L.mx+MS_OX+rnd(18,30)+p.ox,y:L.mFeet,vx:rnd(-40,-10),vy:rnd(-25,-5),life:.4,col:'#f2dca0',g:60});
-    if(id==='ember'&&r<.12)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-12,4),vy:rnd(10,30),life:.5,col:r<.06?'#ff9a2e':'#ffd34d',g:40});
-    if(id==='frost'&&r<.1)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-30,-10),vy:rnd(-12,2),life:.6,col:'#e8f8ff',g:-10});
-    if(id==='storm'&&r<(m.over?.6:m.charge/250)){const b=partPos('body',p);S.pt.push({x:b.x+rnd(-26,30),y:b.y+rnd(-22,20),vx:rnd(-30,30),vy:rnd(-30,30),life:.15,col:m.over?'#ffffff':'#ffe14d',g:0});}}
+  // idle life: dust, embers, mist, drips, sparks and glow
+  if(!dead&&!MH.manual&&!S.def.small){const mo=rigPt(RIGS[S.def.rig].mouth(p),p),r=Math.random();
+    const F=S.def.look.f||{},el=S.def.elem,b=partPos('body',p);
+    if(S.def.rig==='brute'&&r<.05&&m.state==='idle')S.pt.push({x:L.mx+MS_OX+rnd(18,30)+p.ox,y:L.mFeet,vx:rnd(-40,-10),vy:rnd(-25,-5),life:.4,col:BIOMES[S.def.biome].speck,g:60});
+    if(F.hot&&r<.12)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-12,4),vy:rnd(10,30),life:.5,col:r<.06?'#ff9a2e':'#ffd34d',g:40});
+    if(el==='ice'&&r<.1)S.pt.push({x:mo.x,y:mo.y,vx:rnd(-30,-10),vy:rnd(-12,2),life:.6,col:'#e8f8ff',g:-10});
+    if(el==='water'&&r<.08)S.pt.push({x:b.x+rnd(-24,24),y:b.y+rnd(-6,14),vx:rnd(-6,6),vy:rnd(20,50),life:.4,col:'#bfe0ff',g:120});
+    if(S.def.trait==='charge'&&r<(m.over?.6:m.charge/250))S.pt.push({x:b.x+rnd(-26,30),y:b.y+rnd(-22,20),vx:rnd(-30,30),vy:rnd(-30,30),life:.15,col:m.over?'#ffffff':S.def.fxc[0],g:0});
+    if(F.glow&&r<.25)S.pt.push({x:b.x+rnd(-30,30),y:b.y+rnd(-24,18),vx:rnd(-6,6),vy:rnd(-30,-10),life:.6,col:S.def.fxc[r<.12?0:1],g:0});}
   if(m.phase===2&&!dead&&Math.random()<.3)S.pt.push({x:hp.x-6,y:hp.y+4,vx:rnd(-20,0),vy:rnd(-30,-10),life:.4,col:'#c8d0e8',g:-20});
   if(m.state==='roar'){for(let i=0;i<3;i++)ring(hp.x-4,hp.y+4,6+((m.t*40+i*9)%28),'#e8f0fc');}
   if(S.qte){const q=S.qte,pp=partPos(q.part,p),u=q.t/S.qteTime,r=lerp(20,6,u),bl=Math.floor(S.clock*16)%2;       // weak point: a red circle shrinking onto the part
@@ -1217,13 +1407,14 @@ function drawWorld(){
       g.fillStyle=OUTLINE;g.fillRect(bx-3,by-1,7,12);g.fillStyle=col;g.fillRect(bx-2,by,5,10);g.fillStyle='#fff';g.fillRect(bx,by+1,1,5);g.fillRect(bx,by+7,1,2);}
     for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.9){const now=d<PERFECT_WIN;ring(hcx,hcy,9+d*30,now?'#ffffff':col);if(now)ring(hcx,hcy,10+d*30,'#ff4030');}}
     ring(hcx,hcy,9,'rgba(255,255,255,.55)');
+    if(aPose()==='burrow'&&mAir()){for(let k=0;k<3;k++){g.fillStyle=BIOMES[S.def.biome].speck;g.fillRect(Math.round(hcx+8+rnd(-10,10)),Math.round(L.hFeet+rnd(-2,3)),2,1);}}
     if(aPose()==='dive'&&mAir())shadow(hcx+14,L.hFeet+1,Math.round(lerp(4,26,m.t/m.hits[0])),4);
     const A=ATTACKS[m.atk];
     if(A.pose==='spit'){const mo=rigPt(RIGS[S.def.rig].mouth(p),p);                 // projectiles in the air, timed to land on the hit
       for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<0||d>PROJ_TIME)continue;const u=1-d/PROJ_TIME,x=lerp(mo.x,hcx,u),y=lerp(mo.y,L.hFeet-10,u)-Math.sin(Math.PI*u)*22,r=A.big?3:2;
-        g.fillStyle=OUTLINE;g.fillRect(Math.round(x)-r-1,Math.round(y)-r-1,r*2+2,r*2+2);g.fillStyle=A.proj;g.fillRect(Math.round(x)-r,Math.round(y)-r,r*2,r*2);g.fillStyle='rgba(255,255,255,.6)';g.fillRect(Math.round(x)-r,Math.round(y)-r,r,1);
-        if(!A.big)S.pt.push({x,y,vx:rnd(-10,10),vy:rnd(-10,10),life:.2,col:A.proj,g:0});}}
-    if(A.fx==='icicle')for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.3&&d>0){const y=lerp(L.hFeet-8,HUD_T,d/.3);g.fillStyle='#e8f8ff';g.fillRect(hcx-1,y-10,3,10);g.fillStyle='#6cc4f0';g.fillRect(hcx,y-8,1,10);}}
+        g.fillStyle=OUTLINE;g.fillRect(Math.round(x)-r-1,Math.round(y)-r-1,r*2+2,r*2+2);g.fillStyle=A.proj||S.def.fxc[0];g.fillRect(Math.round(x)-r,Math.round(y)-r,r*2,r*2);g.fillStyle='rgba(255,255,255,.6)';g.fillRect(Math.round(x)-r,Math.round(y)-r,r,1);
+        if(!A.big)S.pt.push({x,y,vx:rnd(-10,10),vy:rnd(-10,10),life:.2,col:A.proj||S.def.fxc[0],g:0});}}
+    if(A.fx==='sky'&&S.def.elem==='ice')for(let i=m.hi;i<m.hits.length;i++){const d=m.hits[i]-m.t;if(d<.3&&d>0){const y=lerp(L.hFeet-8,HUD_T,d/.3);g.fillStyle='#e8f8ff';g.fillRect(hcx-1,y-10,3,10);g.fillStyle='#6cc4f0';g.fillRect(hcx,y-8,1,10);}}
   }
   // companion
   if(S.pal){const P=S.pal,k=P.hop>0?Math.sin(Math.PI*(1-P.hop/.4)):0,f=P.role==='fighter';g.drawImage(palSpr(Math.floor(S.clock*5)%2),Math.round(L.hx-6+(f?k*34:0)),Math.round(L.hFeet-13-k*(f?14:8)-(Math.sin(S.clock*4)>0?1:0)));}
@@ -1246,7 +1437,7 @@ function drawWorld(){
   for(const f of S.fx){const u=f.t/.22,n=f.big?16:10,d=f.flip?-1:1;
     if(f.kind==='ring'){const r=6+(f.t/f.life)*46;ring(f.x,f.y,r,f.col||'#ffffff');ring(f.x,f.y,r-2,f.col||'#c8d0e8');continue;}
     if(f.kind==='icicle'){g.fillStyle=u<.5?'#ffffff':'#bfeaff';g.fillRect(f.x-3,f.y-26,7,26);g.fillStyle='#6cc4f0';g.fillRect(f.x-1,f.y-22,3,22);for(let k=0;k<2;k++)S.pt.push({x:f.x,y:f.y-4,vx:rnd(-70,70),vy:rnd(-80,-10),life:.3,col:'#e8f8ff',g:240});continue;}
-    if(f.kind==='bolt'){let x=f.x;for(let y=f.y;y>HUD_T;y-=4){const nx=x+((hash2(y,f.x|0,3)*7)|0)-3;g.fillStyle=u<.5?'#ffffff':'#ffe14d';g.fillRect(Math.min(x,nx)-1,y-4,Math.abs(nx-x)+3,4);x=nx;}continue;}
+    if(f.kind==='bolt'){let x=f.x;for(let y=f.y;y>HUD_T;y-=4){const nx=x+((hash2(y,f.x|0,3)*7)|0)-3;g.fillStyle=u<.5?'#ffffff':f.col||'#ffe14d';g.fillRect(Math.min(x,nx)-1,y-4,Math.abs(nx-x)+3,4);x=nx;}continue;}
     for(let i=0;i<n;i++){const k=i/n-.5+u*.3;g.fillStyle=u<.5?'#fff':'#fff3a0';g.fillRect(Math.round(f.x+k*n*1.4),Math.round(f.y+d*k*n*1.6),f.big?3:2,1);}}
   for(const q of S.pt){g.fillStyle=q.col;g.fillRect(Math.round(q.x),Math.round(q.y),q.life>.25?2:1,q.life>.25?2:1);}
   for(const n of S.nums){const u=n.t/n.life;text(n.txt,clamp(n.x,n.txt.length*2+2,W-n.txt.length*2-2),n.y-u*12-(u<.15?(1-u/.15)*-3:0),n.col,{al:1,out:OUTLINE});}
@@ -1259,7 +1450,8 @@ function drawHud(){
   text(S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name,3,2,'#e8f0fc');
   // part status
   // parts: icon and three pips each, one per weak-point hit
-  if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=46+i*16,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
+  const px0=Math.max(46,textW(S.def.small?S.def.name+' 1/3':S.def.name)+7);   // part icons sit after the name, however long
+  if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*16,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
     g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,0,9,9);g.globalAlpha=1;
     if(P.broken){g.fillStyle='#e2483d';g.fillRect(x+1,4,7,1);}
     for(let j=0;j<S.qteHits;j++){g.fillStyle=j<P.hits?'#ffe14d':act?'#ff4030':'#3a4060';g.fillRect(x+10,6-j*3,3,2);}});
@@ -1274,10 +1466,11 @@ function drawHud(){
   // bottom
   g.fillStyle=OUTLINE;g.fillRect(0,L.gy,W,HUD_B);
   text('HP',4,L.gy+4,'#8a93b0');bar(14,L.gy+4,62,5,h.hp/h.max,h.hp<h.max*.3?'#e2483d':'#4cd964','#2b2f45');
-  if(S.def.sig==='charge'){text('CHRG',3,20,m.over?'#ffe14d':'#c8d0e8');g.fillStyle='#000';g.fillRect(21,20,W-24,4);g.fillStyle='#2b2f45';g.fillRect(22,21,W-26,2);
+  if(S.def.trait==='charge'){text('CHRG',3,20,m.over?'#ffe14d':'#c8d0e8');g.fillStyle='#000';g.fillRect(21,20,W-24,4);g.fillStyle='#2b2f45';g.fillRect(22,21,W-26,2);
     g.fillStyle=m.over?(Math.floor(S.clock*12)%2?'#ffffff':'#ffe14d'):'#7fd6ff';g.fillRect(22,21,Math.round((W-26)*m.charge/100),2);}
-  if(S.clock<3.2&&S.mode==='hunt'){const w=textW(S.def.tip)+8;g.fillStyle='rgba(12,14,26,.8)';g.fillRect((W-w)/2,HUD_T+4,w,11);text(S.def.tip,W/2,HUD_T+7,'#ffe14d',{al:1});}   // the monster's signature, as the hunt opens
-  if(h.burn>0)text('ON FIRE',4,L.gy-8,Math.floor(S.clock*8)%2?'#ff9a2e':'#ffd34d',{out:OUTLINE});else if(h.poison>0)text('POISON',4,L.gy-8,'#7ad84a',{out:OUTLINE});else if(h.state==='frozen')text('FROZEN',4,L.gy-8,'#7fd6ff',{out:OUTLINE});
+  if(S.clock<3.6&&S.mode==='hunt'){const tp=S.def.tip2&&S.clock>1.8?S.def.tip2:S.def.tip,w=textW(tp)+8;g.fillStyle='rgba(12,14,26,.8)';g.fillRect((W-w)/2,HUD_T+4,w,11);text(tp,W/2,HUD_T+7,'#ffe14d',{al:1});}   // the monster's signature, as the hunt opens
+  {const st=h.state==='frozen'?['FROZEN','#7fd6ff']:h.state==='numb'?['NUMBED','#ffe14d']:h.burn>0?['ON FIRE',Math.floor(S.clock*8)%2?'#ff9a2e':'#ffd34d']:h.bleed>0?['BLEEDING','#e2483d']:h.poison>0?['POISON','#7ad84a']:
+    h.stench>0?['STENCH','#a8a84a']:h.blight>0?['BLIGHT','#e0508a']:h.wet>0?['SOAKED','#4c9cff']:h.mud>0?['MUDDY','#a8794a']:null;if(st)text(st[0],4,L.gy-8,st[1],{out:OUTLINE});}
   {const z=h.sharp>=SHARP.hi?'#4cc9ff':h.sharp>=SHARP.lo?'#f5c542':(Math.floor(S.clock*6)%2?'#e2483d':'#ff9a8a');text('SH',4,L.gy+20,'#8a93b0');bar(14,L.gy+21,46,2,h.sharp/SHARP.max,z,'#2b2f45');
     g.fillStyle='#000';g.fillRect(14+Math.round(46*SHARP.hi/100),L.gy+21,1,2);g.fillRect(14+Math.round(46*SHARP.lo/100),L.gy+21,1,2);
     const q=L.sharp,dl=h.sharp<SHARP.lo;g.fillStyle=dl&&Math.floor(S.clock*6)%2?'#ff6a4d':'#c8d0e8';g.fillRect(q.x,q.y,q.w,q.h);g.fillStyle='#1c2134';g.fillRect(q.x+1,q.y+1,q.w-2,q.h-2);
@@ -1319,7 +1512,7 @@ function drawLoot(){
     const yy=y+27+i*14;if(d.rare){g.fillStyle=Math.floor(S.t*6)%2?'#5a4a14':'#3a3010';g.fillRect(10,yy-4,W-20,13);text('RARE!',W-14,yy+6,'#ffe14d',{al:2});}
     g.drawImage(lootSpr(d.id),14,yy-3);text(LOOT[d.id].name,30,yy,d.rare?(Math.floor(S.t*6)%2?'#ffffff':'#ffe14d'):d.id==='gem'?'#4cd9c0':'#e8f0fc');text('*'+d.n,W-14,yy,'#ffe14d',{al:2});
     text('BAG '+R.bag[d.id],30,yy+6,'#5a6080');});
-  if(R.unlock&&S.t>.6+R.drops.length*.35)text('NEW HUNT: '+R.unlock,W/2,y+ph-21,'#ff9a4d',{al:1});
+  if(R.unlock&&S.t>.6+R.drops.length*.35)text(R.unlock,W/2,y+ph-21,'#ff9a4d',{al:1});
   if(S.t>.8+R.drops.length*.35&&Math.floor(S.t*2)%2)text('TAP TO CONTINUE',W/2,y+ph-11,'#fff',{al:1});
 }
 function drawFail(){
@@ -1342,30 +1535,50 @@ function drawCamp(){
     const open=!!SAVE.wins.fern;                                                 // expeditions open after the first Fernwing
     smallBtn(B,'exp:toggle',W-60,1,58,S.exp?'< BIG HUNTS':'EXPEDITIONS >',open?'#2a6aa8':'#3a4060',()=>{if(!open){toast('BEAT THE FERNWING FIRST','#ff6a4d');sfx('miss');return;}S.exp=!S.exp;sfx('charge',1);},open);
     if(!S.exp){
-      HUNTS.forEach((id,i)=>{const D=MONSTERS[id],y=14+i*32,open=unlocked(id),R=RIGS[D.rig],hd=R.head(POSE0);
-      panel(4,y,120,29);
-      g.save();g.beginPath();g.rect(5,y+1,36,27);g.clip();g.drawImage(bgFor(D.biome),20,L.ground-16,36,27,5,y+1,36,27);
-      g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:open&&Math.sin(S.t*2.4+i)>.3?1:0})),5+15-(MS_OX+hd[0]),y+1+13-(MS_OY+hd[1]));g.restore();
-      text(D.name,45,y+3,'#ffe14d');for(let k=0;k<D.stars;k++)text('*',W-10-k*5,y+3,'#ff9a4d');
-      text('HP '+D.hp,45,y+11,'#c8d0e8');text((gs.resist===D.elem?'-25% ':'')+ELEM[D.elem][0],W-7,y+11,ELEM[D.elem][1],{al:2});   // its element; -25% if your armor resists it
-      {let x=45;text('WEAK',x,y+19,'#8a93b0');x+=20;text(ELEM[D.weak][0],x,y+19,ELEM[D.weak][1]);x+=textW(ELEM[D.weak][0])+3;text('+',x,y+19,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y+19,STATUS[D.weakSt].col);}
-      if(!open){g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text('BEAT '+MONSTERS[D.needs].name+' FIRST',W/2,y+16,'#c8d0e8',{al:1});}
-      B.push({id:'hunt:'+id,x:4,y,w:120,h:29,fn:()=>huntTap(id)});});
-    const gy=14+HUNTS.length*32+3;
-    if(LH-20-gy>=34){const w=GEAR[eq.weapon],lines=[[w.name+(lvOf(eq.weapon)?'+'+lvOf(eq.weapon):''),'ATK *'+gs.atk.toFixed(2),w.elem],[GEAR[eq.armor].name+(lvOf(eq.armor)?'+'+lvOf(eq.armor):''),'HP '+gs.hp],[eq.charm?GEAR[eq.charm].name:'NO CHARM',''],[gs.W.tip,'']];
-      lines.forEach(([a,b,el],i)=>{const yy=gy+i*8;text(a,5,yy,i===3?'#8a93b0':i===2&&!eq.charm?'#5a6080':'#e8f0fc');if(b)text(b,W-5,yy,el?ELEM[el][1]:'#4cd964',{al:2});});}
+      // every monster, by rank. The list scrolls.
+      const top=13,bot=LH-20;let y=top+1-(S.scr.hunt||0),total=0;g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
+      for(let r=1;r<=RANKS;r++){const ids=HUNTS.filter(id=>MONSTERS[id].rank===r),ropen=r===1||rankOpen(r);
+        if(y+10>top&&y<bot){g.fillStyle='#232a4a';g.fillRect(4,y,120,9);text(rankName(r),7,y+2,ropen?'#ffe14d':'#8a93b0');
+          const done=rankWins(r);text(ropen?done+'/'+ids.length+' BEATEN':lockText(ids[0]),W-7,y+2,ropen?'#8a93b0':'#ff6a4d',{al:2});}
+        y+=11;total+=11;
+        for(const id of ids){S.itemY[id]=total;if(y+29>top&&y<bot){const D=MONSTERS[id],open=unlocked(id),R=RIGS[D.rig],hd=R.head(POSE0),wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];
+          panel(4,y,120,29);
+          g.save();g.beginPath();g.rect(5,Math.max(top,y+1),36,Math.max(0,Math.min(bot,y+28)-Math.max(top,y+1)));g.clip();g.drawImage(bgFor(D.biome),20,L.ground-16,36,27,5,y+1,36,27);
+          g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:open&&Math.sin(S.t*2.4+D.L)>.3?1:0})),5+15-(MS_OX+hd[0]),y+1+13-(MS_OY+hd[1]));g.restore();
+          if(SAVE.wins[id]){g.fillStyle='#000';g.fillRect(5,y+1,9,7);g.fillStyle='#4cd964';g.fillRect(7,y+5,1,1);g.fillRect(8,y+6,1,1);g.fillRect(9,y+5,1,1);g.fillRect(10,y+4,1,1);g.fillRect(11,y+3,1,1);}
+          text(D.name,45,y+3,'#ffe14d');
+          text('HP '+D.hp,45,y+11,'#c8d0e8');text((gs.resist===D.elem?'-25% ':'')+ELEM[D.elem][0],W-7,y+11,ELEM[D.elem][1],{al:2});   // its element; -25% if your armor resists it
+          {let x=45;text('WEAK',x,y+19,'#8a93b0');x+=20;text(ELEM[D.weak][0],x,y+19,ELEM[D.weak][1]);x+=textW(ELEM[D.weak][0])+3;text('+',x,y+19,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y+19,STATUS[D.weakSt].col);}
+          if(!open){g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text(lockText(id),W/2,y+16,'#c8d0e8',{al:1});}
+          const cy=y+14;if(cy>top&&cy<bot)B.push({id:'hunt:'+id,x:4,y:Math.max(top,y),w:120,h:Math.min(bot,y+29)-Math.max(top,y),fn:()=>huntTap(id)});}
+          y+=32;total+=32;}
+      }
+      g.restore();S.scrMax.hunt=Math.max(0,total-(bot-top)+2);
+      if(S.scrMax.hunt>0){const hh=bot-top,bh=Math.max(10,hh*hh/(total+2)),by=top+(hh-bh)*(S.scr.hunt||0)/S.scrMax.hunt;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }else{
-      HUNTS.forEach((id,i)=>{const D=MONSTERS[id],y=14+i*32,ok=unlocked(id),ing=BIOME_ING[D.biome];
+      EXPED.forEach((id,i)=>{const D=MONSTERS[id],y=14+i*32,ok=unlocked(id),ing=BIOME_ING[D.biome];
         panel(4,y,120,29);g.drawImage(bgFor(D.biome),20,L.ground-16,36,27,5,y+1,36,27);
         text(BIOME_NAME[D.biome],45,y+3,'#ffe14d');g.drawImage(lootSpr(ing[0]),0,0,12,12,45,y+10,9,9);g.drawImage(lootSpr(ing[1]),0,0,12,12,56,y+10,9,9);
         const n=CREATURES.filter(c=>c.biome===D.biome&&SAVE.bugs[c.id]).length;text('BUGS '+n+'/4',W-7,y+12,n===4?'#4cd964':'#8a93b0',{al:2});
-        if(ok){smallBtn(B,'gather:'+id,44,y+18,38,'GATHER','#2f8f4a',()=>startGather(D.biome));smallBtn(B,'pack:'+id,84,y+18,38,'PACK HUNT','#a8502a',()=>toPrep(null,D.biome));}
-        else{g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text('BEAT '+MONSTERS[D.needs].name+' FIRST',W/2,y+16,'#c8d0e8',{al:1});}});
+        if(ok){smallBtn(B,'gather:'+id,44,y+18,38,'GATHER','#2f8f4a',()=>startGather(D.biome));smallBtn(B,'pack:'+id,84,y+18,38,'PACK HUNT','#a8502a',()=>toPrep(null,id));}
+        else{g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text('BEAT THE '+D.name,W/2,y+16,'#c8d0e8',{al:1});}});
     }
   }else if(S.tab==='forge'){
     text('FORGE',W-4,3,'#8a93b0',{al:2});
     const pg=FORGE_PAGES[S.fpage], n=FORGE_PAGES.length;
+    if(S.fpick){                                                                 // the list of every source of gear; it scrolls
+      const top=13,bot=LH-20;let y=top+1-(S.scr.forge||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
+      FORGE_PAGES.forEach((P,i)=>{if(y+13>top&&y<bot){const D=MONSTERS[P.mon],have=P.ids.filter(k=>SAVE.own[k]).length,can=P.ids.some(k=>GEAR[k].cost&&!SAVE.own[k]&&canAfford(k));
+          g.fillStyle=i===S.fpage?'#232a4a':'#1c2134';g.fillRect(4,y,118,12);text(P.title,8,y+3,D&&!unlocked(P.mon)?'#5a6080':'#e8f0fc');
+          if(D){const wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];text(wk[0],W-28,y+3,wk[1],{al:2});}
+          text(have+'/'+P.ids.length,W-9,y+3,have===P.ids.length?'#4cd964':'#8a93b0',{al:2});if(can){g.fillStyle='#4cd964';g.fillRect(5,y+4,2,4);}
+          const cy=y+6;if(cy>top&&cy<bot)B.push({id:'pick:'+i,x:4,y:Math.max(top,y),w:118,h:12,fn:()=>{S.fpage=i;S.fpick=false;sfx('charge',1);}});}
+        y+=13;});
+      g.restore();const total=FORGE_PAGES.length*13;S.scrMax.forge=Math.max(0,total-(bot-top)+2);
+      if(S.scrMax.forge>0){const hh=bot-top,bh=Math.max(10,hh*hh/total),by=top+(hh-bh)*(S.scr.forge||0)/S.scrMax.forge;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
+    }else{
     g.fillStyle='#232a4a';g.fillRect(3,14,W-6,11);text('<',9,17,'#fff');text('>',W-12,17,'#fff');text(pg.title,W/2,17,'#ffe14d',{al:1});
+    B.push({id:'page:pick',x:31,y:12,w:W-62,h:15,fn:()=>{S.fpick=true;S.scr.forge=clamp(S.fpage*13-40,0,1e4);sfx('charge',1);}});
     B.push({id:'page:prev',x:0,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+n-1)%n;sfx('charge',1);}});B.push({id:'page:next',x:W-30,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+1)%n;sfx('charge',1);}});
     pg.ids.forEach((id,i)=>{const G=GEAR[id],y=27+i*24,own=!!SAVE.own[id],on=eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2,loose=G.slot==='charm'||G.slot==='coat';
       g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);
@@ -1383,6 +1596,7 @@ function drawCamp(){
       const lab=on?(loose?'OFF':'ON'):own?'EQUIP':'CRAFT', bc=on?'#8a6a20':own?'#2a6aa8':can?'#2f8f4a':'#3a4060';
       g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,own||can?'#fff':'#8a93b0',{al:1});
       B.push({id:'forge:'+id,x:3,y,w:W-6,h:23,fn:()=>forgeTap(id)});});
+    }
   }else if(S.tab==='cook'){
     text('KITCHEN',W-4,3,'#8a93b0',{al:2});
     g.fillStyle='#1c2134';g.fillRect(3,14,W-6,30);g.drawImage(lootSpr('potion'),5,16);text('POTIONS',19,16,'#e8f0fc');text('*'+SAVE.potions,19+textW('POTIONS')+5,16,'#ffe14d');
@@ -1397,7 +1611,7 @@ function drawCamp(){
     g.fillStyle='#232a4a';g.fillRect(3,y,W-6,50);
     if(st){const D=st.def,done=qDone(st);text('STORY '+(SAVE.story.i+1)+'/'+STORY.length,5,y+2,'#8a93b0');text(D.t,5,y+10,'#ffe14d');D.d.forEach((l,i)=>text(l,5,y+18+i*7,'#c8d0e8'));
       text(goalText(D.goal),5,y+41,done?'#4cd964':'#e8f0fc');
-      if(D.goal[0]!=='never'){if(done)smallBtn(B,'claim:story',W-36,y+38,32,'CLAIM',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',()=>claim(st));else rewardRow(D.rw,W-6-(Object.keys(D.rw).length*24),y+41);}}
+      if(D.goal[0]!=='done'){if(done)smallBtn(B,'claim:story',W-36,y+38,32,'CLAIM',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',()=>claim(st));else rewardRow(D.rw,W-6-(Object.keys(D.rw).length*24),y+41);}}
     else{text('THE STORY SO FAR IS TOLD',W/2,y+18,'#ffe14d',{al:1});text('MORE IS COMING',W/2,y+27,'#8a93b0',{al:1});}
     y+=53;
     const row=(q,label,col)=>{const D=q.def,done=qDone(q);g.fillStyle='#1c2134';g.fillRect(3,y,W-6,16);g.fillStyle=col;g.fillRect(3,y,2,16);
@@ -1435,17 +1649,17 @@ function drawCamp(){
 }
 // ── Prep screen ──
 function drawPrep(){
-  const B=S.btns=[],P=S.prep,D=P.small!=null?smallDef(P.small):MONSTERS[P.id],gs=gearStats(P.meal>=0?MEAL_IDS[P.meal]:null),eq=SAVE.eq;
+  const B=S.btns=[],P=S.prep,D=P.small!=null?smallDef(P.small):MONSTERS[P.id],wkSt=D.weakSt,gs=gearStats(P.meal>=0?MEAL_IDS[P.meal]:null),eq=SAVE.eq;
   g.drawImage(bgFor(D.biome),-4,0);g.fillStyle='rgba(12,14,26,.86)';g.fillRect(0,0,W,LH);
   g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('PREPARE',4,3,'#8a93b0');text(D.small?'SNAPJAW PACK':D.name,W-4,3,'#ffe14d',{al:2});
   let y=16,x=5;text('WEAK TO',x,y,'#8a93b0');x+=textW('WEAK TO')+5;text(ELEM[D.weak][0],x,y,ELEM[D.weak][1]);x+=textW(ELEM[D.weak][0])+3;
   if(D.weakSt){text('+',x,y,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y,STATUS[D.weakSt].col);}
   y+=8;text('ATTACKS WITH',5,y,'#8a93b0');text(ELEM[D.elem][0],5+textW('ATTACKS WITH')+5,y,ELEM[D.elem][1]);if(gs.resist===D.elem)text('-25%',W-5,y,'#4cd964',{al:2});
-  y+=8;text(D.tip,5,y,'#ffe14d');
-  y+=11;g.fillStyle='#1c2134';g.fillRect(3,y-2,W-6,35);
-  const w=GEAR[eq.weapon];text(w.name+(lvOf(eq.weapon)?'+'+lvOf(eq.weapon):''),5,y,'#e8f0fc');text(w.elem?ELEM[w.elem][0]:'NO ELEMENT',W-5,y,w.elem?ELEM[w.elem][1]:'#5a6080',{al:2});
-  if(w.elem===D.weak)text('+',W-5-textW(ELEM[w.elem][0])-6,y,'#4cd964');
-  y+=8;const ct=GEAR[eq.coat];text(ct?ct.name:'NO COATING',5,y,ct?'#e8f0fc':'#5a6080');if(ct&&ct.status===D.weakSt)text('GOOD PICK',W-5,y,'#4cd964',{al:2});else if(ct&&ct.status===D.resSt)text('IT RESISTS',W-5,y,'#ff6a4d',{al:2});
+  y+=8;text(D.tip,5,y,'#ffe14d');if(D.tip2){y+=8;text(D.tip2,5,y,'#ffe14d');}
+  y+=11;g.fillStyle='#1c2134';g.fillRect(3,y-2,W-6,27);
+  const w=GEAR[eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:['PLAIN','#5a6080'],good=(w.elem&&w.elem===D.weak)||(w.status&&w.status===wkSt),bad=w.status&&w.status===D.resSt;
+  text(w.name+(lvOf(eq.weapon)?'+'+lvOf(eq.weapon):''),5,y,'#e8f0fc');
+  y+=8;text(wk[0],5,y,wk[1]);if(good)text('A GOOD PICK',W-5,y,'#4cd964',{al:2});else if(bad)text('IT RESISTS THIS',W-5,y,'#ff6a4d',{al:2});
   y+=8;text('HEALTH '+gs.hp+'   ATTACK *'+gs.atk.toFixed(2),5,y,'#4cd964');
   y+=8;const bring=Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0));g.drawImage(lootSpr('potion'),0,0,12,12,5,y-2,9,9);text('POTIONS '+bring,16,y,bring?'#e8f0fc':'#ff6a4d');text('OF '+SAVE.potions+' IN STOCK',W-5,y,'#8a93b0',{al:2});
   // meal chooser
@@ -1515,7 +1729,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);

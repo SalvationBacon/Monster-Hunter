@@ -24,33 +24,32 @@
 - **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.
 - **Everything is data:** monsters, weapon types, perks and gear are tables at the top of `index.html`. Gear is generated from them, so a new monster brings its weapons, armor and charm with it.
 
-### Monsters
+### Monsters (v0.12.0)
 
-| Monster | Body | Health | Damage | Circle | Element | Weak to | Unlock |
-|---|---|---|---|---|---|---|---|
-| Fernwing | wyvern | 3100 | x1 | 0.50s | nature | fire | from the start |
-| Tuskhide | brute | 4800 | x1.25 | 0.45s | earth | nature | Fernwing |
-| Emberwing | wyvern | 5800 | x1.5 | 0.38s | fire | earth | Tuskhide |
-| Frostmaw | brute | 7800 | x1.8 | 0.34s | ice | fire | Emberwing |
-| Stormwing | wyvern | 10500 | x2.1 | 0.30s | thunder | ice | Frostmaw |
+35 monsters, all defined in one table (`ROSTER` in `index.html`), one line each: name, body, arena, element, what its weapons carry, weak element, weak status, the status it inflicts, a trait, its moves, its colours and look flags. Stats come from its place in the order.
 
-Later monsters also attack faster and dodge more often. Each monster is weak to the element of the one before it, except the Fernwing (fire) and the Frostmaw (fire).
+- **Ranks:** 30 base monsters in six ranks of five, then four apex monsters (rank 7) and the elder (rank 8). The Fernwing opens rank 1; three wins in a rank open the next; the apex rank opens after three rank 6 wins; the elder needs all four apex monsters.
+- **Scaling:** a monster's damage, attack speed, circle speed and dodge rate climb down the order, and its health matches the gear of the monster before it. Apex monsters have 1.5x health and 1.15x damage on top; the elder 1.8x and 1.12x over the strongest apex.
+- **Bodies:** wyvern, brute, serpent (coiled, with a neck fin), raptor (beaked biped) and crab (shelled, one great claw, a stinger). Each monster has its own colours and look flags (tusks, a club tail, glowing spines, a hot mouth, the elder's second pair of wings and starlit chest).
+- **Arenas:** forest, volcano, desert, tundra, storm peaks, swamp, coast, ruins, and the summit under the Hollow Star.
+- **Moves:** a shared library of 25 moves plus five of the elder's own (starfall, beam, comet, nova, eclipse). Every monster draws six or seven, and no two monsters share a set. New animations: a double tail spin, and a burrow where it sinks out of sight and bursts up beside the hunter.
+- **Traits:**
 
-### What makes each monster its own fight (v0.9.0)
+| Trait | What it does | Monsters |
+|---|---|---|
+| Armored | hits do x0.6 until it is winded after its own attack, then x1.4 | Tuskhide, Cinderhide, Icehide, Ruinhorn, Gloomtusk |
+| Charge | a meter fills; overcharged it is faster and harder. Stuns, breaks and counters knock it out | Stormwing, Skyrender, the Hollow Star |
+| Shell | sometimes tucks in for 2.2s: hits do x0.25 and dull the blade twice as fast | Mudclaw, Shellsnap, Magmaclaw, Crystalback, Dusksting, Pyreclaw |
+| Burrow | its burrow attack takes it under the ground, where it cannot be hit | Bogmaw, Sandeel, Tidecoil, Abysscoil, Tidereaver |
+| Regen | heals 0.8% a second when left alone for 3s | Thornback, Mirefang, Aurorawing |
+| Frenzy | winds up to 25% faster as its health falls | Gustraptor, Venomsting, Voltwing, Obsidwing, Tempestbeak |
 
-Every monster has a signature mechanic, at least three moves no other monster uses, and its own idle animation. A one-line tip names the signature as the hunt opens.
+- **Statuses monsters inflict:** poison, burn, freeze (as before), plus soaked (stamina returns at 40%), blight (the weapon's element and status do nothing), bleeding (hurts only while acting; standing still 1.5s stops it), stench (no potions; two rolls air it out), numb (cannot act for 1.4s) and mud (the next roll costs 80% more and shakes it off).
+- **Elements:** water and dragon join, making seven. Every element and status is some monster's weakness.
 
-| Monster | Signature | Its moves | Idle |
-|---|---|---|---|
-| Fernwing | **Poison.** A spit that lands poisons the hunter for 6s (1.5% of full health per tick). A potion cures it | bite, double bite, tail sweep, poison spit (one or two arcing globs), glide dive | alert, head bobbing |
-| Tuskhide | **Armored hide.** Hits do x0.6 until it is winded after its own attack, or staggered, when they do x1.4. Counters and weak-point hits ignore the hide | tusk gore (one or two), rush, rearing stomp with an aftershock, boulder toss | head low, pawing sand |
-| Emberwing | **Burn.** Its fire sets the hunter alight for 6s (2% per tick). Each roll takes 3s off, so two rolls put it out | bite, overhead tail slam, flame breath, fireball volley, flame dive | swaying, mouth flaring, dripping embers |
-| Frostmaw | **Freeze.** Frost breath encases the hunter for 2.4s. Each tap takes 0.35s off. A 6s immunity follows | maul (two or three bites), shoulder charge, frost breath, falling icicles, leap | slow breathing, misting |
-| Stormwing | **Charge.** A meter fills over 12.5s. Overcharged, it attacks 20% faster and hits 25% harder. A stun or part break empties it, a counter takes 35 off, and any of them ends an overcharge with a stagger | bite, tail sweep, wing clap shockwave, lightning bolts, hovering barrage, thunder dive | hovering on beating wings, sparking |
+### The story's end
 
-Poison and burn never land the killing blow: they stop at 1 health.
-
-Moves are data: each names its animation (`pose`), the status it leaves, and what appears at the hit. Thrown projectiles are drawn in flight and timed to land on the hit, so the closing ring still tells the truth.
+The main story now has 15 chapters. The middle chapters follow the ranks as the glow spreads; "Four Heralds" asks for all four apex monsters, and "The Hollow Star" is the final hunt. The last chapter closes the story for now.
 
 ### Weapon types
 
@@ -66,6 +65,8 @@ All four are owned in iron from the start. A weapon of a monster's tier costs it
 All four deal the same damage per second with taps alone (about 44 in iron, measured by `tools/check.js`, which fails if they drift more than 6% apart). Slower weapons hit harder per swing. The brief freeze on each hit scales with the hit, so fast weapons do not lose more time to it.
 
 A weapon does 25% more damage to a monster weak to its element.
+
+Each monster's weapons carry either its element or a status, never both (statuses are no longer coatings, as of v0.12.0).
 
 ### Tiers
 
@@ -88,24 +89,18 @@ A weapon does 25% more damage to a monster weak to its element.
 
 ### Weapon statuses, sharpness and rare drops (v0.10.0)
 
-- **Statuses are coatings (v0.11.0):** the status a weapon builds comes from a coating, a fourth gear slot chosen separately from the weapon and its element. Build-up is half the hit's base damage, so every weapon type builds at the same rate, and the threshold grows 40% each time.
+- **Status weapons:** some monsters' weapons build a status instead of carrying an element. Build-up is half the hit's base damage, so every weapon type builds at the same rate, and the threshold grows 40% each time.
 
-| Coating | Made from | Trigger | Effect |
-|---|---|---|---|
-| Poison | Fernwing | 220 | 8s of damage, 12 x attack per half second. Never lands the kill |
-| Sleep | Tuskhide | 260 | asleep for 5s, or until hit. The hit that wakes it does x2.5 |
-| Blast | Emberwing | 180 | one explosion for 150 x attack |
-| Paralysis | Frostmaw | 300 | the monster is held still for 3s |
+| Status | Trigger | Effect |
+|---|---|---|
+| Poison | 220 | 8s of damage, 12 x attack per half second. Never lands the kill |
+| Sleep | 260 | asleep for 5s, or until hit. The hit that wakes it does x2.5 |
+| Blast | 180 | one explosion for 150 x attack |
+| Paralysis | 300 | the monster is held still for 3s |
 
 - **Every monster is weak to one element and one status**, as in Monster Hunter, and resists the status it uses itself. A weak status builds 50% faster, a resisted one half as fast.
 
-| Monster | Weak element | Weak status | Resists |
-|---|---|---|---|
-| Fernwing | fire | sleep | poison |
-| Tuskhide | nature | poison | none |
-| Emberwing | earth | paralysis | blast |
-| Frostmaw | fire | blast | sleep |
-| Stormwing | ice | sleep | paralysis |
+Each monster's weaknesses are in the roster table. A monster resists the status its own weapons carry, or the status it inflicts.
 
 - **Sharpness:** a meter that wears with every hit, by the hit's base damage. Above 60 the edge is keen (+10% damage), below 25 it is dull (-25%). It dulls after about 25 seconds of steady hitting. Sharpening takes 1.3s (whetstone button, or swipe down), leaves the hunter open, and a hit interrupts it.
 - **Rare drops:** every monster has one (Heartleaf, Ivory Core, Magma Heart, Rime Heart, Storm Core). The chance per win is 3%, plus 3% for each broken part, plus 0.5% for every win since the last one, doubled by Fortune. The +5 upgrade of that monster's gear needs one.
@@ -172,8 +167,8 @@ The camp has five tabs: HUNT, FORGE, COOK, QUEST and BUGS.
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
-- **The elder: the Hollow Star.** The story stops at its name. It needs its own body, moves and arena.
-- **Water and dragon elements**, to complete the Monster Hunter set, with monsters to carry them.
+- **Companion design**, to be workshopped next.
+- **More expedition biomes** for the swamp, coast and ruins.
 - **Variants and ranks**, once there are more monsters.
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
 - **Branching upgrade trees and armor in several pieces**, as in Monster Hunter.

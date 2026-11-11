@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.11.0).** Five monsters with their own moves and mechanics, four weapon types, elements and status coatings, perks, upgrades, and a camp with a forge, kitchen, quests, expeditions, a terrarium and a companion.
+**Current state: prototype (v0.12.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, perks, upgrades, and a camp with a forge, kitchen, quests, expeditions, a terrarium and a companion.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -23,7 +23,7 @@ Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` 
 2. **Hunt** a monster from the prep screen, where you see its weaknesses and pick a meal. Break its parts for their drops.
 3. **Expeditions:** gather runs give ingredients and creatures; pack hunts give meat and common materials.
 4. **Forge** materials into weapons, armor, charms and coatings, and upgrade them. **Cook** potions; meals are chosen in prep.
-5. Each first win unlocks the next monster.
+5. Three wins in a rank open the next rank. The four apex monsters open after rank 6, and the elder after all four apex monsters.
 
 ## Files
 | File | Purpose |
