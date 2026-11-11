@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.10.0).** Five monsters, each with its own moves, animations and signature mechanic, four weapon types, elements, thirteen perks, gear upgrades, a camp to pick hunts from, and a forge that turns loot into gear.
+**Current state: prototype (v0.11.0).** Five monsters with their own moves and mechanics, four weapon types, elements and status coatings, perks, upgrades, and a camp with a forge, kitchen, quests, expeditions, a terrarium and a companion.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -19,14 +19,15 @@ Open `index.html` in a browser. It is one file with no dependencies. Progress is
 Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` potion, `S` sharpen.
 
 ## The loop
-1. Hunt a monster. Break its head, back or wings, and tail for their drops.
-2. Forge its materials into weapons of its element, an armor and a charm, each with a perk.
-3. Upgrade weapons and armor up to +5 to keep an element you need in play.
-4. Each first win unlocks the next monster. Every monster is weak to one element, and armor resists its own monster's element.
+1. **Quests** tell you what to do next. The main story is the tutorial.
+2. **Hunt** a monster from the prep screen, where you see its weaknesses and pick a meal. Break its parts for their drops.
+3. **Expeditions:** gather runs give ingredients and creatures; pack hunts give meat and common materials.
+4. **Forge** materials into weapons, armor, charms and coatings, and upgrade them. **Cook** potions; meals are chosen in prep.
+5. Each first win unlocks the next monster.
 
 ## Files
 | File | Purpose |
 |---|---|
 | `index.html` | The whole game |
-| `tools/check.js` | Headless test: bots play full hunts with every weapon type and up the whole monster ladder, then the camp and real touch input are checked. `node tools/check.js` (needs Playwright) |
+| `tools/check.js` | Headless test: bots play full hunts with every weapon type and up the whole monster ladder, then every system and the real touch flows are checked. `node tools/check.js` (needs Playwright) |
 | `concepts/` | Tone mockups and the design decisions so far |
