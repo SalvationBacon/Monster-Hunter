@@ -391,3 +391,19 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
   - The meal card has arrows, the Pip card changes Pip's job, and one big gold HUNT button sits at the bottom.
 - **Results, pause, options, title buttons, panels and dialogs** are all restyled to match.
 - **Guides:** they start from the camp home (tap the tile), and the forge guide includes "tap an item to see it below".
+
+## v0.30.0: title screen and hunt HUD
+- **Title screen**, laid out like 8-Bit Industry's:
+  - **Background:** a living scene. The monsters you've met take turns in their arenas, panning slowly and crossfading, each with its own music. A caption names the current one ("NOW: QUILLBEAK . FOREST").
+  - **Logo:** FERNWING in triple-size gold with a soft glow and an occasional flicker, over a letter-spaced HUNT.
+  - **Menu card:** a dark card with the tagline (HUNT. CARVE. FORGE. REPEAT.).
+    - New players see one big START.
+    - With progress: CONTINUE (with your rank and hunts won) and NEW GAME, which needs a second tap and erases the save.
+    - HOW TO PLAY and SETTINGS side by side, and a version line.
+  - **Sound:** a speaker button (top right) toggles music, and "TAP FOR SOUND" blinks until audio starts.
+  - Only the buttons start the game now; a tap on the scene does nothing. Enter/Space continue.
+- **Hunt HUD** in the new style:
+  - **Top:** the monster's name and part icons with their pips, the timer in a pill, and a rounded pause button. Below them, a thick monster health bar with phase ticks, then thin bars for stun (a gold star), your weapon's status build-up, and the charge meter (a bolt).
+  - **Bottom:** health with a heart, stamina with a double chevron, and sharpness as a three-color bar with a sword icon. The whetstone and potion are rounded buttons; the potion count is a gold badge.
+  - Your current status ailment shows as a chip above the bottom bar, and the opening tip as a pill.
+  - **COUNTER** is a big gold button with its timer inside.

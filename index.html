@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.29.0';
+const VER='0.30.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1582,7 +1582,7 @@ const tapBtns=(x,y)=>{for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+
 function press(x,y){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
   if(S.talk){talkTap(x,y);return;}
-  if(S.mode==='title'){if(S.howto){S.howto=false;return;}if(!tapBtns(x,y)&&!S.opts)toCamp('home');return;}
+  if(S.mode==='title'){if(S.howto){S.howto=false;return;}tapBtns(x,y);return;}
   if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
   if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
   if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres'){if(S.t>1.2)toCamp('home');return;}
@@ -1620,7 +1620,7 @@ addEventListener('keydown',e=>{
   if(e.repeat)return;
   if(S.talk){if(e.key===' '||e.key==='Enter'){e.preventDefault();talkTap(-1,-1);}else if(e.key==='Escape'){const T=S.talk;S.talk=null;if(T.after)T.after();}return;} const k=e.key.toLowerCase();
   if(k===' '||k==='j'||k==='k'||k==='enter'){e.preventDefault();audioInit();
-    if(S.mode!=='hunt'||S.paused){if(S.mode==='title'||S.mode==='loot'||S.mode==='fail'||S.mode==='gres')press(-99,-99);return;}
+    if(S.mode!=='hunt'||S.paused){if(S.mode==='title'){if(!S.opts&&!S.howto)titleStart();else press(-99,-99);}else if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres')press(-99,-99);return;}
     if(S.h.counter>0&&actCounter())return;
     if(S.qte){const pp=partPos(S.qte.part,mPose());if(qteTap(pp.x,pp.y))return;}   // keyboard: the attack key also hits an open weak point
     IN.down=true;IN.downAt=S.clock;IN.swiped=false;IN.part=k==='k'?'tail':'head';actTap(IN.part);}
@@ -1930,10 +1930,9 @@ function drawWorld(){
   if(h.state==='charge'){for(let i=0;i<3;i++){g.fillStyle=OUTLINE;g.fillRect(L.hx+10+i*6,L.hy-5,5,4);g.fillStyle=i<h.lvl?['#ffe14d','#ff9a2e','#ffffff'][i]:'#2b2f45';g.fillRect(L.hx+11+i*6,L.hy-4,3,2);}
     if(h.lvl<3){const a=h.lvl?CHARGE_AT[h.lvl-1]:0,f=(h.charge-a)/(CHARGE_AT[h.lvl]-a);g.fillStyle='#fff';g.fillRect(L.hx+10,L.hy,Math.round(17*clamp(f,0,1)),1);}}
   if(h.counter>0){const c=L.counter,pu=Math.floor(S.clock*10)%2,f=h.counter/COUNTER_WIN;
-    g.fillStyle=OUTLINE;g.fillRect(c.x-2,c.y-2,c.w+4,c.h+4);g.fillStyle=pu?'#ffffff':'#ffe14d';g.fillRect(c.x-1,c.y-1,c.w+2,c.h+2);
-    g.fillStyle='#e2483d';g.fillRect(c.x,c.y,c.w,c.h);g.fillStyle='#ff6a4d';g.fillRect(c.x,c.y,c.w,2);
-    text('COUNTER!',c.x+c.w/2,c.y+5,'#fff',{al:1,out:OUTLINE});
-    g.fillStyle=OUTLINE;g.fillRect(c.x+4,c.y+13,c.w-8,3);g.fillStyle='#ffe14d';g.fillRect(c.x+4,c.y+13,Math.round((c.w-8)*f),3);}
+    rbox(c.x-1,c.y-1,c.w+2,c.h+3,pu?'#ffffff':'#000');rbox(c.x,c.y+1,c.w,c.h,UI.goldD);rbox(c.x,c.y,c.w,c.h,UI.gold);
+    big('COUNTER',c.x+c.w/2,c.y+3,UI.ink,1);
+    rbox(c.x+4,c.y+c.h-4,c.w-8,3,shade(UI.gold,-.5));g.fillStyle=UI.ink;g.fillRect(c.x+5,c.y+c.h-3,Math.round((c.w-10)*f),1);}
   // slashes
   for(const f of S.fx){const u=f.t/.22,n=f.big?16:10,d=f.flip?-1:1;
     if(f.kind==='ring'){const r=6+(f.t/f.life)*46;ring(f.x,f.y,r,f.col||'#ffffff');ring(f.x,f.y,r-2,f.col||'#c8d0e8');continue;}
@@ -1946,41 +1945,40 @@ function drawWorld(){
 }
 function fmtTime(s){s=Math.max(0,Math.ceil(s));return((s/60)|0)+':'+('0'+s%60).slice(-2);}
 function drawHud(){
-  const h=S.h,m=S.m;
-  g.fillStyle=OUTLINE;g.fillRect(0,0,W,HUD_T);
-  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name.replace('THE ','');text(hn,3,2,'#e8f0fc');
-  // part status
-  // parts: icon and three pips each, one per weak-point hit
-  const px0=Math.max(46,textW(hn)+7);   // part icons sit after the name, however long
-  if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*16,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
-    g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,0,9,9);g.globalAlpha=1;
-    if(P.broken){g.fillStyle='#e2483d';g.fillRect(x+1,4,7,1);}
-    for(let j=0;j<S.qteHits;j++){g.fillStyle=j<P.hits?'#ffe14d':act?'#ff4030':'#3a4060';g.fillRect(x+10,6-j*3,3,2);}});
-  text(fmtTime(S.timeLeft),W-16,2,S.timeLeft<30?'#ff6a4d':'#c8d0e8',{al:2});
-  g.fillStyle='#2b3358';g.fillRect(W-13,1,11,8);g.fillStyle='#e8f0fc';g.fillRect(W-10,2,2,6);g.fillRect(W-6,2,2,6);   // pause button
-  bar(3,10,W-6,3,m.hp/m.max,m.phase===2?'#ff4030':m.phase===1?'#f08030':'#e2483d','#2b2f45');
-  g.fillStyle='#000';g.fillRect(3+Math.round((W-6)/3),10,1,3);g.fillRect(3+Math.round((W-6)*2/3),10,1,3);
-  const sf=m.stunned&&m.state==='stagger'?1-m.t/m.staggerDur:m.stun/m.stunMax;
-  const sw=h.g.status?W-26-34:W-26;                                              // the stun bar shares its row with the weapon's status build-up
-  text('STUN',3,14,'#c8d0e8');g.fillStyle='#000';g.fillRect(21,14,sw+2,4);g.fillStyle='#2b2f45';g.fillRect(22,15,sw,2);
-  if(h.g.status){const T=STATUS[h.g.status],x=W-34,on=m.mpoison>0;g.fillStyle='#000';g.fillRect(x-1,14,32,4);g.fillStyle='#2b2f45';g.fillRect(x,15,30,2);g.fillStyle=on&&Math.floor(S.clock*8)%2?'#ffffff':T.col;g.fillRect(x,15,Math.round(30*(on?m.mpoison/T.time:m.sb/m.sNeed)),2);g.fillStyle=T.col;g.fillRect(x-5,14,3,4);}
-  g.fillStyle=m.stunned&&m.state==='stagger'?(Math.floor(S.clock*10)%2?'#fff':'#ffe14d'):'#ffe14d';g.fillRect(22,15,Math.round(sw*clamp(sf,0,1)),2);
-  // bottom
-  g.fillStyle=OUTLINE;g.fillRect(0,L.gy,W,HUD_B);
-  text('HP',4,L.gy+4,'#8a93b0');bar(14,L.gy+4,62,5,h.hp/h.max,h.hp<h.max*.3?'#e2483d':'#4cd964','#2b2f45');
-  if(S.def.trait==='charge'){text('CHRG',3,20,m.over?'#ffe14d':'#c8d0e8');g.fillStyle='#000';g.fillRect(21,20,W-24,4);g.fillStyle='#2b2f45';g.fillRect(22,21,W-26,2);
-    g.fillStyle=m.over?(Math.floor(S.clock*12)%2?'#ffffff':'#ffe14d'):'#7fd6ff';g.fillRect(22,21,Math.round((W-26)*m.charge/100),2);}
-  if(S.clock<3.6&&S.mode==='hunt'){const tp=S.def.tip2&&S.clock>1.8?S.def.tip2:S.def.tip,w=textW(tp)+8;g.fillStyle='rgba(12,14,26,.8)';g.fillRect((W-w)/2,HUD_T+4,w,11);text(tp,W/2,HUD_T+7,'#ffe14d',{al:1});}   // the monster's signature, as the hunt opens
-  {const st=h.state==='frozen'?['FROZEN','#7fd6ff']:h.state==='numb'?['NUMBED','#ffe14d']:h.burn>0?['ON FIRE',Math.floor(S.clock*8)%2?'#ff9a2e':'#ffd34d']:h.bleed>0?['BLEEDING','#e2483d']:h.poison>0?['POISON','#7ad84a']:
-    h.stench>0?['STENCH','#a8a84a']:h.blight>0?['BLIGHT','#e0508a']:h.wet>0?['SOAKED','#4c9cff']:h.mud>0?['MUDDY','#a8794a']:null;if(st)text(st[0],4,L.gy-8,st[1],{out:OUTLINE});}
-  {const z=h.sharp>=SHARP.hi?'#4cc9ff':h.sharp>=SHARP.lo?'#f5c542':(Math.floor(S.clock*6)%2?'#e2483d':'#ff9a8a');text('SH',4,L.gy+20,'#8a93b0');bar(14,L.gy+21,46,2,h.sharp/SHARP.max,z,'#2b2f45');
-    g.fillStyle='#000';g.fillRect(14+Math.round(46*SHARP.hi/100),L.gy+21,1,2);g.fillRect(14+Math.round(46*SHARP.lo/100),L.gy+21,1,2);
-    const q=L.sharp,dl=h.sharp<SHARP.lo;g.fillStyle=dl&&Math.floor(S.clock*6)%2?'#ff6a4d':'#c8d0e8';g.fillRect(q.x,q.y,q.w,q.h);g.fillStyle='#1c2134';g.fillRect(q.x+1,q.y+1,q.w-2,q.h-2);
-    g.fillStyle='#8a93b0';g.fillRect(q.x+4,q.y+12,14,4);g.fillStyle='#5a6080';g.fillRect(q.x+4,q.y+15,14,1);g.fillStyle=z;for(let i=0;i<9;i++)g.fillRect(q.x+6+i,q.y+11-i,2,1);g.fillStyle='#6b4a2e';g.fillRect(q.x+4,q.y+11,3,2);}
-  text('ST',4,L.gy+14,'#8a93b0');bar(14,L.gy+15,46,3,h.st/100,h.st<h.g.W.dodge?'#8a6a20':'#f5c542','#2b2f45');
-  const b=L.potion;g.fillStyle=h.potions>0?'#c8d0e8':'#3a4060';g.fillRect(b.x,b.y,b.w,b.h);g.fillStyle='#1c2134';g.fillRect(b.x+1,b.y+1,b.w-2,b.h-2);
-  const fx=b.x+4,fy=b.y+3;g.fillStyle='#c8d0e8';g.fillRect(fx+2,fy,4,3);g.fillRect(fx,fy+3,8,10);g.fillStyle=h.potions>0?'#e2483d':'#3a4060';g.fillRect(fx+1,fy+6,6,6);g.fillStyle='#6b4a2e';g.fillRect(fx+2,fy-1,4,2);
-  text('*'+h.potions,b.x+13,b.y+8,h.potions>0?'#fff':'#5a6080');
+  const h=S.h,m=S.m,blink=Math.floor(S.clock*8)%2;
+  // top: the monster. Name and parts, a big health bar, stun (and status, and charge) as thin bars with icons
+  g.fillStyle=UI.bg;g.fillRect(0,0,W,HUD_T);g.fillStyle='rgba(17,20,31,.55)';g.fillRect(0,HUD_T,W,2);
+  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name.replace('THE ','');text(hn,4,3,UI.tx);
+  const px0=Math.max(44,textW(hn)+9);
+  if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*15,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
+    g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,1,8,8);g.globalAlpha=1;if(P.broken){g.fillStyle=UI.bad;g.fillRect(x,5,8,1);}
+    for(let j=0;j<S.qteHits;j++){g.fillStyle=j<P.hits?UI.gold:act?'#ff4030':UI.s2;g.fillRect(x+9,7-j*3,2,2);}});
+  {const t=fmtTime(S.timeLeft),w=textW(t)+6,low=S.timeLeft<30;rbox(W-17-w,2,w,9,low&&blink?'#5a1e1e':UI.s1);text(t,W-17-w/2,4,low?UI.bad:UI.dim,{al:1});}
+  rbox(W-14,2,11,9,UI.s2);g.fillStyle=UI.tx;g.fillRect(W-11,4,2,5);g.fillRect(W-7,4,2,5);        // pause
+  {const col=m.phase===2?'#ff4030':m.phase===1?'#f08030':'#e2483d',bw=W-8,f=clamp(m.hp/m.max,0,1);rbox(4,12,bw,5,'#000');rbox(5,13,bw-2,3,UI.s2);if(f>0){g.fillStyle=col;g.fillRect(5,13,Math.max(1,Math.round((bw-2)*f)),3);g.fillStyle=shade(col,.35);g.fillRect(5,13,Math.max(1,Math.round((bw-2)*f)),1);}
+    g.fillStyle='#000';g.fillRect(5+Math.round((bw-2)/3),13,1,3);g.fillRect(5+Math.round((bw-2)*2/3),13,1,3);}
+  const sf=m.stunned&&m.state==='stagger'?1-m.t/m.staggerDur:m.stun/m.stunMax,sw=h.g.status?W-50:W-16;
+  // a little star for stun
+  {const y=18;g.fillStyle=UI.gold;g.fillRect(5,y,1,3);g.fillRect(4,y+1,3,1);rbox(9,y,sw,3,UI.s2);g.fillStyle=m.stunned&&m.state==='stagger'?(Math.floor(S.clock*10)%2?'#fff':UI.gold):UI.gold;g.fillRect(9,y+1,Math.round(sw*clamp(sf,0,1)),1);
+    if(h.g.status){const T=STATUS[h.g.status],x=W-36,on=m.mpoison>0;g.fillStyle=T.col;g.fillRect(x-4,y,2,3);rbox(x,y,32,3,UI.s2);g.fillStyle=on&&Math.floor(S.clock*8)%2?'#fff':T.col;g.fillRect(x,y+1,Math.round(32*(on?m.mpoison/T.time:m.sb/m.sNeed)),1);}}
+  if(S.def.trait==='charge'){const y=23;g.fillStyle=m.over?UI.gold:'#7fd6ff';g.fillRect(5,y,2,1);g.fillRect(4,y+1,2,1);g.fillRect(5,y+2,1,1);rbox(9,y,W-16,3,UI.s2);
+    g.fillStyle=m.over?(Math.floor(S.clock*12)%2?'#fff':UI.gold):'#7fd6ff';g.fillRect(9,y+1,Math.round((W-16)*m.charge/100),1);}
+  if(S.clock<3.6&&S.mode==='hunt'){const tp=S.def.tip2&&S.clock>1.8?S.def.tip2:S.def.tip,w=textW(tp)+10;rbox((W-w)/2,HUD_T+5,w,11,'rgba(17,20,31,.85)');text(tp,W/2,HUD_T+8,UI.gold,{al:1});}
+  // what is wrong with you, as a chip above the bottom bar
+  {const st=h.state==='frozen'?['FROZEN','#7fd6ff']:h.state==='numb'?['NUMBED','#ffe14d']:h.burn>0?['ON FIRE',blink?'#ff9a2e':'#ffd34d']:h.bleed>0?['BLEEDING','#e2483d']:h.poison>0?['POISON','#7ad84a']:
+    h.stench>0?['STENCH','#a8a84a']:h.blight>0?['BLIGHT','#e0508a']:h.wet>0?['SOAKED','#4c9cff']:h.mud>0?['MUDDY','#a8794a']:null;if(st)chip(4,L.gy-11,st[0],st[1],'rgba(17,20,31,.85)');}
+  // bottom: you. Health, stamina and edge as bars with icons; whetstone and potions as two buttons
+  g.fillStyle='rgba(17,20,31,.55)';g.fillRect(0,L.gy-2,W,2);g.fillStyle=UI.bg;g.fillRect(0,L.gy,W,HUD_B);const bw=W-62;
+  icHeart(4,L.gy+4,h.hp<h.max*.3&&blink?UI.bad:UI.ok);{const f=clamp(h.hp/h.max,0,1),c=h.hp<h.max*.3?'#e2483d':'#4cd964';rbox(11,L.gy+3,bw,6,'#000');rbox(12,L.gy+4,bw-2,4,UI.s2);g.fillStyle=c;g.fillRect(12,L.gy+4,Math.round((bw-2)*f),4);g.fillStyle=shade(c,.35);g.fillRect(12,L.gy+4,Math.round((bw-2)*f),1);}
+  {const y=L.gy+12,c=h.st<h.g.W.dodge?'#8a6a20':'#f5c542';g.fillStyle=c;g.fillRect(4,y,2,1);g.fillRect(5,y+1,2,1);g.fillRect(4,y+2,2,1);g.fillRect(7,y,2,1);g.fillRect(8,y+1,2,1);g.fillRect(7,y+2,2,1);   // stamina: a double chevron
+    rbox(11,y,bw-14,3,UI.s2);g.fillStyle=c;g.fillRect(11,y+1,Math.round((bw-14)*h.st/100),1);}
+  {const y=L.gy+18,z=h.sharp>=SHARP.hi?'#4cc9ff':h.sharp>=SHARP.lo?'#f5c542':(Math.floor(S.clock*6)%2?'#e2483d':'#ff9a8a');icSword(4,y,z);
+    const sw=bw-14,segs=[[0,SHARP.lo,'#e2483d'],[SHARP.lo,SHARP.hi,'#f5c542'],[SHARP.hi,100,'#4cc9ff']];
+    for(const [a,b2,c] of segs){const x0=11+Math.round(sw*a/100),x1=11+Math.round(sw*b2/100)-1;g.fillStyle=shade(c,-.65);g.fillRect(x0,y+1,x1-x0,2);const fill=clamp((h.sharp-a)/(b2-a),0,1);g.fillStyle=c;g.fillRect(x0,y+1,Math.round((x1-x0)*fill),2);}}
+  {const q=L.sharp,dl=h.sharp<SHARP.lo;rbox(q.x,q.y,q.w,q.h,dl&&Math.floor(S.clock*6)%2?'#5a1e1e':UI.s1);const z=h.sharp>=SHARP.hi?'#4cc9ff':h.sharp>=SHARP.lo?'#f5c542':'#e2483d';
+    g.fillStyle='#8a93b0';g.fillRect(q.x+4,q.y+13,14,3);g.fillStyle='#5a6080';g.fillRect(q.x+4,q.y+15,14,1);g.fillStyle=z;for(let i=0;i<9;i++)g.fillRect(q.x+6+i,q.y+11-i,2,1);g.fillStyle='#6b4a2e';g.fillRect(q.x+4,q.y+11,3,2);}
+  {const b=L.potion,has=h.potions>0;rbox(b.x,b.y,b.w,b.h,UI.s1);g.globalAlpha=has?1:.35;g.drawImage(lootSpr('potion'),b.x+5,b.y+4);g.globalAlpha=1;
+    const t=''+h.potions,w=textW(t)+4;rbox(b.x+b.w-w-1,b.y+b.h-9,w,8,has?UI.gold:UI.s2);text(t,b.x+b.w-w/2-1,b.y+b.h-7,has?UI.ink:UI.faint,{al:1});}
 }
 function panel(x,y,w,h){g.fillStyle='#000';g.fillRect(x,y+1,w,h);g.fillStyle='#3a4466';g.fillRect(x+1,y-1,w-2,h+2);g.fillRect(x,y,w,h);g.fillStyle='#1a1f30';g.fillRect(x+1,y+1,w-2,h-2);}
 function drawPause(){
@@ -1992,32 +1990,47 @@ function drawPause(){
   uBtn(B,'pause:quit',14,y+80,W-28,12,'QUIT HUNT','plain',quitHunt);
 }
 function drawTitle(){
-  // a showcase: the monsters you have met take turns, each in its arena, with its own music
-  const met=HUNTS.filter(id=>id==='fern'||SAVE.wins[id]),id=met[Math.floor(Math.max(0,S.t)/8)%met.length],D=MONSTERS[id];S.show=met.length>1||SAVE.wins.fern?id:null;
-  g.drawImage(bgFor(D.biome),-4,0);
-  const hd=RIGS[D.rig].head(POSE0);shadow(L.mx+MS_OX+38,L.mFeet+2,D.rig==='crab'||D.rig==='serpent'?26:30,5);
-  g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*.7)>.9?2:0})),L.mx,L.my);
-  shadow(L.hx+18,L.hFeet+1,9,2);g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),L.hx,L.hy);
-  if(SAVE.pal)g.drawImage(palSpr(Math.floor(S.t*4)%2),L.hx-6,L.hFeet-13);
-  g.fillStyle='rgba(10,12,22,.35)';g.fillRect(0,0,W,LH);
-  // logo
-  g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,8,W,40);g.fillStyle='#ffe14d';g.fillRect(0,8,W,1);g.fillRect(0,47,W,1);
-  text('FERNWING',W/2,13,'#ffe14d',{al:1,s:2,out:OUTLINE});text('HUNT',W/2,27,'#fff',{al:1,s:2,out:OUTLINE});
-  text(PREFS.dev?'DEV MODE':met.length>1?'NOW: '+D.name:'V'+VER,W/2,40,PREFS.dev?'#ff9a4d':'#8a93b0',{al:1});
-  if(S.howto){const y=56;panel(8,y,W-16,102);
-    const rows=[['TAP','ATTACK'],['HOLD','WEAPON SKILL'],['SWIPE','DODGE'],['UP / DOWN','POTION / WHET']];
-    rows.forEach((r,i)=>{text(r[0],14,y+6+i*10,'#ffb020');text(r[1],W-14,y+6+i*10,'#e8f0fc',{al:2});});
-    text('DODGE AS THE RING CLOSES',W/2,y+47,'#c8d0e8',{al:1});text('PERFECT DODGE: COUNTER!',W/2,y+54,'#ffe14d',{al:1});
-    text('HIT THE HEAD TO STUN IT',W/2,y+64,'#c8d0e8',{al:1});text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
-    text('TAP THE RED CIRCLES:',W/2,y+84,'#ff6a4d',{al:1});text('3 HITS BREAK A PART',W/2,y+91,'#c8d0e8',{al:1});
-    text('TAP TO CLOSE',W/2,y+108,'#fff',{al:1,out:OUTLINE});S.btns=[];return;}
-  const B=S.btns=[],by=LH-22;
-  const btn=(bid,x,w,lab,col,fn)=>uBtn(B,bid,x,by,w,13,lab,'plain',fn);
-  btn('title:howto',4,58,'HOW TO PLAY','#2a6aa8',()=>{S.howto=true;sfx('charge',1);});
-  btn('title:options',66,58,'OPTIONS','#2a6aa8',()=>{S.opts=true;S.armDel=0;sfx('charge',1);});
+  // a living scene: the monsters you have met take turns in their arenas, panning slowly, with their own music
+  const met=HUNTS.filter(id=>id==='fern'||SAVE.wins[id]),T8=Math.max(0,S.t)/8,id=met[Math.floor(T8)%met.length],D=MONSTERS[id];S.show=met.length>1||SAVE.wins.fern?id:null;
+  const ph=T8%1,pan=Math.round(Math.sin(S.t*.25)*5);
+  g.drawImage(bgFor(D.biome),-4+pan,0);
+  shadow(L.mx+MS_OX+38+pan,L.mFeet+2,D.rig==='crab'||D.rig==='serpent'?26:30,5);
+  g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*.7)>.9?2:0})),L.mx+pan,L.my);
+  shadow(L.hx+18+pan,L.hFeet+1,9,2);g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),L.hx+pan,L.hy);
+  if(SAVE.pal)g.drawImage(palSpr(Math.floor(S.t*4)%2),L.hx-6+pan,L.hFeet-13);
+  const fade=ph<.08?1-ph/.08:ph>.92?(ph-.92)/.08:0;if(fade>0&&met.length>1){g.fillStyle='rgba(17,20,31,'+fade.toFixed(2)+')';g.fillRect(0,0,W,LH);}   // crossfade between monsters
+  for(let i=0;i<56;i++){g.fillStyle='rgba(17,20,31,'+(.85*(1-i/56)).toFixed(2)+')';g.fillRect(0,i,W,1);}                                       // the logo's backdrop
+  // logo: a glowing, flickering FERNWING over a letter-spaced HUNT
+  const fl=Math.floor(S.t*10)%53===0||Math.floor(S.t*10)%53===2?.65:1;
+  g.globalAlpha=.18*fl;for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]])text('FERNWING',W/2+dx,21+dy,UI.gold,{al:1,s:3});g.globalAlpha=1;
+  text('FERNWING',W/2+1,22,'#000',{al:1,s:3});g.globalAlpha=fl;text('FERNWING',W/2,21,UI.gold,{al:1,s:3});g.globalAlpha=1;
+  {const w='HUNT'.length*10-6;'HUNT'.split('').forEach((c,i)=>{text(c,W/2-w/2+i*10+1,39,'#000');text(c,W/2-w/2+i*10,38,UI.tx);});}
+  // sound
+  const B=S.btns=[];const audible=AC&&AC.state==='running'&&PREFS.music;
+  rbox(W-17,4,13,13,'rgba(0,0,0,.55)');{const c=PREFS.music?UI.tx:UI.faint;g.fillStyle=c;g.fillRect(W-14,9,2,3);g.fillRect(W-12,8,1,5);g.fillRect(W-11,7,1,7);if(PREFS.music){g.fillRect(W-9,9,1,3);g.fillRect(W-8,8,1,1);g.fillRect(W-8,12,1,1);}else{px1(W-9,8,UI.bad);px1(W-8,9,UI.bad);px1(W-7,10,UI.bad);px1(W-8,11,UI.bad);px1(W-9,12,UI.bad);}}
+  B.push({id:'title:mute',x:W-20,y:0,w:20,h:20,fn:()=>{audioInit();setMusic(!PREFS.music);}});
+  if(!AC||AC.state!=='running'){if(Math.floor(S.t*1.6)%3){const w=textW('TAP FOR SOUND')+6;chip((W-w)/2,48,'TAP FOR SOUND',UI.gold,'rgba(0,0,0,.6)');}}
+  if(S.howto){const y=Math.max(46,((LH-120)/2)|0);g.fillStyle='rgba(10,12,22,.75)';g.fillRect(0,0,W,LH);panel(8,y,W-16,118);big('HOW TO PLAY',W/2,y+7,UI.tx,1);
+    const rows=[['TAP','ATTACK'],['HOLD','WEAPON SKILL'],['SWIPE','DODGE'],['UP / DOWN','POTION / SHARPEN']];
+    rows.forEach((r,i)=>{text(r[0],14,y+24+i*9,UI.gold);text(r[1],W-14,y+24+i*9,UI.tx,{al:2});});
+    text('DODGE AS THE RING CLOSES',W/2,y+64,UI.dim,{al:1});text('PERFECT DODGE: COUNTER!',W/2,y+72,UI.gold,{al:1});
+    text('HIT THE HEAD TO STUN IT',W/2,y+82,UI.dim,{al:1});text('TAP RED CIRCLES TO BREAK PARTS',W/2,y+90,UI.dim,{al:1});
+    text('TAP TO CLOSE',W/2,y+106,UI.faint,{al:1});S.btns=[];return;}
+  // the menu card
+  const prog=Object.keys(SAVE.wins).length>0||SAVE.story.i>0,ch=prog?84:68,cy=LH-ch-18;
+  rbox(8,cy,W-16,ch,'rgba(10,10,14,.72)');g.fillStyle='rgba(255,255,255,.07)';g.fillRect(9,cy,W-18,1);
+  text('HUNT. CARVE. FORGE. REPEAT.',W/2,cy+6,UI.faint,{al:1});
+  let y=cy+15;
+  if(prog){const won=Object.values(SAVE.wins).reduce((a,b)=>a+b,0),top=Math.max(1,...HUNTS.filter(id=>rankOpen(MONSTERS[id].rank)||MONSTERS[id].rank===1).map(id=>MONSTERS[id].rank));
+    uBtn(B,'title:start',14,y,W-28,16,'CONTINUE','gold',titleStart,true);text(rankName(Math.min(top,8))+' . '+won+' HUNTS WON',W/2,y+19,UI.dim,{al:1});y+=28;
+    const armed=S.armNew>0&&S.t<S.armNew;uBtn(B,'title:new',14,y,W-28,11,armed?'TAP AGAIN: ERASE SAVE':'NEW GAME',armed?'gold':'plain',()=>{if(armed){S.armNew=0;deleteSave();titleStart();}else{S.armNew=S.t+3;sfx('warn');}});y+=15;}
+  else{uBtn(B,'title:start',14,y,W-28,18,'START','gold',titleStart,true);y+=24;}
+  const hw=(W-31)>>1;uBtn(B,'title:howto',14,y,hw,11,'HOW TO PLAY','plain',()=>{S.howto=true;sfx('charge',1);});uBtn(B,'title:options',17+hw,y,hw,11,'SETTINGS','plain',()=>{S.opts=true;S.armDel=0;sfx('charge',1);});
+  text('V'+VER+(PREFS.dev?' . DEV MODE':' . 35 MONSTERS'),W/2,cy+ch-8,PREFS.dev?'#ff9a4d':UI.faint,{al:1});
+  {const cap=(met.length>1||SAVE.wins.fern?'NOW: ':'')+D.name+' . '+BIOME_NAME[D.biome],w=textW(cap)+10;rbox((W-w)/2,cy-15,w,11,'rgba(0,0,0,.6)');text(cap,W/2,cy-12,UI.gold,{al:1});}
   if(S.opts){drawOptions();return;}
-  if(Math.floor(S.t*2)%2)text('TAP TO START',W/2,by-16,'#fff',{al:1,out:OUTLINE});
 }
+function titleStart(){toCamp('home');sfx('charge',2);}
 // The options panel: on the title screen and from the camp menu
 function drawOptions(){
   S.btns=[];const B=S.btns,ph=118,y=Math.max(30,((LH-ph)/2)|0);g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);panel(8,y,W-16,ph);big('OPTIONS',W/2,y+7,UI.tx,1);
@@ -2672,7 +2685,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
