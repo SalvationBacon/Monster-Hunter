@@ -407,3 +407,13 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
   - **Bottom:** health with a heart, stamina with a double chevron, and sharpness as a three-color bar with a sword icon. The whetstone and potion are rounded buttons; the potion count is a gold badge.
   - Your current status ailment shows as a chip above the bottom bar, and the opening tip as a pill.
   - **COUNTER** is a big gold button with its timer inside.
+
+## v0.31.0: title art
+- The title background is now five handmade scenes, drawn in code from the game's sprites, each panning slowly for 7 seconds and fading through dark into the next. A caption names each one:
+  - **Hollowroot Camp:** dusk, tents, a string of lanterns, a crackling campfire with rising sparks, and the hunter (and Pip once it has joined).
+  - **The Hunt:** a sunset with a huge sun, the hunter's silhouette facing a giant monster's (the Emberwing once you've met it), and birds and drifting dust.
+  - **Bram's Forge:** a brick wall, the glowing forge mouth and floating embers, an anvil with a hot blade, and a hammer that falls on the beat with a burst of sparks.
+  - **The Glowing Woods:** moonlight, three layers of trees, glowing mushrooms, fireflies, and a moth.
+  - **The Peak:** an aurora, a starfield with falling stars, and a glowing light on the summit.
+- The title always plays its own theme now (no monster tracks).
+- HOW TO PLAY is gone from the title (the first hunt teaches the controls). SETTINGS takes the full width.
