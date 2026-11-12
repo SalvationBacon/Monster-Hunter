@@ -33,7 +33,8 @@ const shots=process.argv[2];
       for(const k in D.matName)if(w(D.matName[k])>70)long.push(D.matName[k]);}
     for(const t of [...MH.STORY.map(s=>[s.t,...s.d,MH.goalText(s.goal)]).flat(),...MH.SIDES.map(s=>MH.goalText(s.goal)),...MH.DAILIES.map(s=>MH.goalText(s.goal)),...Object.values(MH.MEALS).map(m=>m.desc)])if(w(t)>117)long.push(t);
     for(const r of Object.values(MH.ROLES))if(w(r[1])>90)long.push(r[1]);
-    for(const id in MH.GEAR){const G=MH.GEAR[id];if(G.slot==='armor'&&G.perk){const t='HP '+Math.round(G.hp*1.4)+'  ';if(19+w(t)+4+w(MH.PERKS[G.perk].desc)>125)long.push(MH.PERKS[G.perk].desc);}if(G.slot==='charm'&&19+w(MH.PERKS[G.perk].desc)>96)long.push(MH.PERKS[G.perk].desc);}
+    for(const id in MH.GEAR){const G=MH.GEAR[id];if(!G.sk)continue;let x=19+(G.hp?w('HP '+Math.round(G.hp*1.4))+4:0);for(const [k,n] of Object.entries(G.sk))x+=w(MH.PERKS[k].tag+'+'+n)+3;if(x>124)long.push(id);}
+    for(const k of MH.SK){const K=MH.PERKS[k];if(w(K.name)>80)long.push(K.name);for(let L=1;L<=K.max;L++)if(w(K.d(L))>116)long.push(K.d(L));}
     return long.length?[...new Set(long)].join(' | '):true;}),'every name, tip, story line and quest line fits the screen');
   ok(await ev(()=>{EQ();for(const id of MH.HUNTS)for(const a of new Set(MH.MONSTERS[id].moves)){MH.newHunt(id);const S=MH.S,m=S.m,D=MH.MONSTERS[id];S.h.hp=S.h.max=1e7;m.evadeCd=1e9;m.qteT=1e9;S.timeLeft=1e9;
       const pool=D.pools,tr=D.trait;D.pools=[[a],[a],[a]];D.trait=null;m.wait=0;let t=0,moved=false;const p0=JSON.stringify(MH.mPose());
@@ -127,9 +128,23 @@ const shots=process.argv[2];
     'upgrades cost materials, add 8% a level and stop at +5; the last levels need the next monster\'s scales and the rare drop; charms have no levels');
   ok(await ev(()=>{const taken=ar=>{let n=0;for(let k=0;k<12;k++){EQ('iron_gs',ar);MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}n+=S.stats.taken/Math.round(MH.ATTACKS[m.atk].dmg*MH.MONSTERS.ember.dmg);}return n/12;};
     const a=taken('ember_ar'),c=taken('frost_ar');return Math.abs(a-.75)<.06&&Math.abs(c-1)<.02||a+','+c;}),'armor takes 25% less from its own monster\'s element');
-  ok(await ev(()=>{EQ('ember_gs','mud_ar','relic_weak');const g=MH.gearStats();return g.elem==='fire'&&Math.abs(g.atk-1.66*1.1)<1e-6&&g.perks.might&&g.perks.weakspot&&g.hp===156;}),'gear adds up: element, attack with Might, health, perks');
-  ok(await ev(()=>{EQ('iron_gs','leather','dust_ch');MH.newHunt('fern');const a=MH.S.h.potions;EQ();MH.SAVE.potions=2;MH.newHunt('fern');return a===4&&MH.S.h.potions===2;}),'three potions come on a hunt, four with Herbalist, and never more than are in stock');
-  ok(await ev(()=>{EQ('iron_gs','leather','mud_ch');MH.newHunt('fern');const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);}return S.m.parts.head.broken;}),'the Breaker Charm breaks a part in two hits');
+  ok(await ev(()=>{EQ('ember_gs','mud_ar','relic_weak');const g=MH.gearStats();return g.elem==='fire'&&g.perks.might===3&&Math.abs(g.atk-1.66*1.12)<.001&&g.perks.weakspot===2&&g.perks.keenedge===1&&g.hp===Math.round(156*(1+.04*(g.perks.vigor||0)))||JSON.stringify([g.perks,g.atk,g.hp]);}),'gear adds up: element, attack with three levels of Might, health, and the charm\'s skills');
+  // equip pieces until a skill reaches a level, starting from a charm; returns the slots used
+  await ev(()=>{window.BUILD=(skill,lvl,charm)=>{EQ('iron_gs','leather',charm||null);const E=MH.SAVE.eq;for(const sl of ['armor','helm','arms','legs']){if((MH.skillLevels()[skill]||0)>=lvl)break;
+      const id=Object.keys(MH.GEAR).find(k=>MH.GEAR[k].slot===sl&&MH.GEAR[k].sk&&MH.GEAR[k].sk[skill]);if(id)E[sl]=id;}return MH.skillLevels()[skill]||0;};});
+  ok(await ev(()=>{const a=BUILD('herbal',2);MH.newHunt('fern');const p2=MH.S.h.potions;const b=BUILD('herbal',3,'dust_ch');MH.newHunt('fern');const p3=MH.S.h.potions;EQ();MH.SAVE.potions=2;MH.newHunt('fern');
+    return a>=2&&p2===3&&b===3&&p3===4&&MH.S.h.potions===2||[a,p2,b,p3].join(',');}),'three potions come on a hunt, four with Herbalist at level 3, and never more than are in stock');
+  ok(await ev(()=>{EQ('iron_gs','leather','mud_ch');const two=MH.gearStats().qteHits;const L=BUILD('breaker',3,'mud_ch');MH.newHunt('fern');const S=MH.S;for(let k=0;k<2;k++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);}
+    return two===3&&L===3&&S.m.parts.head.broken;}),'Breaker at level 3 breaks a part in two hits; the charm alone is not enough');
+  ok(await ev(()=>{EQ();const base=MH.skillLevels();BUILD('might',3);const lv3=MH.skillLevels().might,raw=MH.skillRaw().might;const E=MH.SAVE.eq;
+    const extra=Object.keys(MH.GEAR).filter(k=>MH.GEAR[k].slot==='charm'&&MH.GEAR[k].sk&&MH.GEAR[k].sk.might);if(extra.length)E.charm=extra[0];const capped=MH.skillLevels().might;
+    return Object.keys(base).length===0&&lv3===3&&capped===3&&MH.skillRaw().might>=raw;}),'skill points stack from pieces and charms, and stop at the skill\'s max');
+  ok(await ev(()=>{const t=id=>MH.GEAR[id].sk,bad=[];for(const id of MH.HUNTS){const a=t(id+'_ar'),h=t(id+'_he'),g=t(id+'_ga'),b=t(id+'_bo');
+      const all={};for(const s of [a,h,g,b])for(const [k,n] of Object.entries(s))all[k]=(all[k]||0)+n;const lv=Object.values(all).sort().join(',');if(lv!=='2,2,2,3'||Object.keys(a).length!==2||Object.keys(b).length!==1)bad.push(id+':'+lv);}
+    const sets=new Set(MH.HUNTS.map(id=>JSON.stringify(['ar','he','ga','bo'].map(k=>t(id+'_'+k)))));return bad.length?bad.join(' '):sets.size===35;}),'each monster\'s armor carries a theme of four skills: a full set gives levels 3, 2, 2 and 2, and no two sets match');
+  ok(await ev(()=>{EQ();const h0=MH.gearStats().hp;const a=MH.gearStats().atk;BUILD('vigor',2);const h1=MH.gearStats().hp,lvv=MH.skillLevels().vigor;EQ();
+    const k0=MH.HUNTS[0];const d=(()=>{EQ();const S=QUIET('ember');MH.applyStatus('burn');const t0=S.h.burn;BUILD('hardy',3);const T=QUIET('ember');MH.applyStatus('burn');return [t0,T.h.burn,MH.skillLevels().hardy];})();EQ();
+    return lvv>=1&&h1>=Math.round(h0*(1+.04*lvv))-1&&Math.abs(d[1]/d[0]-(1-.2*d[2]))<.01||[h0,h1,lvv,d].join(',');}),'new skills work: Vigor adds health, Hardy shortens ailments');
   ok(await ev(()=>{EQ('iron_ln');MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=99;m.wait=0;m.qteT=99;MH.update(1/60);Object.assign(MH.IN,{down:true,swiped:false,downAt:-9});let t=0;while(m.state==='attack'&&m.hi===0&&t<3){S.h.state='guard';S.h.t=1;MH.update(1/60);t+=1/60;}
     const chip=S.stats.guards===1&&S.stats.taken>0&&S.stats.taken<=4&&S.h.st<100&&S.h.state!=='hurt';
     MH.IN.down=false;MH.newHunt('fern');const T=MH.S.m;T.evadeCd=99;T.wait=0;T.qteT=99;MH.update(1/60);t=0;while(T.state==='attack'&&T.hi===0&&t<3){if(T.hits[0]-T.t<.1&&MH.S.h.state!=='guard'){Object.assign(MH.IN,{down:true,swiped:false,downAt:MH.S.clock-1});MH.S.h.state='guard';MH.S.h.t=0;}MH.update(1/60);t+=1/60;}MH.IN.down=false;
@@ -139,11 +154,11 @@ const shots=process.argv[2];
 
   // ── armor in four pieces ──
   ok(await ev(()=>{const G=MH.GEAR,bad=[];for(const id of MH.HUNTS){const parts=['ar','he','ga','bo'].map(k=>G[id+'_'+k]);if(parts.some(x=>!x))bad.push(id);else{const sum=parts.reduce((t,x)=>t+x.hp,0);if(Math.abs(sum-(140+8*MH.MONSTERS[id].L))>.01)bad.push(id+' '+sum);
-      if(!parts[0].perk||parts.slice(1).some(x=>x.perk))bad.push(id+' perk');}}return bad.length?bad.join(','):true;}),'every monster makes a chest, helm, gauntlets and boots; together they are worth the old armor, and only the chest carries a perk');
+      if(parts.some(x=>!x.sk||!Object.keys(x.sk).length))bad.push(id+' skills');}}return bad.length?bad.join(','):true;}),'every monster makes a chest, helm, gauntlets and boots; together they are worth the old armor, and every piece carries skills');
   ok(await ev(()=>{EQ('iron_gs','ember_ar');const full=MH.gearStats();Object.assign(MH.SAVE.eq,{helm:'frost_he',arms:'frost_ga',legs:'frost_bo'});const mix=MH.gearStats();
     Object.assign(MH.SAVE.eq,{armor:'leather'});const two=MH.gearStats();EQ();
-    const pk=MH.GEAR.ember_ar.perk;return full.res.fire===.25&&Math.abs(mix.res.fire-.1)<1e-9&&Math.abs(mix.res.ice-.15)<1e-9&&!two.res.fire&&Math.abs(two.res.ice-.15)<1e-9&&!!mix.perks[pk]&&!two.perks[pk]&&full.hp===140+8*MH.MONSTERS.ember.L||JSON.stringify([full.res,mix.res,two.res,full.hp]);}),
-    'mixing pieces splits the resistance by share, and the perk comes with the chest');
+    const pk=Object.keys(MH.GEAR.ember_ar.sk).find(k=>!MH.GEAR.frost_he.sk[k]&&!MH.GEAR.frost_ga.sk[k]&&!MH.GEAR.frost_bo.sk[k]);return full.res.fire===.25&&Math.abs(mix.res.fire-.1)<1e-9&&Math.abs(mix.res.ice-.15)<1e-9&&!two.res.fire&&Math.abs(two.res.ice-.15)<1e-9&&!!mix.perks[pk]&&!two.perks[pk]&&full.hp===Math.round((140+8*MH.MONSTERS.ember.L)*(1+.04*(full.perks.vigor||0)))||JSON.stringify([full.res,mix.res,two.res,full.hp,pk]);}),
+    'mixing pieces splits the resistance by share, and each piece brings its own skills');
   ok(await ev(()=>{const S=MH.SAVE;S.lv={};S.bag={scale:99,claw:99,horn:9,wing:9,spike:9};EQ('iron_gs','fern_ar');const ch=JSON.stringify(MH.upCost('fern_ar')),he=JSON.stringify(MH.upCost('fern_he'));
     const h0=MH.gearStats().hp;MH.upgradeTap('fern_he');const h1=MH.gearStats().hp;S.lv={};S.bag={};return ch==='{"scale":3,"claw":1}'&&he==='{"scale":2,"claw":1}'&&h1-h0===Math.round(140*.2*.08)||[ch,he,h0,h1].join(' ');}),
     'helm, gauntlets and boots upgrade too, for about half the materials');
@@ -286,8 +301,9 @@ const shots=process.argv[2];
   await ev(()=>{Object.assign(MH.SAVE.bag,{scale:9,claw:4,horn:2,wing:1,spike:1});});await p.waitForTimeout(80);
   await tapBtn('craft:fern_gs');ok(await ev(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.bag.scale===4&&MH.SAVE.bag.claw===2&&MH.SAVE.bag.horn===1&&MH.gearStats().atk===1.3&&MH.gearStats().elem==='nature'),'crafting spends the materials, wears the gear and gives its element');
   await tapBtn('forge:fern_gs');ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.toast&&/GEAR/.test(MH.S.toast.txt)),'tapping owned gear in the forge points to the GEAR tab');
-  await tapBtn('fcat:armor');await tapBtn('fsub:4');await tapBtn('craft:fern_ch');ok(await ev(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
+  await tapBtn('fcat:armor');await tapBtn('fsub:4');await tapBtn('craft:fern_ch');ok(await ev(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().perks.keeneye===2&&Math.abs(MH.gearStats().qteSlow-1.26)<1e-9),'the Keen Eye Charm gives Keen Eye 2, slowing the circles');
   await tapBtn('tab:gear');await tapBtn('slot:charm');await tapBtn('wear:none');ok(await ev(()=>MH.SAVE.eq.charm===null),'a charm can be taken off in the GEAR tab');await tapBtn('slot:charm');await tapBtn('wear:fern_ch');
+  await tapBtn('gear:skills');ok(await ev(()=>MH.S.gpick==='skills'),'tapping the stats opens the skills page');await shot('c-gear-skills');await tapBtn('gear:back');
   await tapBtn('tab:forge');await tapBtn('fcat:weapon');await tapBtn('fsub:0');
   ok(await tapBtn('up:fern_gs')&&await ev(()=>MH.lvOf('fern_gs')===1&&MH.SAVE.bag.scale===1&&MH.SAVE.bag.claw===1&&MH.SAVE.eq.weapon==='fern_gs'),'a tap on UP upgrades the weapon and spends materials');await shot('c-forge-crafted');
   await p.reload();await p.waitForTimeout(200);
@@ -295,7 +311,7 @@ const shots=process.argv[2];
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);await tapBtn('tab:hunt');await tapBtn('hunt:fern');
   ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='fern'&&!MH.S.btns.some(b=>b.id==='prep:rnext')),'a tap on the Fernwing card opens the prep screen, with no companion yet');await shot('c-prep');
   await tapBtn('prep:mnext');ok(await ev(()=>MH.S.prep.meal===0),'the arrows pick a meal');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='prep'),'a meal cannot be eaten without its ingredients');await tapBtn('prep:mprev');await tapBtn('prep:start');
-  ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='fern'&&MH.S.h.atk===1.404&&Math.abs(MH.S.qteTime-.7)<1e-9),'START HUNT begins the hunt with the worn gear');
+  ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='fern'&&MH.S.h.atk===1.404&&Math.abs(MH.S.qteTime-.5*1.26)<1e-9),'START HUNT begins the hunt with the worn gear');
   await p.waitForTimeout(1300);ok(await ev(()=>MH.music.key==='mon:fern'),'the music crosses over to the Fernwing\'s own track');
   const pz=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(128-8)/128*r.width,y:r.top+5/MH.LH*r.height};});
   await p.touchscreen.tap(pz.x,pz.y);await p.waitForTimeout(100);

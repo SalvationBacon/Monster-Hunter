@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.17.0';
+const VER='0.18.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -162,7 +162,7 @@ const MONSTERS={}, HUNTS=[];
 ROSTER.forEach((r,i)=>{
   const [id,name,short,rig,biome,elem,w,weak,weakSt,inflict,trait,moves,cols,flags]=r, c=cols.split(',').map(x=>'#'+x), f={};(flags||'').split(',').forEach(k=>{if(k)f[k]=1;});
   const rank=i<30?1+(i/5|0):i<34?7:8, L=i<30?i:i<34?31:33, t=L/29, m=moves.split(','), q=id in OLD_PRE?OLD_PRE[id]:id+'_';
-  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.53;dmg*=1.19;} if(trait==='armor')hp=Math.round(hp*.9/50)*50;
+  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.53;dmg*=1.19;} if(trait==='armor')hp=Math.round(hp*.9/50)*50; hp=Math.round(hp*1.1/50)*50;   // a full armor set's skills add about a tenth to a hunter's power
   const s0=1-.2*t, e0=3.4-t;
   const D=MONSTERS[id]={id,name,short,rig,biome:+biome,rank,stars:rank,L,elem,weak,weakSt,inflict:inflict||null,trait:trait||null,
     resSt:STATUS[w]?w:STATUS[inflict]?inflict:null,wElem:ELEM[w]?w:null,wStatus:STATUS[w]?w:null,
@@ -179,25 +179,43 @@ ROSTER.forEach((r,i)=>{
 });
 const EXPED=['fern','mud','tusk','ember','shell','frost','dread','storm'];     // the eight biomes with expeditions, by the monster that opens each
 // ── Perks, carried by armor and charms ──
+// ── Skills. Armor pieces and charms carry skill points; points stack to a skill's level, up to its max.
+// Each level is a small step, kept modest for a rebirth system later. tag: the short name on gear rows.
+// d(L): what the skill does at level L.
 const PERKS={
-  tireless:{name:'TIRELESS',  desc:'DODGE COST -40%'},
-  guardian:{name:'GUARDIAN',  desc:'SOME HITS HALVED'},
-  might:   {name:'MIGHT',     desc:'ATTACK +10%'},
-  nimble:  {name:'NIMBLE',    desc:'EASIER PERFECTS'},
-  keenedge:{name:'KEEN EDGE', desc:'20% CRIT HITS'},
-  keeneye: {name:'KEEN EYE',  desc:'SLOWER CIRCLES'},
-  bludgeon:{name:'BLUDGEONER',desc:'STUN BUILDS +40%'},
-  breaker: {name:'BREAKER',   desc:'BREAK IN 2 HITS'},
-  herbal:  {name:'HERBALIST', desc:'+1 POTION +HEAL'},
-  fortune: {name:'FORTUNE',   desc:'MORE LOOT'},
-  quick:   {name:'QUICK DRAW',desc:'CHARGE 30% FASTER'},
-  riposte: {name:'RIPOSTE',   desc:'COUNTER +40%'},
-  weakspot:{name:'WEAK SPOT', desc:'HEAD DAMAGE +25%'},
+  might:    {name:'MIGHT',       tag:'MIGHT', max:3,d:L=>'ATTACK +'+4*L+'%'},
+  keenedge: {name:'KEEN EDGE',   tag:'CRIT',  max:3,d:L=>7*L+'% CRITICAL HITS'},
+  weakspot: {name:'WEAK SPOT',   tag:'HEAD', max:3,d:L=>'HEAD DAMAGE +'+8*L+'%'},
+  elemboost:{name:'ELEMENTALIST',tag:'ELEM',  max:3,d:L=>'WEAKNESS BONUS +'+5*L+'%'},
+  statusup: {name:'AFFLICTOR',   tag:'STAT',max:3,d:L=>'STATUS BUILDS +'+12*L+'%'},
+  bludgeon: {name:'BLUDGEONER',  tag:'STUN',  max:3,d:L=>'STUN BUILDS +'+13*L+'%'},
+  quick:    {name:'QUICK DRAW',  tag:'DRAW',  max:3,d:L=>'CHARGE '+10*L+'% FASTER'},
+  riposte:  {name:'RIPOSTE',     tag:'RIPO',max:3,d:L=>'COUNTER +'+13*L+'%'},
+  razor:    {name:'RAZOR',       tag:'EDGE',  max:3,d:L=>'EDGE WEARS '+15*L+'% SLOWER'},
+  keeneye:  {name:'KEEN EYE',    tag:'EYE',   max:3,d:L=>'CIRCLES '+13*L+'% SLOWER'},
+  breaker:  {name:'BREAKER',     tag:'BREAK', max:3,d:L=>'WEAK PTS +'+20*L+'%'+(L>=3?', 2-HIT BREAK':'')},
+  tireless: {name:'TIRELESS',    tag:'DODGE', max:3,d:L=>'DODGE COST -'+13*L+'%'},
+  nimble:   {name:'NIMBLE',      tag:'NIMB',max:3,d:L=>'WIDER PERFECTS, LV '+L},
+  guardian: {name:'GUARDIAN',    tag:'GUARD', max:3,d:L=>8*L+'% OF HITS HALVED'},
+  vigor:    {name:'VIGOR',       tag:'VIG', max:3,d:L=>'HEALTH +'+4*L+'%'},
+  hardy:    {name:'HARDY',       tag:'HARD', max:3,d:L=>'AILMENTS '+20*L+'% SHORTER'},
+  herbal:   {name:'HERBALIST',   tag:'HERB',  max:3,d:L=>'POTIONS +'+17*L+'%'+(L>=3?', +1 POTION':'')},
+  fortune:  {name:'FORTUNE',     tag:'LUCK',  max:3,d:L=>'BETTER DROPS'+(L>=2?', MORE LOOT':'')},
+  beast:    {name:'BEASTFRIEND', tag:'PIP',   max:3,d:L=>'PIP +'+8*L+'%'},
 };
+const SK=Object.keys(PERKS);
+const lv=(gs,k)=>(gs.perks[k]||0);
+
 // ── Gear. One weapon, one armor and one charm are worn at a time. Built from the roster.
 // A monster's weapons carry its element or its status, never both. Its armor and charm carry one perk each, by its place in the order.
 const APERK=['tireless','guardian','might','nimble','keenedge','herbal','bludgeon','keeneye','fortune','breaker'];
 const CPERK=['keeneye','bludgeon','breaker','herbal','fortune','tireless','guardian','might','nimble','keenedge'];
+// A monster's armor leans into four skills: its main one (A), two more (B, C), and a minor one (D) on the boots.
+// Pieces: chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2. A full set: A3 B2 C2 D2.
+function armorTheme(id,i){
+  const r=mRng(mHash('skills:'+id)),pool=SK.filter(k=>k!==APERK[i%10]),pick=()=>pool.splice((r()*pool.length)|0,1)[0];
+  const A=APERK[i%10],B=pick(),C=pick(),D=pick();return{armor:{[A]:2,[B]:1},helm:{[A]:1,[C]:1},arms:{[B]:1,[C]:1},legs:{[D]:2}};
+}
 const WCOST={gs:{scale:5,claw:2,head:1},db:{scale:4,claw:4,wings:1},hm:{scale:5,claw:2,tail:1},ln:{scale:6,claw:1,wings:1}};
 // Armor comes in four pieces. Each gives its share of the set's health; the chest carries the perk; every piece adds its share of resistance.
 const APIECES=[['armor','ar','MAIL',.4,{scale:7,claw:2,wings:1},'VEST'],['helm','he','HELM',.2,{scale:3,claw:1,head:1},'CAP'],
@@ -208,12 +226,15 @@ for(const [sl,k,,share,,lname] of APIECES)GEAR[sl==='armor'?'leather':'leather_'
 for(const wt of WT)GEAR['iron_'+wt]={slot:'weapon',tier:'iron',wt,name:'IRON '+WTYPES[wt].name,atk:1,free:true};
 HUNTS.forEach((id,i)=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat,cost=c=>Object.fromEntries(Object.entries(c).map(([k,n])=>[m[k],n]));
   for(const wt of WT)GEAR[id+'_'+wt]={slot:'weapon',tier:id,wt,name:D.short+' '+WTYPES[wt].name,atk:T.atk,elem:D.wElem,status:D.wStatus,cost:cost(WCOST[wt])};
-  for(const [sl,k,nm,share,c] of APIECES)GEAR[id+'_'+k]={slot:sl,tier:id,name:D.short+' '+nm,hp:+(T.hp*share).toFixed(2),perk:sl==='armor'?APERK[i%10]:undefined,cost:cost(c)};
-  GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[CPERK[i%10]].name+' CHARM',perk:CPERK[i%10],cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
+  const th=armorTheme(id,i);for(const [sl,k,nm,share,c] of APIECES)GEAR[id+'_'+k]={slot:sl,tier:id,name:D.short+' '+nm,hp:+(T.hp*share).toFixed(2),sk:th[sl],cost:cost(c)};
+  GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[CPERK[i%10]].name+' CHARM',sk:{[CPERK[i%10]]:2},cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
 Object.assign(GEAR,{
-  relic_quick:  {slot:'charm',tier:'relic',name:'QUICK DRAW CHARM',perk:'quick',  cost:{gem:1,t_horn:1,claw:4}},
-  relic_riposte:{slot:'charm',tier:'relic',name:'RIPOSTE CHARM',   perk:'riposte',cost:{gem:1,e_wing:1,t_spike:1}},
-  relic_weak:   {slot:'charm',tier:'relic',name:'WEAK SPOT CHARM', perk:'weakspot',cost:{gem:1,f_horn:1,e_horn:1}},
+  relic_quick:  {slot:'charm',tier:'relic',name:'QUICK DRAW CHARM',sk:{quick:2,riposte:1},   cost:{gem:1,t_horn:1,claw:4}},
+  relic_riposte:{slot:'charm',tier:'relic',name:'RIPOSTE CHARM',   sk:{riposte:2,nimble:1},  cost:{gem:1,e_wing:1,t_spike:1}},
+  relic_weak:   {slot:'charm',tier:'relic',name:'WEAK SPOT CHARM', sk:{weakspot:2,keenedge:1},cost:{gem:1,f_horn:1,e_horn:1}},
+  relic_elem:   {slot:'charm',tier:'relic',name:'ELEMENT CHARM',   sk:{elemboost:2,razor:1}, cost:{gem:1,e_rare:1}},
+  relic_status: {slot:'charm',tier:'relic',name:'AFFLICTOR CHARM', sk:{statusup:2,hardy:1},  cost:{gem:1,bog_horn:1,quill_horn:1}},
+  relic_beast:  {slot:'charm',tier:'relic',name:'BEAST CHARM',     sk:{beast:2,vigor:1},     cost:{gem:1,shell_horn:1}},
 });
 // ── Pip's gear: a weapon (attack, and the monster's element or status) and a vest (care: how much its support roles do)
 GEAR.pip_fang={slot:'pweapon',tier:'iron',name:'PIP TWIG',patk:1,free:true};
@@ -224,7 +245,7 @@ HUNTS.forEach(id=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat;
 const pipSlot=G=>G.slot==='pweapon'||G.slot==='parmor';
 const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather','leather_helm','leather_arms','leather_legs','pip_fang','pip_vest']},
   ...HUNTS.map(id=>({title:MONSTERS[id].name,mon:id,ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch',id+'_pw',id+'_pa']})),
-  {title:'RELICS',ids:['relic_quick','relic_riposte','relic_weak']}];
+  {title:'RELICS',ids:['relic_quick','relic_riposte','relic_weak','relic_elem','relic_status','relic_beast']}];
 // ── Pantry: two ingredients per biome (the second is the scarcer one), and meat from pack hunts
 const ING={herb:['HERB','#4cd964','#2f8f4a','leaf'],honey:['HONEY','#ffc83d','#c98a1a','drop'],pepper:['PEPPER','#e2483d','#4cd964','fruit'],ashroot:['ASH ROOT','#a89080','#6a5a50','root'],
   cactus:['PEAR','#d94a8a','#4a8a4a','fruit'],spice:['SPICE','#e0a03a','#a86a1a','drop'],frostberry:['ICEBERRY','#7fd6ff','#3a8ac8','fruit'],icefish:['ICEFISH','#bfeaff','#6a9ab8','fish'],
@@ -865,14 +886,18 @@ function upgradeTap(id){
 // Resistance to each element: each worn piece adds its share of 25% for its monster's element
 function armorRes(){const r={};for(const sl of ASLOTS){const D=MONSTERS[GEAR[SAVE.eq[sl]].tier];if(D)r[D.elem]=+((r[D.elem]||0)+(1-RESIST)*aShare(sl)).toFixed(3);}return r;}
 const resPct=(gs,el)=>Math.round((gs.res[el]||0)*100);
+// Skill points from the four armor pieces and the charm, each skill capped at its max
+function skillLevels(eq){eq=eq||SAVE.eq;const t={};for(const sl of [...ASLOTS,'charm']){const G=GEAR[eq[sl]];if(G&&G.sk)for(const [k,n] of Object.entries(G.sk))t[k]=(t[k]||0)+n;}
+  const out={};for(const k in t)out[k]=Math.min(PERKS[k].max,t[k]);return out;}
+const skillRaw=eq=>{eq=eq||SAVE.eq;const t={};for(const sl of [...ASLOTS,'charm']){const G=GEAR[eq[sl]];if(G&&G.sk)for(const [k,n] of Object.entries(G.sk))t[k]=(t[k]||0)+n;}return t;};
 function gearStats(meal){
-  const e=SAVE.eq,w=GEAR[e.weapon],perks={},M=MEALS[meal]||{},bb=bugBonus();for(const sl of ['armor','charm']){const G=GEAR[e[sl]];if(G&&G.perk)perks[G.perk]=true;}
+  const e=SAVE.eq,w=GEAR[e.weapon],perks=skillLevels(),M=MEALS[meal]||{},bb=bugBonus(),P=k=>perks[k]||0;
   return{wt:w.wt,W:WTYPES[w.wt],elem:w.elem||null,status:w.status||null,meal:M,
-    atk:+(gearAtk(e.weapon)*(perks.might?1.1:1)*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(ASLOTS.reduce((t,sl)=>t+gearHpRaw(e[sl]),0)*(M.hp||1)*(1+bb.hp)),
-    res:armorRes(),perks,qteSlow:perks.keeneye?1.4:1,qteHits:perks.breaker?2:3};
+    atk:+(gearAtk(e.weapon)*(1+.04*P('might'))*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(ASLOTS.reduce((t,sl)=>t+gearHpRaw(e[sl]),0)*(1+.04*P('vigor'))*(M.hp||1)*(1+bb.hp)),
+    res:armorRes(),perks,qteSlow:1+.13*P('keeneye'),qteHits:P('breaker')>=3?2:3};
 }
 // Pip's numbers, from its gear
-function palStats(){const e=SAVE.eq,w=GEAR[e.pweapon]||GEAR.pip_fang,a=GEAR[e.parmor]||GEAR.pip_vest;return{atk:w.patk,elem:w.elem||null,status:w.status||null,care:a.care};}
+function palStats(){const e=SAVE.eq,w=GEAR[e.pweapon]||GEAR.pip_fang,a=GEAR[e.parmor]||GEAR.pip_vest,b=1+.08*(skillLevels().beast||0);return{atk:+(w.patk*b).toFixed(3),elem:w.elem||null,status:w.status||null,care:+(a.care*b).toFixed(3)};}
 const canAfford=id=>Object.entries(GEAR[id].cost||{}).every(([k,n])=>(SAVE.bag[k]||0)>=n);
 // Ranks: three wins in a rank open the next. The apex rank needs three of rank 6, and the elder needs all four apex monsters.
 const RANK_NEED=3, RANKS=8;
@@ -900,7 +925,7 @@ function newHunt(id,o){
   S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0;
   S.mode='hunt'; S.t=0; S.timeLeft=D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,flurry:false,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
-       potions:Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
+       potions:Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
        immune:M.immune||{},wear:M.wear||1,regen:M.regen||1,healMul:M.heal||1,luck:M.luck||1,chargeSlow:M.chargeSlow||1};
   S.m=freshMonster(D,gs.status);
   S.pal=o.role&&o.role!=='rest'&&SAVE.pal?Object.assign({role:o.role,t:PAL.every,trapT:PAL.trapFirst,used:false,hop:0,sb:0},palStats()):null;
@@ -1088,10 +1113,11 @@ function mUpdate(dt){
 function applyStatus(st){
   const h=S.h; if(!st||h.state==='dead')return; const hc={x:L.hx+18,y:L.hFeet-18}, I=INFLICT[st], say=()=>addNum(hc.x+6,hc.y-30,I[1],I[2],1.1);
   if(h.immune[st]){addNum(hc.x+6,hc.y-30,'IMMUNE','#4cd964',.8);return;}             // a meal can rule a status out
-  if(st==='freeze'){if(h.freezeImm>0)return;h.state='frozen';h.t=0;h.frozen=FREEZE.time;h.freezeImm=FREEZE.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
-  if(st==='numb'){if(h.numbImm>0)return;h.state='numb';h.t=0;h.numb=NUMB.time;h.numbImm=NUMB.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
+  const hardy=1-.2*lv(h.g,'hardy');
+  if(st==='freeze'){if(h.freezeImm>0)return;h.state='frozen';h.t=0;h.frozen=FREEZE.time*hardy;h.freezeImm=FREEZE.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
+  if(st==='numb'){if(h.numbImm>0)return;h.state='numb';h.t=0;h.numb=NUMB.time*hardy;h.numbImm=NUMB.immune;h.charge=0;h.lvl=0;h.buf=0;say();sfx('brk');return;}
   const T={poison:POISON,burn:BURN,wet:WET,blight:BLIGHT,bleed:BLEED,stench:STENCH,mud:MUD}[st]; if(!T)return;
-  if(h[st]<=0)say(); h[st]=T.time; if(st==='bleed')h.still=0;
+  if(h[st]<=0)say(); h[st]=T.time*hardy; if(st==='bleed')h.still=0;
 }
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
@@ -1110,9 +1136,9 @@ function mHit(i){
   if(h.state==='dead'||h.state==='win'||h.state==='counter')return;
   const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
     for(let k=0;k<10;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-50,50),vy:rnd(-70,-10),life:.5,col:'#ffe14d',g:60});};
-  if(h.state==='dodge'&&h.t<DODGE_IFR+(P.nimble?.06:0)+scoutBonus()){
+  if(h.state==='dodge'&&h.t<DODGE_IFR+.02*(P.nimble||0)+scoutBonus()){
     S.stats.dodges++;
-    if(h.t<=PERFECT_WIN+(P.nimble?.1:0)+scoutBonus())perfect('PERFECT!');
+    if(h.t<=PERFECT_WIN+.035*(P.nimble||0)+scoutBonus())perfect('PERFECT!');
     else addNum(hc.x+6,hc.y-20,'DODGE','#c8d0e8',.7);
     return;
   }
@@ -1126,7 +1152,7 @@ function mHit(i){
     addNum(hc.x+6,hc.y-28,'GUARD BROKEN','#ff6a4d',.9);
   }
   if(h.g.res[S.def.elem])dmg=Math.max(1,Math.round(dmg*(1-h.g.res[S.def.elem])));
-  if(P.guardian&&Math.random()<.25){dmg=Math.ceil(dmg/2);addNum(hc.x+10,hc.y-28,'GUARDIAN','#4cc9ff',.9);}
+  if(P.guardian&&Math.random()<.08*P.guardian){dmg=Math.ceil(dmg/2);addNum(hc.x+10,hc.y-28,'GUARDIAN','#4cc9ff',.9);}
   h.hp-=dmg;S.stats.taken+=dmg;h.state='hurt';h.t=0;h.charge=0;h.lvl=0;h.buf=0;h.buff=0;h.frozen=0;
   S.shake=Math.max(S.shake,.35);S.stop=.06;addNum(hc.x+4,hc.y-18,''+dmg,'#ff6a4d',.9);sfx('hurt');buzz(80);
   for(let k=0;k<8;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-80,10),vy:rnd(-80,-10),life:.4,col:'#e2483d',g:220});
@@ -1167,9 +1193,9 @@ function dealDamage(base,part,heavy,stun,pierce){
     return;
   }
   if(m.state==='evade'&&m.t<EVADE_DUR-.2){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
-  const P=h.g.perks, weak=h.blight<=0&&h.g.elem&&h.g.elem===S.def.weak, shelled=m.state==='shell', crit=P.keenedge&&Math.random()<CRIT[0];
-  let mult=1; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=P.weakspot?1.4:1.15; if(weak)mult*=ELEM_BONUS; if(crit)mult*=CRIT[1];
-  if(stun&&P.bludgeon)stun*=1.4;
+  const P=h.g.perks, weak=h.blight<=0&&h.g.elem&&h.g.elem===S.def.weak, shelled=m.state==='shell', crit=P.keenedge&&Math.random()<.07*P.keenedge;
+  let mult=1; if(m.state==='stagger')mult*=1.25; if(part==='head')mult*=1.15+.08*(P.weakspot||0); if(weak)mult*=ELEM_BONUS+.05*(P.elemboost||0); if(crit)mult*=CRIT[1];
+  if(stun&&P.bludgeon)stun*=1+.13*P.bludgeon;
   if(shelled&&!pierce)mult*=SHELL.dmg; m.lastHit=S.clock;
   const asleep=m.state==='sleep'; if(asleep)mult*=STATUS.sleep.wake;             // the hit that wakes it lands far harder
   const keen=h.sharp>=SHARP.hi, dull=h.sharp<SHARP.lo; mult*=keen?SHARP.bonus:dull?SHARP.dull:1;
@@ -1181,11 +1207,11 @@ function dealDamage(base,part,heavy,stun,pierce){
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:heavy,flip:h.combo===1});
   for(let k=0;k<(heavy?12:5);k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-70,70),vy:rnd(-90,-10),life:rnd(.2,.5),col:k%2?'#fff':S.def.blood,g:240});
   sfx(heavy?'heavy':'hit');buzz(heavy?40:10);
-  const was=h.sharp; h.sharp=Math.max(0,h.sharp-base*SHARP.wear*h.wear*(shelled&&!pierce?SHELL.wear:1));
+  const was=h.sharp; h.sharp=Math.max(0,h.sharp-base*SHARP.wear*h.wear*(1-.15*(P.razor||0))*(shelled&&!pierce?SHELL.wear:1));
   if(was>=SHARP.lo&&h.sharp<SHARP.lo)addNum(L.hx+18,L.hFeet-40,'BLADE IS DULL!','#ff6a4d',1.2);
   const stt=h.g.status;                                                         // the weapon's status builds with every hit
   if(asleep&&m.hp>0){m.state='idle';m.wait=.7;addNum(pp.x,pp.y-24,'WAKE-UP HIT!',STATUS.sleep.col,1.2);S.shake=.6;}
-  if(stt&&h.blight<=0&&m.hp>0&&!asleep&&m.state!=='sleep'&&(m.sb+=base*STATUS_RATE*(stt===S.def.weakSt?STATUS_WEAK:stt===S.def.resSt?STATUS_RES:1))>=m.sNeed){
+  if(stt&&h.blight<=0&&m.hp>0&&!asleep&&m.state!=='sleep'&&(m.sb+=base*STATUS_RATE*(1+.12*(P.statusup||0))*(stt===S.def.weakSt?STATUS_WEAK:stt===S.def.resSt?STATUS_RES:1))>=m.sNeed){
     m.sb=0;m.sNeed*=STATUS_GROW;procStatus(stt,h.atk,pose);
   }
   if(m.hp<=0){mKill();return;}
@@ -1216,7 +1242,7 @@ function qteTap(x,y){
   S.qte=null;m.qteT=rnd(QTE_GAP[0],QTE_GAP[1]);S.stats.qteHit++;
   const P=m.parts[q.part];P.hits++;
   if(h.state==='idle'||h.state==='atk'){h.combo=(h.combo+1)%3;h.state='atk';h.t=0;h.hitDone=true;h.buf=0;}   // swing for show: the hit is dealt here
-  const qd=Math.round(QTE_DMG*h.atk);m.hp-=qd;S.stats.dealt+=qd;m.flash=.09;S.stop=.07;S.shake=Math.max(S.shake,.3);
+  const qd=Math.round(QTE_DMG*h.atk*(1+.2*lv(h.g,'breaker')));m.hp-=qd;S.stats.dealt+=qd;m.flash=.09;S.stop=.07;S.shake=Math.max(S.shake,.3);
   S.fx.push({kind:'slash',x:pp.x,y:pp.y,t:0,big:true,flip:false});
   for(let k=0;k<10;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-80,80),vy:rnd(-100,-10),life:rnd(.2,.5),col:k%2?'#fff':'#ff6a4d',g:240});
   addNum(pp.x,pp.y-12,P.hits+'/'+S.qteHits,'#ffffff',.9);sfx('heavy');buzz(30);
@@ -1226,7 +1252,7 @@ function qteTap(x,y){
     if(m.hp>0){mStagger(2);mDischarge();}
   }
   if(m.hp<=0){mKill();return true;}
-  if(q.part==='head'&&!m.stunned&&(m.stun+=QTE_STUN*(h.g.perks.bludgeon?1.4:1))>=m.stunMax){m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);addNum(pp.x,pp.y-34,'STUNNED!','#ffe14d',1.4);mDischarge();}
+  if(q.part==='head'&&!m.stunned&&(m.stun+=QTE_STUN*(1+.13*lv(h.g,'bludgeon')))>=m.stunMax){m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);addNum(pp.x,pp.y-34,'STUNNED!','#ffe14d',1.4);mDischarge();}
   const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase&&!S.def.small){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
   return true;
@@ -1254,7 +1280,7 @@ function hUpdate(dt){
     if(h.state==='atk'&&W.hold==='guard'&&held&&h.hitDone&&S.clock-IN.downAt>.14){h.state='guard';h.t=0;}          // the lance can raise its shield mid-combo
     else if(h.t>=W.dur[h.combo]){if(h.buf>0&&h.state==='atk')hStartAtk(h.bufPart);else if(h.state==='atk'){h.state='idle';h.comboT=.45;}}
   }else if(h.state==='charge'){
-    h.charge+=dt;const k=P.quick?.7:1,l=h.charge>=CHARGE_AT[2]*k?3:h.charge>=CHARGE_AT[1]*k?2:h.charge>=CHARGE_AT[0]*k?1:0;
+    h.charge+=dt;const k=1-.1*(P.quick||0),l=h.charge>=CHARGE_AT[2]*k?3:h.charge>=CHARGE_AT[1]*k?2:h.charge>=CHARGE_AT[0]*k?1:0;
     if(l>h.lvl){h.lvl=l;sfx('charge',l);buzz(15);}
     if(!IN.down)hRelease();
   }else if(h.state==='guard'){if(!held)h.state='idle';}
@@ -1262,7 +1288,7 @@ function hUpdate(dt){
     if(!h.hitDone&&h.t>=.14){h.hitDone=true;dealDamage(W.heavy[h.lvl],h.target,true,h.target==='head'?STUN_HEAVY[h.lvl]*W.stunHeavy:W.stunAll*h.lvl);}
     if(h.t>=.5&&h.state==='heavy'){h.state='idle';h.lvl=0;}
   }else if(h.state==='counter'){
-    if(!h.hitDone&&h.t>=.16){h.hitDone=true;const m=S.m;dealDamage(W.counter*(P.riposte?1.4:1),'head',true,W.cstun,true);mDischarge(CHARGE.counter);
+    if(!h.hitDone&&h.t>=.16){h.hitDone=true;const m=S.m;dealDamage(W.counter*(1+.13*(P.riposte||0)),'head',true,W.cstun,true);mDischarge(CHARGE.counter);
       if(m.state==='attack'||m.state==='recover')mStagger(.8);}                  // the counter knocks it out of its attack
     if(h.t>=.5&&h.state==='counter'){h.state='idle';h.inv=.3;}
   }else if(h.state==='dodge'){if(h.t>=DODGE_DUR)h.state='idle';}
@@ -1272,7 +1298,7 @@ function hUpdate(dt){
   }
   else if(h.state==='hurt'){if(h.t>=.45){h.state='idle';h.inv=.7;}}
   else if(h.state==='drink'){
-    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;SAVE.potions=Math.max(0,SAVE.potions-1);const heal=Math.round(h.max*POTION_HEAL*(P.herbal?1.5:1)*h.healMul);h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');
+    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;SAVE.potions=Math.max(0,SAVE.potions-1);const heal=Math.round(h.max*POTION_HEAL*(1+.17*(P.herbal||0))*h.healMul);h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');
       if(h.poison>0){h.poison=0;addNum(L.hx+18,L.hFeet-44,'CURED','#7ad84a',.9);}}
     if(h.t>=.9)h.state='idle';
   }
@@ -1300,7 +1326,7 @@ function actDodge(dir){const h=S.h;
   if(h.state==='numb')return;
   if(h.state==='hurt'||h.state==='dead'||h.state==='win'||h.state==='dodge'||h.state==='counter')return;
   if(h.state==='drink'&&h.drank)return;
-  const cost=h.g.W.dodge*(h.g.perks.tireless?.6:1)*(h.mud>0?MUD.cost:1);
+  const cost=h.g.W.dodge*(1-.13*lv(h.g,'tireless'))*(h.mud>0?MUD.cost:1);
   if(h.st<cost){addNum(L.hx+18,L.hFeet-34,'TIRED','#f5c542',.5);return;}
   h.st-=cost;h.stDelay=.6;h.state='dodge';h.t=0;h.dir=dir;h.charge=0;h.lvl=0;h.buf=0;sfx('dodge');
   if(h.burn>0&&(h.burn-=BURN.roll)<=0){h.burn=0;addNum(L.hx+18,L.hFeet-40,'PUT OUT','#c8d0e8',.8);}   // rolling smothers the flames
@@ -1381,15 +1407,15 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k===' '||k==='j'||k=
 function rollLoot(){
   const m=S.m,D=S.def,h=S.h,out=[],add=(id,n)=>{if(n>0)out.push({id,n});};
   for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
-  const lucky=h.g.perks.fortune, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
-  if(lucky)for(const d of out)d.n++;
+  const fl=lv(h.g,'fortune'),luck=1+.33*fl, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
+  if(fl>=2)for(const d of out)d.n++;
   if(S.pal&&S.pal.role==='gatherer'){for(const d of out)d.n++;add(BIOME_ING[D.biome][0],Math.floor(2*S.pal.care));}
   let unlock='';
   if(D.small){SAVE.packs++;qEvent('small');}
   else{
-    for(const k of PARTS)add(D.loot.parts[k],m.parts[k].broken?1:(Math.random()<(lucky?.25:.1)?1:0));
-    add('gem',Math.random()<(lucky?.16:.08)?1:0);
-    const dry=SAVE.dry[D.id]||0, chance=(RARE.base+RARE.part*broke.length+RARE.pity*dry)*(lucky?2:1)*h.luck;
+    for(const k of PARTS)add(D.loot.parts[k],m.parts[k].broken?1:(Math.random()<.1*luck?1:0));
+    add('gem',Math.random()<.08*luck?1:0);
+    const dry=SAVE.dry[D.id]||0, chance=(RARE.base+RARE.part*broke.length+RARE.pity*dry)*luck*h.luck;
     if(Math.random()<chance){out.push({id:D.mat.rare,n:1,rare:true});SAVE.dry[D.id]=0;}else SAVE.dry[D.id]=dry+1;
     if(D.rank===7)qEvent('apex');
     const first=!SAVE.wins[D.id]; SAVE.wins[D.id]=(SAVE.wins[D.id]||0)+1;
@@ -1775,8 +1801,9 @@ function gearLine(id,x,y,alt){
   if(G.slot==='pweapon'){tag('PIP ATK *'+G.patk.toFixed(2),'#7fe0c0');if(wk)tag(wk[0],wk[1]);}
   else if(G.slot==='parmor')tag('PIP CARE *'+G.care.toFixed(2),'#7fe0c0');
   else if(G.slot==='weapon'){tag('ATK *'+gearAtk(id).toFixed(2),'#4cd964');if(wk)tag(wk[0],wk[1]);}
-  else if(isArmor(G.slot)){tag('HP '+gearHp(id),'#4cd964');const el=(MONSTERS[G.tier]||{}).elem;if(el&&(alt||!G.perk)){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(G.perk)tag(PERKS[G.perk].desc,'#4cd964');}
-  else tag(PERKS[G.perk].desc,'#4cd964');
+  else if(isArmor(G.slot)){tag('HP '+gearHp(id),'#4cd964');const el=(MONSTERS[G.tier]||{}).elem;if(el&&alt){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else skillTags(G);}
+  else skillTags(G);
+  function skillTags(G){for(const [k,n] of Object.entries(G.sk||{})){text(PERKS[k].tag+'+'+n,x,y,'#ffe14d');x+=textW(PERKS[k].tag+'+'+n)+3;}}
 }
 // One line of cost icons with have/need, from x. Returns where it ended.
 function costRow(cost,x,y,gap){for(const [k,n] of Object.entries(cost)){const have=Math.min(99,k==='potion'?SAVE.potions:SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);text(t,x+10,y,have>=n?'#4cd964':'#ff6a4d');x+=10+textW(t)+(gap||4);}return x;}
@@ -1825,7 +1852,17 @@ function drawCamp(){
     }
   }else if(S.tab==='gear'){
     text('GEAR',W-4,3,'#8a93b0',{al:2});
-    if(S.gpick){                                                                 // choosing a piece for one slot; the list scrolls
+    if(S.gpick==='skills'){                                                      // every skill you have, with its level and what it does
+      const gs=gearStats(),raw=skillRaw(),ks=Object.keys(gs.perks).sort((a,b)=>gs.perks[b]-gs.perks[a]);
+      smallBtn(B,'gear:back',3,14,30,'BACK','#3a4060',()=>{S.gpick=null;sfx('charge',1);});text('SKILLS',W-5,17,'#ffe14d',{al:2});
+      const top=28,bot=LH-20;let y=top+1-(S.scr.gpick||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
+      if(!ks.length)text('ARMOR AND CHARMS GIVE SKILLS',W/2,top+10,'#8a93b0',{al:1});
+      for(const k of ks){const L=gs.perks[k],K=PERKS[k];if(y+19>top&&y<bot){g.fillStyle='#1c2134';g.fillRect(3,y,W-6,19);text(K.name,6,y+3,'#e8f0fc');
+          for(let j=0;j<K.max;j++){g.fillStyle=j<L?'#ffe14d':'#3a4060';g.fillRect(W-8-(K.max-j)*6,y+3,5,4);}
+          text(K.d(L),6,y+11,'#4cd964');if(raw[k]>K.max)text('+'+(raw[k]-K.max)+' WASTED',W-6,y+11,'#5a6080',{al:2});}
+        y+=20;}
+      g.restore();const tot=ks.length*20+2;S.scrMax.gpick=Math.max(0,tot-(bot-top));
+    }else if(S.gpick){                                                           // choosing a piece for one slot; the list scrolls
       const sl=S.gpick,lab=SLOTS.find(x=>x[0]===sl)[1],ids=Object.keys(GEAR).filter(k=>GEAR[k].slot===sl&&SAVE.own[k]);if(sl==='charm')ids.unshift(null);
       smallBtn(B,'gear:back',3,14,30,'BACK','#3a4060',()=>{S.gpick=null;sfx('charge',1);});text('CHOOSE '+lab,W-5,17,'#ffe14d',{al:2});
       const top=28,bot=LH-20;let y=top+1-(S.scr.gpick||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
@@ -1845,10 +1882,10 @@ function drawCamp(){
       g.fillStyle='rgba(12,14,26,.7)';g.fillRect(58,py+3,64,ph-6);
       text('ATK *'+gs.atk.toFixed(2),61,py+6,'#e8f0fc');text(wk[0],61,py+14,wk[1]);text('HP '+gs.hp,61,py+22,'#e8f0fc');
       {const best=Object.entries(gs.res).sort((a,b)=>b[1]-a[1])[0];text(best?'RES '+ELEM[best[0]][0]+' '+Math.round(best[1]*100)+'%':'NO RESIST',61,py+30,best?ELEM[best[0]][1]:'#5a6080');}
-      const pk=Object.keys(gs.perks).map(k=>PERKS[k].name);let pt=pk.length?pk.join(' '):'NO PERKS';if(textW(pt)>60)pt=pk[0]+' +'+(pk.length-1);   // shortened when it would not fit
-      text(pt,61,py+38,pk.length?'#ffe14d':'#5a6080');
+      const nsk=Object.keys(gs.perks).length;text(nsk?nsk+' SKILLS >':'NO SKILLS',61,py+38,nsk?'#ffe14d':'#5a6080');
+      B.push({id:'gear:skills',x:58,y:py+3,w:64,h:ph-6,fn:()=>{S.gpick='skills';S.scr.gpick=0;sfx('charge',1);}});
       // the eight slots, two to a row
-      const short=id=>{const G=GEAR[id];return G.slot==='charm'?PERKS[G.perk].name:G.tier==='iron'?(isArmor(G.slot)?'LEATHER':G.slot[0]==='p'?'PIP':'IRON'):MONSTERS[G.tier].short;};
+      const short=id=>{const G=GEAR[id];return G.slot==='charm'?PERKS[Object.keys(G.sk)[0]].name:G.tier==='iron'?(isArmor(G.slot)?'LEATHER':G.slot[0]==='p'?'PIP':'IRON'):MONSTERS[G.tier].short;};
       let y=py+ph+3;const cw=(W-8)>>1,rh=Math.max(20,Math.min(26,((LH-20-y-2)/4)|0));
       SLOTS.forEach(([sl,lab],i)=>{const x=3+(i%2)*(cw+2),yy=y+(i>>1)*(rh+1),id=SAVE.eq[sl],dim=sl[0]==='p'&&!SAVE.pal;
         g.fillStyle='#1c2134';g.fillRect(x,yy,cw,rh);text(lab,x+3,yy+2,'#8a93b0');text('>',x+cw-5,yy+2,'#5a6080');
@@ -1947,7 +1984,7 @@ function drawPrep(){
   text(w.name+(lvOf(eq.weapon)?'+'+lvOf(eq.weapon):''),5,y,'#e8f0fc');
   y+=8;text(wk[0],5,y,wk[1]);if(good)text('A GOOD PICK',W-5,y,'#4cd964',{al:2});else if(bad)text('IT RESISTS THIS',W-5,y,'#ff6a4d',{al:2});
   y+=8;text('HEALTH '+gs.hp+'   ATTACK *'+gs.atk.toFixed(2),5,y,'#4cd964');
-  y+=8;const bring=Math.min(SAVE.potions,POT_CARRY+(gs.perks.herbal?1:0));g.drawImage(lootSpr('potion'),0,0,12,12,5,y-2,9,9);text('POTIONS '+bring,16,y,bring?'#e8f0fc':'#ff6a4d');text('OF '+SAVE.potions+' IN STOCK',W-5,y,'#8a93b0',{al:2});
+  y+=8;const bring=Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0));g.drawImage(lootSpr('potion'),0,0,12,12,5,y-2,9,9);text('POTIONS '+bring,16,y,bring?'#e8f0fc':'#ff6a4d');text('OF '+SAVE.potions+' IN STOCK',W-5,y,'#8a93b0',{al:2});
   // meal chooser
   y+=12;g.fillStyle='#232a4a';g.fillRect(3,y-2,W-6,34);text('MEAL',5,y,'#8a93b0');
   const n=MEAL_IDS.length+1,mk=P.meal>=0?MEAL_IDS[P.meal]:null,M=MEALS[mk];
@@ -2016,7 +2053,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests

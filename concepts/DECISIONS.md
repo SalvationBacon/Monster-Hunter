@@ -83,7 +83,7 @@ Each monster's weapons carry either its element or a status, never both (statuse
 
 ### Armor pieces (v0.17.0)
 
-Armor comes in four pieces from every monster: chest (40% of the set's health, and the only piece with a perk), helm, gauntlets and boots (20% each). A full set is worth what one armor piece was before. Each piece adds its share of 25% resistance to its monster's element, so a full set resists 25% and mixing splits it. Helm, gauntlets and boots upgrade for about half the materials. The hunter's helmet, shoulder guards and boots take each piece's colours. Starter pieces: leather vest, cap, gloves and boots.
+Armor comes in four pieces from every monster: chest (40% of the set's health), helm, gauntlets and boots (20% each), each with its own skills. A full set is worth what one armor piece was before. Each piece adds its share of 25% resistance to its monster's element, so a full set resists 25% and mixing splits it. Helm, gauntlets and boots upgrade for about half the materials. The hunter's helmet, shoulder guards and boots take each piece's colours. Starter pieces: leather vest, cap, gloves and boots.
 
 ### Upgrades and resistance
 
@@ -111,30 +111,37 @@ Each monster's weaknesses are in the roster table. A monster resists the status 
 - **Sharpness:** a meter that wears with every hit, by the hit's base damage. Above 60 the edge is keen (+10% damage), below 25 it is dull (-25%). It dulls after about 25 seconds of steady hitting. Sharpening takes 1.3s (whetstone button, or swipe down), leaves the hunter open, and a hit interrupts it.
 - **Rare drops:** every monster has one (Heartleaf, Ivory Core, Magma Heart, Rime Heart, Storm Core). The chance per win is 3%, plus 3% for each broken part, plus 0.5% for every win since the last one, doubled by Fortune. The +5 upgrade of that monster's gear needs one.
 
-### Perks
+### Skills (v0.18.0)
 
-Perks are kept modest on purpose (most are 10% to 40% on one narrow thing), to leave room for a rebirth system later.
+Perks became Monster Hunter-style skills with levels. Every armor piece and charm carries skill points; points add up to a skill's level, capped at 3 (extra points are wasted, and the skills page says so). Each level is a small step, to leave room for a rebirth system later.
 
+- **Armor themes:** each monster's armor leans into four skills. Chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2, so a full set gives A3, B2, C2, D2. A is the monster's old armor perk; B, C and D are picked from its name, so no two sets match. Mixing pieces is how you build.
+- **Charms** give one skill at +2; relic charms give two (+2 and +1).
+- **Monster health** went up 10% to balance the extra power from full sets.
 
-Modelled on Monster Hunter's skills, under their own names.
-
-| Perk | Effect |
+| Skill | Per level (max 3) |
 |---|---|
-| Tireless | dodge costs 40% less stamina |
-| Guardian | 1 in 4 hits does half damage |
-| Might | attack +10% |
-| Nimble | longer dodge and perfect-dodge windows |
-| Keen Edge | 20% chance of a critical hit for x1.5 |
-| Keen Eye | weak-point circles close 40% slower |
-| Bludgeoner | stun builds 40% faster |
-| Breaker | parts break in 2 hits |
-| Herbalist | one more potion, and potions heal 50% more |
-| Fortune | one more of each common drop, better odds on parts and gems |
-| Quick Draw (relic) | charge 30% faster |
-| Riposte (relic) | counter damage +40% |
-| Weak Spot (relic) | head damage bonus rises from 15% to 40% |
+| Might | attack +4% |
+| Keen Edge | 7% critical hits (x1.5) |
+| Weak Spot | head damage +8% |
+| Elementalist (new) | weakness bonus +5% |
+| Afflictor (new) | status build-up +12% |
+| Bludgeoner | stun build-up +13% |
+| Quick Draw | charge 10% faster |
+| Riposte | counter damage +13% |
+| Razor (new) | edge wears 15% slower |
+| Keen Eye | circles 13% slower |
+| Breaker | weak-point damage +20%; at 3, parts break in 2 hits |
+| Tireless | dodge cost -13% |
+| Nimble | dodge window +0.02s, perfect window +0.035s |
+| Guardian | 8% of hits halved |
+| Vigor (new) | health +4% |
+| Hardy (new) | ailments 20% shorter |
+| Herbalist | potions heal +17%; at 3, one more potion |
+| Fortune | drop odds +33%; at 2, one more of each common drop |
+| Beastfriend (new) | Pip's attack and care +8% |
 
-Relic charms each cost a Wyvern Gem (8% drop from any monster) plus parts from two monsters.
+Relic charms each cost a Wyvern Gem (8% drop from any monster) plus parts: Quick Draw, Riposte, Weak Spot, Element, Afflictor and Beast charms.
 
 - **Balance (bots, `tools/check.js`):** each iron weapon type beats the Fernwing in about 45 seconds. An average bot beats every monster in the gear of the one before it in 45 to 65 seconds, and takes longer or loses in gear two tiers old.
 
