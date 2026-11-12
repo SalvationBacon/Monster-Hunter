@@ -16,7 +16,9 @@ Ideas agreed on but not built yet. Newest first.
 ## Monster and hunter art redesign (in progress)
 - Drafts are being reviewed: https://claude.ai/artifact/FyXieP1MFkZGUCRFWaHvcY (round 4: all 35 monsters drafted).
 - Five body types, each a builder with per-monster design specs: wyvern, brute, crab, serpent, and a new raptor rig (feathered wing-arms, crest, sickle claws). Every monster has its own horns/crest, back, tail, markings and element effects, plus a breath or spit of its element.
-- Waiting on feedback for which monsters need more work.
+- Round 5: every monster needs its own body plan, not one shared skeleton per type with recolours. Dragons are done first (two-legged, four-legged, wing-walking, floating sky dragon, with their own necks, heads, legs, wings and tails); the brutes, crabs, serpents and raptors follow once the dragons are approved.
+- Part icons: each monster's material icons drawn from its own parts (its horn style, tail tip, wing, scale, element core), at 16 px instead of the game's 12 px.
+- Weapons: each monster gets its own greatsword, dual blades, hammer and lance made from its parts and matching its armour (blade, guard, hammer head, lance tip, shield), shown in the hunter's hands and as icons.
 - Once approved: swap the new renderer, animations and breaks into the game.
   - Pre-bake animation frames, because rendering live costs about 20–50 ms a frame.
   - Grow the hunter's sprite canvas.
