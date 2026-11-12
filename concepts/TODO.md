@@ -29,7 +29,7 @@ Ideas agreed on but not built yet. Newest first.
   - Helms tilt with the head, and shoulders and crests are cut away around the face so nothing covers it in any animation.
   - Potion: the weapon swings onto the back, then the bottle comes up from the belt and is held in front of the chin. One continuous motion.
 - Renames to match the new looks (drafts updated; the game still uses the old names): Obsidwing to TRIMAW, Stormwing to STORMPEARL, Cinderhide to CINDERHOOF, Icehide to ICETUSK, Gloomtusk to GLOOMFANG, Magmaclaw to MAGMASTRIDER, Dusksting to DUSKHORN, Bogmaw to BOGCROWN, Sandeel to SANDMAW (gear short name SAND), Dustfang to DUSTSPUR, Gustraptor to GUSTHAWK. Old saves keep working: ids stay the same.
-- Moves today: 31 shared moves; each monster picks 6 or 7. Only the Hollow Star has its own. Proposed: one or two signature moves per monster, taken from its legend (list pending approval).
+- Moves today: 31 shared moves; each monster picks 6 or 7. Only the Hollow Star has its own. Proposed: one or two signature moves per monster, taken from its legend (list in concepts/MOVES.md, pending approval).
 
 ## Earlier ideas still open
 - Variants and ranks of existing monsters (deferred until there are more monsters).
