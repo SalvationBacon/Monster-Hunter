@@ -240,6 +240,11 @@ const shots=process.argv[2];
       return[[...got].sort().join(','),[...bugs].join(',')];};
     const sw=run(5),co=run(6),ru=run(7);MH.toCamp('hunt');return sw[0].split(',').every(k=>['bogbean','lily'].includes(k))&&sw[0].includes('bogbean')&&sw[1]==='5'&&co[0].includes('kelp')&&co[1]==='6'&&ru[0].includes('fig')&&ru[1]==='7'||JSON.stringify([sw,co,ru]);}),
     'a gather run in the swamp, coast or ruins turns up that biome\'s ingredients and creatures');
+  ok(await ev(()=>{const runs=[];for(let k=0;k<30;k++){MH.startGather(0);const G=MH.S.g;let seen=0;for(let i=0;i<60*21;i++){MH.gatherUpdate(1/60);for(const n of [...G.nodes])if(n.t>.1)MH.gatherTap(n.x,n.y);
+      if(G.bug&&G.bug.t>.3){seen++;MH.gatherTap(G.bug.x,G.bug.y);}}runs.push({items:Object.values(G.got).reduce((a,b)=>a+b,0),herb:G.got.herb||0,bugs:G.caught.length,seen});}MH.toCamp('hunt');
+    const avg=runs.reduce((a,r)=>a+r.items,0)/runs.length,max=Math.max(...runs.map(r=>r.items)),herbs=runs.reduce((a,r)=>a+r.herb,0)/runs.length;
+    return avg>=8&&avg<=12&&max<=14&&herbs<=11&&runs.every(r=>r.bugs===1&&r.seen===1)||JSON.stringify({avg,max,herbs,b:runs.map(r=>r.bugs).join('')});}),
+    'a perfect gather run collects about ten things, three or so potions\' worth of herbs, and exactly one creature');
   ok(await ev(()=>{EQ();const pr=(mon,st,meal)=>{const S=QUIET(mon,{meal});MH.applyStatus(st);return !(S.h[st]>0||S.h.state==='numb');};
     return pr('mud','mud','beanbroth')&&pr('mire','stench','beanbroth')&&pr('quill','bleed','lilytea')&&pr('shell','wet','kelpwrap')&&pr('dust','numb','chowder')&&pr('dread','blight','figpie')&&!pr('dread','blight','kelpwrap');}),
     'the new meals guard against mud, stench, bleeding, soaking, numbing and blight');

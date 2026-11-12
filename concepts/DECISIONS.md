@@ -226,7 +226,7 @@ The camp has five tabs: HUNT, FORGE, COOK, QUEST and BUGS.
 New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fig and glowcap (ruins).
 
 - **Expeditions** cover eight biomes (v0.14.0): forest, swamp, desert, volcano, coast, tundra, ruins and storm peaks. Each opens with the first monster that lives there (Fernwing, Mudclaw, Tuskhide, Emberwing, Shellsnap, Frostmaw, Dreadbeak, Stormwing). The list scrolls.
-  - **Gather run (25s):** ingredients pop up and are tapped before they vanish. Each biome has a common and a scarce ingredient (12% of pop-ups, gone sooner). A creature crosses every few seconds inside a closing circle; tapping it catches it.
+  - **Gather run (20s, rebalanced in v0.23.0):** ingredients pop up every 1.4 to 2.2 seconds and are tapped before they vanish (1.6s, 1s for scarce ones). Each biome has a common and a scarce ingredient (15% of pop-ups). A perfect run gathers about ten things, roughly three potions' worth of herbs (it was about fifty). One creature crosses once per run, at a random moment, inside a closing circle; tapping it catches it.
   - **Pack hunt:** three Snapjaws, one after another, with the normal combat. No parts to break. Pays meat and the biome monster's common materials.
 - **Terrarium:** 32 creatures, four per biome, the fourth rare (15% of sightings). Caught species wander in a tank. Each common adds 0.15% health or attack and each rare 0.3% of both, so the full set of 32 is about +4.8% health and +3.6% attack. Kept low on purpose, to leave room for a rebirth system.
 - **Quests:**
