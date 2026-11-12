@@ -573,6 +573,14 @@ const shots=process.argv[2];
   ok(await ev(()=>{const v=id=>MH.voiceOf(MH.MONSTERS[id]);const ps=new Set(MH.HUNTS.map(id=>Math.round(v(id).p)));return ps.size>=25&&v('tusk').p<v('fern').p&&v('quill').p>v('fern').p&&v('star').p<v('fern').p;}),'every monster has its own voice: brutes low, raptors high, the elder deepest');
   ok(await ev(()=>{MH.audioInit();MH.PREFS.sfx=true;MH.newHunt('fern');const S=MH.S,m=S.m;S.h.inv=1e9;m.evadeCd=1e9;m.qteT=1e9;const V=MH.voiceOf(S.def);V.last={};
     for(let i=0;i<60*6;i++)MH.update(1/60);MH.S.mode='camp';return (V.last.roar>0&&V.last.growl>0)||JSON.stringify(V.last);}),'a hunt is full of the monster\'s noises: a roar to open, growls as it winds up');
+  // ── v0.28.1: the i badge ──
+  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('forge');MH.S.fcat='weapon';MH.S.fsub=0;MH.S.scr={};});await p.waitForTimeout(250);
+  ok(await ev(()=>MH.S.btns.some(b=>b.id==='info:fern_gs')),'every forge item has an i to tap');
+  await tapBtn0('info:fern_gs');ok(await ev(()=>MH.S.info==='fern_gs'&&!MH.SAVE.own.x),'tapping the i opens the item\'s details');await p.touchscreen.tap(30,20);await p.waitForTimeout(120);
+  await tapBtn('tab:gear');await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');const w0=await ev(()=>MH.SAVE.eq.weapon);
+  ok(await ev(()=>MH.S.btns.some(b=>b.id==='info:fern_gs')),'so does every item in the gear lists');
+  await tapBtn0('info:fern_gs');ok(await ev(w0=>MH.S.info==='fern_gs'&&MH.SAVE.eq.weapon===w0,w0),'and its i shows details without wearing it');await p.touchscreen.tap(30,20);await p.waitForTimeout(120);
+  await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();

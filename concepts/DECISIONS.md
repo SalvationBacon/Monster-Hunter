@@ -358,3 +358,7 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
   - low **grumbles** while it circles
 - **Strike sounds:** an elemental attack sounds like its element (fire whoosh, water splash, thunder crack, icy chime, earth thud, rustling nature, dragon shimmer). Physical attacks get a heavy thud or a fast swish.
 - Every sound follows the SOUND setting, and each sound type has a minimum gap so they don't stack.
+
+## v0.28.1: the i badge
+- Every item in the forge and in the GEAR picker lists has a small blue **i** under its icon. Tapping the icon or the i opens the details card (skills, set bonus, cost). The rest of the row behaves as before (craft or wear), and holding still works.
+- The forge footer and Bram's intro point to the i.

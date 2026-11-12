@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.28.0';
+const VER='0.28.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -456,7 +456,7 @@ const SCENES={
   // the first visit to each part of camp
   v_quest:[['wren','THE QUEST BOARD. STORY JOBS COME FROM ME. DAILY AND WEEKLY JOBS COME FROM WHOEVER YELLS LOUDEST.'],['wren','WHEN A JOB IS DONE, CLAIM ITS REWARD HERE.']],
   v_gear:[['wren','YOUR KIT. SWAP WEAPONS AND ARMOR HERE. TAP YOUR STATS TO SEE YOUR SKILLS.'],['wren','WEAR ALL FOUR ARMOR PIECES FROM ONE MONSTER FOR A SET BONUS.']],
-  v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.'],['bram','HOLD ANY ITEM TO SEE ALL ITS SKILLS. TAP A SKILL TO READ WHAT IT DOES.']],
+  v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.'],['bram','TAP THE LITTLE i ON ANY ITEM TO SEE ALL ITS SKILLS. TAP A SKILL TO READ WHAT IT DOES.']],
   v_cook:[['moss','MY KITCHEN! I BREW POTIONS HERE. YOU CAN TAKE A FEW ON EACH HUNT.'],['moss','MEALS ARE CHOSEN ON THE PREP SCREEN, RIGHT BEFORE YOU HEAD OUT.']],
   v_book:[['oda','MY BESTIARY! EVERY BEAST YOU MEET GETS A PAGE.'],['oda','HUNT ONE 1, 3, 5 AND 10 TIMES AND I\'LL LEARN ITS HABITS, ITS ATTACKS, AND WHAT IT DROPS.']],
   v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON GATHER RUNS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
@@ -2177,6 +2177,9 @@ function drawSkill(){
     text('TAP TO CLOSE',W/2,py+ph-8,'#5a6080',{al:1});}
   B.push({id:'skill:close',x:0,y:0,w:W,h:LH,fn:()=>{S.skill=null;sfx('charge',1);}});
 }
+// the little i on an item's icon: tap it for the details card
+function infoBadge(B,id,x,y,top,bot,bx,bw,bh){g.fillStyle=OUTLINE;g.fillRect(x-1,y-1,7,7);g.fillStyle='#2a6aa8';g.fillRect(x,y,5,5);g.fillStyle='#fff';g.fillRect(x+2,y,1,1);g.fillRect(x+2,y+2,1,3);
+  const by=Math.max(top,bx[1]),bh2=Math.min(bot,bx[1]+bh)-by;if(bh2>6)B.push({id:'info:'+id,x:bx[0],y:by,w:bw,h:bh2,fn:()=>{S.info=id;sfx('charge',1);}});}
 // hold a gear row in a list for its details
 function holdCheck(){const u=IN.ui;if(!u||u.moved||u.held||S.mode!=='camp'||performance.now()-u.t0<450)return;
   const b=S.btns.find(b=>u.x>=b.x&&u.x<b.x+b.w&&u.y>=b.y&&u.y<b.y+b.h);const m=b&&/^(forge|craft|up|wear):(.+)$/.exec(b.id);
@@ -2428,7 +2431,7 @@ function drawCamp(){
       smallBtn(B,'gear:back',3,14,30,'BACK','#3a4060',()=>{if(wt){S.gwt=null;S.scr.gpick=0;}else S.gpick=null;sfx('charge',1);});text(wt?lab:'CHOOSE '+lab,W-5,17,'#ffe14d',{al:2});
       const top=28,bot=CB;let y=top+1-(S.scr.gpick||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
       for(const id of ids){if(y+19>top&&y<bot){const on=SAVE.eq[sl]===id;g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,19);if(on){g.fillStyle='#ffe14d';g.fillRect(3,y,2,19);}
-          if(id){g.drawImage(gearSpr(id),6,y+3);text(GEAR[id].name+(lvOf(id)?'+'+lvOf(id):''),20,y+3,'#e8f0fc');gearLine(id,20,y+11,false);}else text('NO CHARM',20,y+7,'#8a93b0');
+          if(id){g.drawImage(gearSpr(id),6,y+3);infoBadge(B,id,15,y+12,top,bot,[3,y],15,19);text(GEAR[id].name+(lvOf(id)?'+'+lvOf(id):''),20,y+3,'#e8f0fc');gearLine(id,20,y+11,false);}else text('NO CHARM',20,y+7,'#8a93b0');
           if(on)text('ON',W-7,y+3,'#ffe14d',{al:2});
           const by=Math.max(top,y),bh=Math.min(bot,y+19)-by;if(bh>8)B.push({id:'wear:'+(id||'none'),x:3,y:by,w:W-6,h:bh,fn:()=>equip(sl,id)});}
         y+=20;}
@@ -2468,7 +2471,7 @@ function drawCamp(){
     L2.ids.forEach((id,i)=>{const G=GEAR[id],y=ptop+1+i*24-off,own=!!SAVE.own[id],on=SAVE.eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2;
       if(y+23<ptop||y>pbot)return;
       g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);if(on){g.fillStyle='#ffe14d';g.fillRect(3,y,2,23);}
-      g.drawImage(gearSpr(id),5,y+2);text(G.name+(lv?'+'+lv:''),19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');
+      g.drawImage(gearSpr(id),5,y+2);infoBadge(B,id,8,y+15,ptop,pbot,[3,y],15,23);text(G.name+(lv?'+'+lv:''),19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');
       gearLine(id,19,y+9,alt,B,ptop,pbot);
       if(!own)costRow(G.cost,19,y+16,4,B,ptop,pbot);
       else if(uc){costRow(uc,19,y+16,2,B,ptop,pbot);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
@@ -2478,7 +2481,7 @@ function drawCamp(){
       g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,can||on?'#fff':'#8a93b0',{al:1});
       const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-36,h:bh,fn:()=>forgeTap(id)});
       if(!own&&y>=ptop&&y+9<=pbot)B.push({id:'craft:'+id,x:W-34,y,w:31,h:11,fn:()=>forgeTap(id)});});
-    let ey=ptop+1+L2.ids.length*24-off;if(L2.hidden){text(L2.hidden+' MORE AS YOU RANK UP',W/2,ey+3,'#5a6080',{al:1});ey+=12;}text('HOLD AN ITEM FOR ITS DETAILS',W/2,ey+3,'#5a6080',{al:1});
+    let ey=ptop+1+L2.ids.length*24-off;if(L2.hidden){text(L2.hidden+' MORE AS YOU RANK UP',W/2,ey+3,'#5a6080',{al:1});ey+=12;}text('TAP THE i FOR AN ITEM\'S DETAILS',W/2,ey+3,'#5a6080',{al:1});
     g.restore();const tot=L2.ids.length*24+(L2.hidden?13:2)+11;S.scrMax[sk]=Math.max(0,tot-(pbot-ptop));
     if(S.scrMax[sk]>0){const hh=pbot-ptop,bh=Math.max(10,hh*hh/tot),by=ptop+(hh-bh)*off/S.scrMax[sk];g.fillStyle='#3a4060';g.fillRect(W-2,ptop,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
   }else if(S.tab==='cook'){
