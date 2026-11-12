@@ -417,3 +417,17 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
   - **The Peak:** an aurora, a starfield with falling stars, and a glowing light on the summit.
 - The title always plays its own theme now (no monster tracks).
 - HOW TO PLAY is gone from the title (the first hunt teaches the controls). SETTINGS takes the full width.
+
+## v0.32.0: an original score
+- The music is now this game's own. The title theme was a copy of 8-Bit Industry's "Start With Nothing", and the other tracks were built from that game's chord tables and melody generator. All of that is gone. Only the synth voices (the instruments) remain.
+- **Five themes, written out by hand** (chords per bar, melodies as scale degree + length):
+  - **Hollowroot** (title): mixolydian, an adventurous fanfare
+  - **Campfire**: a gentle 3/4 waltz
+  - **Foraging**: a bouncy bell melody over a shaker groove
+  - **Snapjaws** (pack hunts): driving minor
+  - **The Hollow Star**: harmonic minor, with choir pads and a breakbeat
+- **Seven element motifs** (nature, earth, fire, ice, thunder, water, dragon), each a call, an answer and two chord loops. Every monster's theme is a variation on its element's motif:
+  - the phrase is lifted a third, has its bars swapped, or is turned upside down
+  - it moves to its own key and its tempo rises with rank
+  - its body picks the lead instrument, its trait the drum groove (drive, stomp, shuffle, break, tribal, gallop), and a seed the bass line
+- New grooves and bass lines throughout.

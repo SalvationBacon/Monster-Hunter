@@ -45,7 +45,7 @@ const shots=process.argv[2];
       if(m.state!=='recover'||!moved||S.stats.taken<=0)return id+':'+a;}return true;}),'every move of every monster animates, lands its hits and ends');
 
   // ── music ──
-  ok(await ev(()=>{const sig=MH.HUNTS.map(id=>{const t=MH.monsterTrack(MH.MONSTERS[id]);return JSON.stringify([t.scale,t.root,t.prog,t.rhy,t.lead,t.drums,t.bpm,t.bassPat]);});
+  ok(await ev(()=>{const sig=MH.HUNTS.map(id=>{const t=MH.monsterTrack(MH.MONSTERS[id]);return JSON.stringify([t.scale,t.root,t.lead,t.groove,t.bpm,t.bassPat,t.sec.A.lead.slice(0,8)]);});
     const bpm=r=>{const ids=MH.HUNTS.filter(id=>MH.MONSTERS[id].rank===r);return ids.reduce((s,id)=>s+MH.monsterTrack(MH.MONSTERS[id]).bpm,0)/ids.length;};
     return new Set(sig).size===35&&bpm(1)<bpm(3)&&bpm(3)<bpm(6)&&bpm(6)<bpm(7)&&MH.monsterTrack(MH.MONSTERS.star)===MH.MTRACKS.star;}),'every monster has its own track, and tracks speed up with rank');
   ok(await ev(()=>{for(const k of ['title','camp','gather','pack','star'])if(!MH.compileSong(MH.MTRACKS[k],1).ev.length)return k;
@@ -589,6 +589,7 @@ const shots=process.argv[2];
   await tapBtn0('title:start');ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='home'&&MH.SAVE.wins.fern===1),'CONTINUE goes to the camp with the save intact');
   ok(await ev(()=>{MH.newHunt('storm');const S=MH.S;S.h.counter=1;MH.S.mode='hunt';return 1;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(!MH.lastErr))))),'the new hunt HUD draws, counter button and all');await shot('c-hud');
   await ev(()=>{MH.S.mode='camp';MH.toCamp('home');});
+  ok(await ev(()=>{const kinds=Object.keys(MH.MOTIF);return kinds.length===7&&Object.keys(MH.SCORE).filter(k=>['title','camp','gather','pack','star'].includes(k)).length===5&&MH.SCORE.camp.beat===12&&MH.HUNTS.every(id=>MH.monsterTrack(MH.MONSTERS[id]).sec);}),'the music is its own score: five written themes (a waltz for the camp) and seven element motifs the monsters vary');
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();

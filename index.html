@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.31.0';
+const VER='0.32.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -893,88 +893,107 @@ function setMusic(on){PREFS.music=on;savePrefs();if(on){audioInit();musicStart()
 function setSfx(on){PREFS.sfx=on;savePrefs();if(on)sfx('charge',1);}
 
 // ═══════════════════════════════════════════════════
-//  MUSIC: the same approach as 8-Bit Industry. Each track is a recipe (tempo, key, scale, chords, instruments,
-//  drums); compileSong() turns it into notes as it plays. The melody hook comes from the track's own seed, so it
-//  is the same every time; the accompaniment is reseeded each loop. A look-ahead scheduler (mTick, every 100ms)
+//  MUSIC: an original score. Each track is written out by hand (chords and melodies, see SCORE and MOTIF);
+//  compileSong() turns it into notes. A look-ahead scheduler (mTick, every 100ms)
 //  plays the notes, and the music crossfades when the screen changes (musicCtx).
 //  Every monster has its own track, built from what it is: its element picks the key and scale, its rank the
 //  tempo, its body the lead voice and its trait the drums. Hunt tracks loop with no gap.
 // ═══════════════════════════════════════════════════
 const MSCALE={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10],mixo:[0,2,4,5,7,9,10],phryg:[0,1,3,5,7,8,10],lydian:[0,2,4,6,7,9,11],harm:[0,2,3,5,7,8,11]};
 // Lead motifs: one bar each, [16th step, length, scale steps above the chord root]
-const MMOT=[[[0,4,0],[4,4,2],[8,8,4]],[[0,2,4],[2,2,2],[4,4,0],[8,4,2],[12,4,4]],[[0,6,2],[6,2,1],[8,8,0]],[[0,3,0],[3,3,2],[6,2,4],[8,8,2]],
-  [[0,8,4],[8,8,2]],[[0,2,0],[2,2,1],[4,2,2],[6,2,4],[8,8,2]],[[0,4,4],[6,2,2],[8,4,0],[12,4,2]],[[0,3,4],[3,3,4],[6,2,2],[8,4,0],[12,4,1]]];
-const MCAD_OPEN=[[0,4,2],[4,12,4]], MCAD_HOME=[[0,4,2],[4,12,0]];
-const MFORMS={song:['intro',4,'A',8,'B',8,'A',8,'C',8,'B',8,'A',8,'outro',4],ambient:['intro',4,'A',8,'B',8,'C',8,'A',8,'outro',4],
-  hunt:['intro',2,'A',8,'B',8,'A',8,'C',4,'B',8]};
-const MROLES={intro:{lead:0,bass:'long',drums:'intro',arp:1},A:{lead:'mid',bass:'track',drums:'track',arp:0},B:{lead:'high',bass:'track',drums:'track',arp:1},
-  C:{lead:'slow',bass:'pulse',drums:'half',arp:1},outro:{lead:'mid',bass:'long',drums:'intro',arp:0}};
-const MDRUMS={four:{k:[0,4,8,12],s:[4,12],h:[2,6,10,14]},back:{k:[0,8,10],s:[4,12],h:[0,2,4,6,8,10,12,14]},half:{k:[0],s:[8],h:[0,4,8,12]},
-  break:{k:[0,6,10],s:[4,12],h:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},tick:{k:[],s:[],h:[2,6,10,14]},gallop:{k:[0,3,8,11],s:[4,12],h:[0,2,4,6,8,10,12,14]}};
+// ── The score: written for this game. Every track is notated by hand: chords per bar (scale degrees) and melodies as
+// "degree.length" (16th notes; r = rest). Monster themes grow from seven element motifs, varied per monster.
 const MV={pulse25:.032,pulse12:.03,square:.024,tri:.06,saw:.024,bell:.04,pad:.011,kick:.18,snare:.05,hat:.016};
-const PROGS=[[[0,5,3,4],[3,4,0,5],[5,3,0,4]],[[0,6,3,0],[3,4,0,6],[5,3,6,4]],[[0,3,5,4],[3,0,4,5],[5,4,3,4]],[[0,5,6,4],[3,0,4,4],[5,6,0,6]],
-  [[0,1,0,6],[5,6,0,0],[3,1,6,0]],[[0,3,0,6],[3,3,0,0],[5,6,3,4]],[[0,6,5,4],[0,6,5,4],[3,4,5,6]],[[0,2,5,6],[5,6,0,0],[3,4,5,4]]];
-const MTRACKS={
-  title: {name:'HOLLOWROOT',bpm:112,root:60,scale:'major',prog:PROGS[0],form:'song',lead:'pulse25',arp:'pulse12',bass:'tri',drums:'back',bassPat:'octave',rhy:[0,1,6,3],fx:.18},
-  camp:  {name:'CAMPFIRE',  bpm:92, root:62,scale:'major',prog:PROGS[2],form:'ambient',lead:'tri',arp:'bell',bass:'tri',drums:'half',bassPat:'walk',rhy:[2,0,4,6],pad:1,swing:.25,fx:.22,vol:1.1},
-  gather:{name:'FORAGING',  bpm:108,root:65,scale:'lydian',prog:PROGS[5],form:'ambient',lead:'bell',arp:'pulse12',bass:'tri',drums:'tick',bassPat:'pulse',rhy:[1,5,3,0],swing:.2,fx:.25},
-  pack:  {name:'SNAPJAWS',  bpm:132,root:57,scale:'minor',prog:PROGS[1],form:'hunt',lead:'square',arp:'pulse12',bass:'saw',drums:'four',bassPat:'octave',rhy:[5,1,3,0],fx:.1,loop:1},
-  star:  {name:'THE HOLLOW STAR',bpm:126,root:50,scale:'harm',prog:[[0,5,3,4],[5,3,4,4],[0,1,5,4]],form:'hunt',lead:'saw',arp:'bell',bass:'saw',drums:'break',bassPat:'synco',rhy:[4,7,3,6],pad:1,fx:.35,loop:1,vol:.9},
+const GROOVE={drive:{k:[0,8,10],s:[4,12],h:[0,2,4,6,8,10,12,14]},stomp:{k:[0,4,8,12],s:[4,12],h:[2,6,10,14]},shuffle:{k:[0,10],s:[4,12],h:[0,3,4,7,8,11,12,15]},
+  break:{k:[0,7,10],s:[4,12],h:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},tribal:{k:[0,3,6,10],s:[8,14],h:[0,4,8,12]},gallop:{k:[0,3,6,8,11,14],s:[4,12],h:[0,2,4,6,8,10,12,14]},
+  soft:{k:[0],s:[],h:[4,8,12]},waltz:{k:[0],s:[],h:[4,8]},shaker:{k:[0,8],s:[],h:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}};
+const mel=str=>str.trim().split(/\s+/).filter(x=>x!=='|').map(t=>{const [d,l]=t.split('.');return[d==='r'?null:+d,+l];});
+const SCORE={
+  title:{name:'HOLLOWROOT',bpm:120,root:62,scale:'mixo',lead:'pulse25',counter:'bell',bass:'tri',bassPat:'oct',groove:'drive',fx:.2,pad:1,
+    sec:{intro:{bars:2,ch:[0,6],arp:1},
+      A:{ch:[0,6,3,0],lead:'0.2 4.2 7.4 6.2 4.2 7.4 | 6.6 4.2 3.4 4.4 | 5.2 4.2 3.2 2.2 3.4 5.4 | 4.8 r.4 0.2 2.2'},
+      A2:{ch:[0,6,3,0],lead:'0.2 4.2 7.4 6.2 4.2 7.4 | 6.6 4.2 3.4 4.4 | 5.2 7.2 9.4 8.4 7.4 | 7.12 r.4'},
+      B:{ch:[3,4,5,6],arp:1,lead:'3.4 5.4 7.6 5.2 | 4.4 6.4 8.8 | 5.2 7.2 9.4 10.4 9.4 | 8.8 6.4 4.4'}},
+    form:['intro','A','A2','B','A2']},
+  camp:{name:'CAMPFIRE',bpm:84,beat:12,root:67,scale:'major',lead:'tri',counter:'bell',bass:'tri',bassPat:'waltz',groove:'waltz',fx:.24,pad:1,vol:1.1,
+    sec:{A:{ch:[0,5,3,4],lead:'4.6 2.2 0.4 | 5.6 4.2 2.4 | 3.4 5.4 7.4 | 6.8 r.4'},
+      A2:{ch:[0,2,3,0],lead:'4.6 5.2 4.4 | 2.6 0.2 2.4 | 3.4 2.4 1.4 | 0.12'},
+      B:{ch:[3,0,4,5],arp:1,lead:'7.4 6.4 5.4 | 4.8 2.4 | 6.4 5.4 4.4 | 2.12'}},
+    form:['A','A2','B','A2']},
+  gather:{name:'FORAGING',bpm:116,root:65,scale:'major',lead:'bell',bass:'tri',bassPat:'bounce',groove:'shaker',fx:.26,
+    sec:{A:{ch:[0,3,5,4],lead:'0.1 r.1 2.1 r.1 4.2 2.2 7.2 4.2 5.4 | 5.2 7.2 8.4 7.2 5.2 3.4 | 4.2 2.2 4.2 5.2 7.4 4.4 | 6.2 4.2 1.4 r.8'},
+      B:{ch:[3,4,2,5],arp:1,lead:'7.3 6.1 5.4 4.4 2.4 | 3.6 4.2 5.8 | 2.3 1.1 0.4 2.4 4.4 | 4.16'}},
+    form:['A','B','A','B']},
+  pack:{name:'SNAPJAWS',bpm:140,root:57,scale:'minor',lead:'square',bass:'saw',bassPat:'oct',groove:'stomp',fx:.1,loop:1,
+    sec:{intro:{bars:2,ch:[0,0]},
+      A:{ch:[0,0,5,6],lead:'0.2 0.2 7.2 0.2 6.2 0.2 4.2 5.2 | 0.2 0.2 7.2 0.2 9.4 7.4 | 5.2 5.2 9.2 5.2 8.2 7.2 5.4 | 6.4 4.4 6.4 8.4'},
+      B:{ch:[3,4,5,6],arp:1,lead:'3.4 5.2 7.2 8.8 | 7.4 6.2 4.2 2.8 | 5.2 7.2 9.4 7.2 9.2 10.4 | 11.8 r.8'}},
+    form:['intro','A','B','A']},
+  star:{name:'THE HOLLOW STAR',bpm:132,root:62,scale:'harm',lead:'saw',counter:'bell',bass:'saw',bassPat:'syn',groove:'break',fx:.34,pad:1,loop:1,vol:.9,
+    sec:{intro:{bars:2,ch:[0,4],arp:1},
+      A:{ch:[0,5,3,4],lead:'0.4 2.2 4.2 7.6 6.2 | 5.4 4.2 5.2 7.8 | 3.4 5.4 6.4 5.2 3.2 | 4.8 6.4 r.4'},
+      A2:{ch:[0,5,3,4],lead:'0.4 2.2 4.2 7.6 6.2 | 5.4 4.2 5.2 7.8 | 8.4 7.4 6.4 5.4 | 4.12 r.4'},
+      B:{ch:[0,6,5,4],arp:1,lead:'7.2 9.2 11.4 10.2 9.2 7.4 | 6.6 7.2 6.4 4.4 | 5.2 7.2 9.4 8.2 7.2 5.4 | 4.16'}},
+    form:['intro','A','A2','B','A2']},
 };
-const ELEM_KEY={nature:['dorian',57],earth:['mixo',55],fire:['phryg',52],ice:['lydian',62],thunder:['minor',57],water:['dorian',60],dragon:['harm',50]};
+// seven element motifs: a call, an answer, and two chord loops each
+const MOTIF={
+  nature: {scale:'dorian',root:57,A:[0,3,0,6],B:[2,3,4,0],call:'0.2 2.2 4.4 3.2 2.2 0.4 | 4.2 5.2 7.4 5.4 4.4',answer:'7.2 6.2 5.4 4.4 2.4 | 3.4 2.2 1.2 0.8'},
+  earth:  {scale:'mixo',root:55,A:[0,6,0,3],B:[3,6,4,0],call:'0.4 0.2 4.2 3.4 2.4 | 0.4 -1.4 -3.8',answer:'4.4 4.2 7.2 6.4 4.4 | 3.4 2.4 0.8'},
+  fire:   {scale:'phryg',root:52,A:[0,1,0,6],B:[5,6,1,0],call:'0.2 1.2 0.2 7.4 6.2 4.4 | 5.2 4.2 1.2 0.2 1.8',answer:'7.2 8.2 7.2 4.4 5.2 4.4 | 1.4 2.4 0.8'},
+  ice:    {scale:'lydian',root:62,A:[0,1,0,4],B:[5,1,4,0],call:'4.2 7.2 11.4 10.2 7.2 8.4 | 7.6 4.2 3.8',answer:'3.2 4.2 7.4 4.2 3.2 1.4 | 2.4 0.4 r.8'},
+  thunder:{scale:'minor',root:57,A:[0,0,6,5],B:[3,4,6,4],call:'0.1 0.1 0.2 7.2 0.2 6.2 4.2 3.2 2.2 | 0.2 2.2 3.4 4.2 3.2 2.4',answer:'7.4 9.4 8.2 7.2 6.4 | 4.8 2.4 4.4'},
+  water:  {scale:'dorian',root:60,A:[0,4,3,0],B:[5,3,1,4],call:'0.3 2.3 4.2 7.4 6.4 | 5.3 4.3 2.2 4.8',answer:'2.3 4.3 5.2 7.4 9.4 | 8.6 7.2 6.8'},
+  dragon: {scale:'harm',root:50,A:[0,5,3,4],B:[0,1,5,4],call:'0.4 6.2 0.2 2.4 3.4 | 4.6 3.2 2.4 1.4',answer:'7.2 6.2 5.4 4.4 3.4 | 6.8 4.8'},
+};
 const RIG_LEAD={wyvern:'square',brute:'saw',serpent:'pulse25',raptor:'pulse12',crab:'square'};
-const TRAIT_DRUMS={armor:'four',charge:'break',shell:'half',burrow:'back',regen:'back',frenzy:'gallop'};
+const TRAIT_GROOVE={armor:'stomp',charge:'break',shell:'shuffle',burrow:'tribal',regen:'tribal',frenzy:'gallop'};
 function mRng(seed){let s=(seed>>>0)||1;return()=>{s^=s<<13;s>>>=0;s^=s>>>17;s^=s<<5;s>>>=0;return s/4294967296;};}
 function mHash(str){let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);return h>>>0;}
-// A monster's own track, from what it is
+// a phrase, changed: lifted a third, its two bars swapped, or turned upside down around its first note
+function vary(m,kind){const L=mel(m);if(kind===1)return L.map(([d,l])=>[d===null?null:d+2,l]);
+  if(kind===2){let s=0,i=0;for(;i<L.length&&s<16;i++)s+=L[i][1];return L.slice(i).concat(L.slice(0,i));}
+  if(kind===3){const f=L.find(x=>x[0]!==null)[0];return L.map(([d,l])=>[d===null?null:2*f-d,l]);}return L;}
+// A monster's own theme, from what it is
 function monsterTrack(D){
-  if(MTRACKS[D.id])return MTRACKS[D.id];
-  const h=mHash(D.id),[scale,root]=ELEM_KEY[D.elem],r=mRng(h);
-  return MTRACKS[D.id]={name:D.name,bpm:Math.min(144,104+D.rank*5+(D.trait==='frenzy'?6:0)+(h%5)),root:root+((h>>>3)%5)-2,scale,prog:PROGS[(h>>>7)%PROGS.length],form:'hunt',
-    lead:RIG_LEAD[D.rig],arp:D.elem==='ice'||D.elem==='water'?'bell':'pulse12',bass:D.rank>=4||D.rig==='brute'?'saw':'tri',drums:TRAIT_DRUMS[D.trait]||(D.rank>=4?'four':'back'),
-    bassPat:['octave','root8','synco','pulse','walk'][(h>>>11)%5],rhy:[0,1,2,3].map(()=>(r()*MMOT.length)|0),pad:D.rank>=6?1:0,swing:D.elem==='nature'?.15:0,fx:.12+((h>>>15)%3)*.06,loop:1};
+  if(SCORE[D.id])return SCORE[D.id];
+  const M=MOTIF[D.elem],h=mHash(D.id),v=h%4,v2=(h>>>2)%4;
+  return SCORE[D.id]={name:D.name,bpm:Math.min(150,100+D.rank*6+(D.trait==='frenzy'?6:0)+(h>>>5)%5),root:M.root+((h>>>8)%5)-2,scale:M.scale,
+    lead:RIG_LEAD[D.rig],counter:D.elem==='ice'||D.elem==='water'?'bell':'pulse12',bass:D.rank>=4||D.rig==='brute'?'saw':'tri',
+    bassPat:['pump','oct','climb','syn'][(h>>>11)%4],groove:TRAIT_GROOVE[D.trait]||(D.rank>=4?'stomp':'drive'),pad:D.rank>=6?1:0,fx:.12+((h>>>15)%3)*.06,loop:1,
+    sec:{intro:{bars:2,ch:[M.A[0],M.A[3]]},
+      A:{ch:M.A.concat(M.A),lead:[...vary(M.call,v),...vary(M.answer,0),...vary(M.call,(v+1)%4),...vary(M.answer,v2)]},
+      B:{ch:M.B.concat(M.B),arp:1,lead:[...vary(M.answer,1),...vary(M.call,3),...vary(M.answer,(v2+2)%4),...vary(M.call,2)]},
+      bridge:{ch:[M.A[1],M.B[2],M.A[2],M.A[3]],slow:1}},
+    form:['intro','A','B','bridge']};
 }
+// notes from a score; a looping track skips its intro after the first time through
 function compileSong(tr,n){
-  const sc=MSCALE[tr.scale], st=60/tr.bpm/4, bar=st*16, ev=[], form=MFORMS[tr.form];
-  const freq=deg=>{const o=Math.floor(deg/7), k=((deg%7)+7)%7; return 440*Math.pow(2,(tr.root+12*o+sc[k]-69)/12);};
-  let t=0;
-  const add=(s,len,deg,i,v,x)=>{const sw=s%4===2?(tr.swing||0)*st:0; ev.push(Object.assign({t:t+s*st+sw,f:deg===null?0:freq(deg),d:len*st,v:v*(tr.vol||1),i},x||{}));};
-  const lp=i=>i==='saw'?{lp:1800}:null, occ={};
-  for(let k=0;k<form.length;k+=2){
-    const sec=form[k], bars=form[k+1], role=MROLES[sec]; occ[sec]=(occ[sec]||0)+1;
-    if(sec==='intro'&&tr.loop&&n>1)continue;                                     // a looping hunt track skips its intro after the first time
-    const prog=tr.prog[sec==='B'?1:sec==='C'?2:0], rng=mRng(mHash(tr.name+':'+sec+':'+n+':'+occ[sec]));
-    const drums=role.drums==='track'?tr.drums:role.drums==='intro'?'tick':role.drums==='half'?(tr.drums==='tick'?'tick':'half'):null;
-    const bassPat=role.bass==='track'?tr.bassPat:role.bass;
-    for(let b=0;b<bars;b++){
-      const c=prog[b%prog.length], nc=prog[(b+1)%prog.length];
-      const fade=sec==='intro'?Math.min(1,.35+.65*b/bars):sec==='outro'?Math.max(.15,1-b/bars):1;
-      if(tr.pad||sec==='intro'||sec==='outro')for(const d of[c,c+2,c+4])add(0,16,d,'pad',MV.pad*fade);
-      if(role.lead){
-        const hi=role.lead==='high', slow=role.lead==='slow', phraseEnd=b%4===3;
-        const mot=slow?(b%2?[[0,16,0]]:[[0,8,4],[8,8,2]]):MMOT[(hi?tr.rhy[n%2?2:3]:tr.rhy[0])%MMOT.length];
-        const notes=phraseEnd&&!slow?(b===bars-1&&!tr.loop?MCAD_HOME:MCAD_OPEN):mot;
-        const centre=hi?11:8; let base=c; while(base<centre-3)base+=7; while(base>centre+3)base-=7;
-        for(const[s,len,off]of notes)add(s,len*.9,base+off,tr.lead,MV[tr.lead]*fade*(slow?.8:1),Object.assign({vib:len>=6},lp(tr.lead)));
-      }
-      if(role.arp){const tones=[c,c+2,c+4,c+7,c+9,c+7,c+4,c+2];for(let s=0,j=0;s<16;s+=2,j++)add(s,1.6,tones[j%tones.length],tr.arp,MV[tr.arp]*.42*fade);}
-      let bd=c-14; while(freq(bd)<58)bd+=7;
-      const bv=MV[tr.bass]*1.05*fade, bx=tr.bass==='saw'?{lp:520}:null, B=(s,len,d)=>add(s,len,d,tr.bass,bv,bx);
-      if(bassPat==='long')B(0,15,bd);
-      else if(bassPat==='pulse')[0,4,8,12].forEach(s=>B(s,3,bd));
-      else if(bassPat==='root8')for(let s=0;s<16;s+=2)B(s,1.6,bd);
-      else if(bassPat==='octave')for(let s=0;s<16;s+=2)B(s,1.6,s%4?bd+7:bd);
-      else if(bassPat==='walk'){let ap=bd+(nc-c)+(rng()<.5?-1:1); while(freq(ap)<58)ap+=7; B(0,3.6,bd);B(4,3.6,bd+2);B(8,3.6,bd+4);B(12,3.6,ap);}
-      else if(bassPat==='synco')[[0,3,0],[3,3,0],[6,2,4],[8,3,0],[11,3,7],[14,2,4]].forEach(([s,l,o])=>B(s,l*.9,bd+o));
-      if(drums){const D=MDRUMS[drums];
-        if(drums==='tick'&&b%2===0)add(0,2,null,'kick',MV.kick*.7*fade);
-        D.k.forEach(s=>add(s,2,null,'kick',MV.kick*fade));D.s.forEach(s=>add(s,2,null,'snare',MV.snare*fade));D.h.forEach(s=>add(s,1,null,'hat',MV.hat*(s%4===2?1:.6)*fade));
-        if(b===bars-1&&(sec==='A'||sec==='B')&&drums!=='tick')[12,13,14,15].forEach((s,j)=>add(s,1,null,'snare',MV.snare*(.4+j*.2)));}
-      t+=bar;
-    }
+  const sc=MSCALE[tr.scale],step=60/tr.bpm/4,BL=tr.beat||16,bar=step*BL,ev=[];let t=0;
+  const freq=(deg,root)=>{const o=Math.floor(deg/7),k=((deg%7)+7)%7;return 440*Math.pow(2,(root+12*o+sc[k]-69)/12);};
+  const add=(s,len,f,i,v,x)=>ev.push(Object.assign({t:t+s*step,f,d:len*step,v:v*(tr.vol||1),i},x||{}));
+  for(const name of tr.form){const S2=tr.sec[name];if(name==='intro'&&tr.loop&&n>1)continue;
+    const ch=S2.ch,bars=S2.bars||ch.length,L=S2.lead?(typeof S2.lead==='string'?mel(S2.lead):S2.lead):null,fadeIn=name==='intro';
+    for(let b=0;b<bars;b++){const c=ch[b%ch.length],nc=ch[(b+1)%ch.length],f=fadeIn?Math.min(1,.4+.6*b/bars):1;
+      if(tr.pad||fadeIn||S2.slow)for(const d of [c,c+2,c+4])add(0,BL,freq(d,tr.root-12),'pad',MV.pad*f);
+      if(S2.arp||fadeIn){const tones=[c,c+4,c+7,c+9,c+7,c+4];for(let s=0,j=0;s<BL;s+=2,j++)add(s,1.5,freq(tones[j%6],tr.root),tr.counter||'pulse12',MV[tr.counter||'pulse12']*.4*f);}
+      if(S2.slow){add(0,BL*.95,freq(c+7,tr.root),tr.lead,MV[tr.lead]*.7,{vib:1,lp:tr.lead==='saw'?1600:0});}
+      let bd=c-14;while(freq(bd,tr.root)<58)bd+=7;const bf=d=>freq(d,tr.root),bv=MV[tr.bass]*1.05*f,bx=tr.bass==='saw'?{lp:520}:null,Bn=(s,l,d)=>add(s,l,bf(d),tr.bass,bv,bx);
+      const bp=fadeIn?'drone':tr.bassPat;
+      if(bp==='drone')Bn(0,BL-1,bd);
+      else if(bp==='pump')for(let s=0;s<BL;s+=2)Bn(s,1.6,bd);
+      else if(bp==='oct')for(let s=0;s<BL;s+=2)Bn(s,1.6,s%4?bd+7:bd);
+      else if(bp==='climb'){Bn(0,3.6,bd);Bn(4,3.6,bd+2);Bn(8,3.6,bd+4);Bn(12,3.6,bd+5+((nc-c)>0?0:-1));}
+      else if(bp==='syn')[[0,3,0],[3,3,0],[6,2,7],[10,2,0],[12,4,4]].forEach(([s,l,o])=>Bn(s,l*.9,bd+o));
+      else if(bp==='bounce')[[0,2,0],[4,2,4],[8,2,7],[12,2,4]].forEach(([s,l,o])=>Bn(s,l,bd+o));
+      else if(bp==='waltz'){Bn(0,3.6,bd);for(const s of [4,8])for(const d of [c+2,c+4])add(s,2,freq(d,tr.root-12),'tri',MV.tri*.35*f);}
+      const G=GROOVE[fadeIn?'soft':S2.slow?'soft':tr.groove];
+      G.k.forEach(s=>s<BL&&add(s,2,0,'kick',MV.kick*f));G.s.forEach(s=>s<BL&&add(s,2,0,'snare',MV.snare*f));G.h.forEach(s=>s<BL&&add(s,1,0,'hat',MV.hat*(s%4===2?1:.6)*f));
+      if(b===bars-1&&!fadeIn&&!S2.slow&&tr.groove!=='waltz')[BL-3,BL-2,BL-1].forEach((s,j)=>add(s,1,0,'snare',MV.snare*(.5+j*.25)));
+      t+=bar;}
+    if(L){let s=0,t0=t-bars*bar;for(const [d,l] of L){if(d!==null)ev.push({t:t0+s*step,f:freq(d,tr.root),d:l*step*.92,v:MV[tr.lead]*(tr.vol||1),i:tr.lead,vib:l>=6,lp:tr.lead==='saw'?1800:0});s+=l;}}
   }
-  ev.sort((x,y)=>x.t-y.t);
-  return {ev,len:t};
+  ev.sort((x,y)=>x.t-y.t);return {ev,len:t};
 }
 const _music={running:false,gain:null,bus:null,send:null,delay:null,timer:null,song:null,idx:0,t0:0,key:null,cur:null,plays:{},fading:0};
 let _pulseWaves={};
@@ -1015,7 +1034,7 @@ function musicCtx(){
   if(S.mode==='hunt'&&S.def)return S.def.small?'pack':'mon:'+S.def.id;
   return 'camp';
 }
-const trackFor=key=>key.startsWith('mon:')?monsterTrack(MONSTERS[key.slice(4)]):MTRACKS[key];
+const trackFor=key=>key.startsWith('mon:')?monsterTrack(MONSTERS[key.slice(4)]):SCORE[key];
 function mNext(key,at){
   const tr=trackFor(key),id=key;_music.plays[id]=(_music.plays[id]||0)+1;
   _music.cur=tr;_music.key=key;_music.song=compileSong(tr,_music.plays[id]);_music.idx=0;_music.t0=at;
@@ -2730,7 +2749,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS:SCORE,SCORE,MOTIF,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 Object.defineProperty(MH,'AC',{get:()=>AC});
