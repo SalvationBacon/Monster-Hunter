@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.26.0';
+const VER='0.26.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1006,7 +1006,7 @@ function buzz(ms){if(!MH.manual&&navigator.vibrate)try{navigator.vibrate(ms);}ca
 //  STATE
 // ═══════════════════════════════════════════════════
 const S={mode:'title',t:0};
-const MH=window.MH={S,manual:false,noTalk:(()=>{try{return !!localStorage.getItem('mh_notalk');}catch(e){return false;}})()};       // test hook (tools/check.js)
+const MH=window.MH={S,manual:false,noTalk:!!window.MH_NOTALK};       // test hook (tools/check.js)
 // ── Save: bag of materials, owned and worn gear, wins per monster. On this device only.
 const SAVE_KEY='mh_save_v1', DEV_KEY='mh_dev_v1';
 const saveKey=()=>PREFS.dev?DEV_KEY:SAVE_KEY;                                    // dev mode plays on its own save
@@ -1618,7 +1618,7 @@ function rollLoot(){
 const scrollKey=()=>S.mode!=='camp'||S.menu||S.opts||S.mat?null:S.tab==='book'?(S.bpick?'bdet':'book'):S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?'forge'+S.fcat+S.fsub:S.tab==='gear'&&S.gpick?'gpick':null;
 const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
 function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
-function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fcat=S.fcat||'weapon';S.fsub=S.fsub||0;S.gpick=null;S.mode='camp';S.menu=false;S.opts=false;S.mat=null;S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
+function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fcat=S.fcat||'weapon';S.fsub=S.fsub||0;S.gpick=null;S.mode='camp';S.menu=false;S.opts=false;S.mat=null;S.fromPrep=null;S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
 function toast(txt,col){S.toast={txt,col:col||'#fff',t:0};}
 // The forge crafts; the GEAR tab is where gear is worn. A freshly crafted piece is worn straight away.
 function forgeTap(id){
@@ -1683,6 +1683,8 @@ function claim(q){
 function brew(){if(!affords(POT_COST)){toast('NEEDS 3 HERBS','#ff6a4d');sfx('miss');return;}for(const [k,n] of Object.entries(POT_COST))SAVE.bag[k]-=n;SAVE.potions++;toast('POTION BREWED','#4cd964');sfx('heal');save();}
 // ── Prep: the screen before a hunt ──
 const ROLE_IDS=['fighter','healer','trapper','scout','gatherer','rest'];
+function prepGear(){const P=S.prep;toCamp('gear');S.fromPrep=P;sfx('charge',1);}
+function backToPrep(){const P=S.fromPrep;S.fromPrep=null;S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.gpick=null;S.prep=P;sfx('charge',1);}
 function toPrep(id,small){S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.prep={id,small:small==null?null:small,meal:-1};}
 function prepStart(){
   const P=S.prep,meal=P.meal>=0?MEAL_IDS[P.meal]:null;
@@ -2033,7 +2035,7 @@ function menuIcon(k,x,y,col){const m=MENU_ICONS[k];g.fillStyle=OUTLINE;m.forEach
 const MENU_COLS={hunt:'#ff6a4d',gear:'#4cc9ff',forge:'#ff9a4d',cook:'#ffe14d',quest:'#c8d0e8',bugs:'#4cd964',book:'#e0508a',options:'#8a93b0'};
 // a green dot means something is waiting there: gear to forge or upgrade, a quest to claim
 function tabDot(k){return k==='forge'?Object.keys(GEAR).some(id=>(GEAR[id].cost&&!SAVE.own[id]&&canAfford(id))||(SAVE.eq[GEAR[id].slot]===id&&affords(upCost(id)))):k==='quest'?quests().some(qClaimable):false;}
-function campGo(k){S.menu=false;S.tab=k;S.exp=false;S.gpick=null;S.bpick=null;sfx('charge',1);}
+function campGo(k){S.menu=false;if(k!=='gear')S.fromPrep=null;S.tab=k;S.exp=false;S.gpick=null;S.bpick=null;sfx('charge',1);}
 function drawMenu(){
   const B=S.btns=[];g.fillStyle='rgba(10,12,22,.75)';g.fillRect(0,12,W,LH-12);
   const cols=2,tw=54,th=30,gap=4,rows=Math.ceil(TABS.length/cols),ph=10+rows*(th+gap)+th/2+gap+4,px=(W-(tw*cols+gap)-8)>>1,py=16;
@@ -2374,6 +2376,7 @@ function drawCamp(){
       B.push({id:'bug:'+c.id,x,y,w:18,h:11,fn:()=>toast(got?c.name+(c.rare?' (RARE)':''):'NOT CAUGHT YET',got?c.col:'#8a93b0')});});y+=12;}
   }
   if(S.tab==='book'){if(S.bpick)drawBookPage(B);else drawBookList(B);}
+  if(S.fromPrep&&S.tab==='gear'){const D=S.fromPrep.small!=null?{short:'PACK'}:MONSTERS[S.fromPrep.id],lab='< '+(D.short||D.name)+' HUNT';smallBtn(B,'gear:toprep',W-20-textW(lab)-8,1,textW(lab)+8,lab,Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',backToPrep);}
   drawBurger(B);
   if(S.mat)drawMat();
   if(S.menu)drawMenu();
@@ -2389,10 +2392,10 @@ function drawPrep(){
   if(D.weakSt){text('+',x,y,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y,STATUS[D.weakSt].col);}
   y+=8;text('ATTACKS WITH',5,y,'#8a93b0');text(ELEM[D.elem][0],5+textW('ATTACKS WITH')+5,y,ELEM[D.elem][1]);if(resPct(gs,D.elem))text('-'+resPct(gs,D.elem)+'%',W-5,y,'#4cd964',{al:2});
   y+=8;text(D.tip,5,y,'#ffe14d');if(D.tip2){y+=8;text(D.tip2,5,y,'#ffe14d');}
-  y+=11;g.fillStyle='#1c2134';g.fillRect(3,y-2,W-6,27);
+  y+=11;g.fillStyle='#1c2134';g.fillRect(3,y-2,W-6,27);text('>',W-6,y+10,'#4cc9ff',{al:2});B.push({id:'prep:gearbox',x:3,y:y-2,w:W-6,h:27,fn:prepGear});
   const w=GEAR[eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:['PLAIN','#5a6080'],good=(w.elem&&w.elem===D.weak)||(w.status&&w.status===wkSt),bad=w.status&&w.status===D.resSt;
   text(w.name+(lvOf(eq.weapon)?'+'+lvOf(eq.weapon):''),5,y,'#e8f0fc');
-  y+=8;text(wk[0],5,y,wk[1]);if(good)text('A GOOD PICK',W-5,y,'#4cd964',{al:2});else if(bad)text('IT RESISTS THIS',W-5,y,'#ff6a4d',{al:2});
+  y+=8;text(wk[0],5,y,wk[1]);if(good)text('A GOOD PICK',W-12,y,'#4cd964',{al:2});else if(bad)text('IT RESISTS THIS',W-12,y,'#ff6a4d',{al:2});else if(!D.small)text('TRY '+ELEM[D.weak][0],W-12,y,ELEM[D.weak][1],{al:2});
   y+=8;text('HEALTH '+gs.hp+'   ATTACK *'+gs.atk.toFixed(2),5,y,'#4cd964');
   y+=8;const bring=Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0));g.drawImage(lootSpr('potion'),0,0,12,12,5,y-2,9,9);text('POTIONS '+bring,16,y,bring?'#e8f0fc':'#ff6a4d');text('OF '+SAVE.potions+' IN STOCK',W-5,y,'#8a93b0',{al:2});
   // meal chooser
@@ -2405,7 +2408,8 @@ function drawPrep(){
   y+=37;
   if(SAVE.pal){g.fillStyle='#232a4a';g.fillRect(3,y-2,W-6,30);g.drawImage(palSpr(Math.floor(S.t*4)%2),5,y+2);text('PIP',5,y+16,'#7fe0c0');{const ps=palStats();text('ATK *'+ps.atk.toFixed(2)+'  CARE *'+ps.care.toFixed(2),W/2+8,y+20,'#7fe0c0',{al:1});}const R=ROLES[SAVE.role];text(R[0],W/2+8,y+1,'#ffe14d',{al:1});text(R[1],W/2+8,y+10,'#8a93b0',{al:1});
     const rn=ROLE_IDS.length,ri=ROLE_IDS.indexOf(SAVE.role);smallBtn(B,'prep:rnext',W-17,y+1,13,'>','#2a6aa8',()=>{SAVE.role=ROLE_IDS[(ri+1)%rn];sfx('charge',1);});}
-  const by=LH-18;smallBtn(B,'prep:back',4,by,34,'BACK','#3a4060',()=>toCamp('hunt'));smallBtn(B,'prep:start',42,by,W-46,D.small?'START PACK HUNT':'START HUNT',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',prepStart);
+  const by=LH-18;smallBtn(B,'prep:back',4,by,26,'BACK','#3a4060',()=>toCamp('hunt'));smallBtn(B,'prep:gear',33,by,30,'GEAR','#2a6aa8',prepGear);smallBtn(B,'prep:start',66,by,W-70,D.small?'START PACK':'START HUNT',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',prepStart);
+  {const k=B.findIndex(b=>b.id==='prep:gearbox');if(k>=0)B.push(B.splice(k,1)[0]);}
   if(S.toast){const tw=textW(S.toast.txt)+10;g.fillStyle='#000';g.fillRect((W-tw)/2-1,by-17,tw+2,13);g.fillStyle='#1c2134';g.fillRect((W-tw)/2,by-16,tw,11);text(S.toast.txt,W/2,by-13,S.toast.col,{al:1});}
 }
 // ── Gather run ──
@@ -2463,7 +2467,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

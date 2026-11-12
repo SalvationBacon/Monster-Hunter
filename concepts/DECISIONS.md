@@ -304,3 +304,8 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 - **Replay:** the quest board's story card has REPLAY, and THE ENDING once the story is done.
 - Older saves skip the tutorial but see their current chapter's scene once. Dev mode skips every scene.
 - Tests set `localStorage.mh_notalk` so scenes stay out of the bot hunts. The story checks turn scenes back on.
+
+## v0.26.1: gear from the prep screen
+- The prep screen has a **GEAR** button (bottom row, between BACK and START). The gear box is tappable too.
+- Either opens the GEAR screen with a green "< [MONSTER] HUNT" button in the top bar that returns to the same prep screen with the meal choice kept. Leaving for another screen drops that button.
+- When the worn weapon isn't a good match, the gear box hints the monster's weakness ("TRY WATER").

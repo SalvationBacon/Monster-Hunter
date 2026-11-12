@@ -5,7 +5,7 @@ const shots=process.argv[2];
 (async()=>{
   const b=await chromium.launch();
   const p=await b.newPage({viewport:{width:390,height:780},hasTouch:true,isMobile:true});
-  await p.addInitScript(()=>{try{localStorage.setItem('mh_notalk','1');}catch(e){}});   // scenes stay out of the way, except in the story checks
+  await p.addInitScript(()=>{window.MH_NOTALK=1;});   // scenes stay out of the way, except in the story checks
   const errs=[];p.on('pageerror',e=>errs.push(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
   await p.goto('file://'+path.resolve(__dirname,'../index.html'));await p.waitForTimeout(200);
   let fail=0;const ok=(c,msg)=>{console.log((c===true?'ok   ':'FAIL ')+msg+(c===true||c===false?'':' -> '+c));if(c!==true)fail++;};
@@ -533,6 +533,15 @@ const shots=process.argv[2];
   ok(await ev(()=>{const v=JSON.parse(JSON.stringify(MH.SAVE));delete v.seen;v.story={i:4,p:0};v.wins={fern:1,quill:1};localStorage.setItem('mh_save_v1',JSON.stringify(v));const L=MH.loadSave();
     return L.seen.h_attack&&L.seen.ch3&&!L.seen.ch4;}),'an older save skips the tutorial but still sees its current chapter');
   ok(await ev(()=>{MH.setDev(true);const r=Object.keys(MH.SCENES).every(k=>MH.SAVE.seen[k]);MH.setDev(false);return r;}),'dev mode skips every scene');
+  // ── v0.26.1: change gear from the prep screen ──
+  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.setDev(true);MH.toPrep('ember');MH.S.prep.meal=1;});await p.waitForTimeout(150);
+  await tapBtn0('prep:gear');ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='gear'&&MH.S.btns.some(b=>b.id==='gear:toprep')),'GEAR on the prep screen opens the gear screen, with a way back to the hunt');await shot('c-prep-gear');
+  await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');await tapBtn0('wear:fern_gs');
+  ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.btns.some(b=>b.id==='gear:toprep')),'gear can be changed there');
+  await tapBtn0('gear:toprep');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='ember'&&MH.S.prep.meal===1),'and the button goes back to the same hunt, meal kept');
+  await tapBtn0('prep:gearbox');ok(await ev(()=>MH.S.tab==='gear'&&!!MH.S.fromPrep),'tapping the gear box on the prep screen does the same');
+  await tapBtn0('camp:menu');await tapBtn0('tab:hunt');ok(await ev(()=>!MH.S.fromPrep&&!MH.S.btns.some(b=>b.id==='gear:toprep')),'leaving for another screen drops the way back');
+  await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();
