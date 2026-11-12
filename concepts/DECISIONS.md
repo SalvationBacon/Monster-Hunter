@@ -115,10 +115,49 @@ Each monster's weaknesses are in the roster table. A monster resists the status 
 
 Perks became Monster Hunter-style skills with levels. Every armor piece and charm carries skill points; points add up to a skill's level, capped at 3 (extra points are wasted, and the skills page says so). Each level is a small step, to leave room for a rebirth system later.
 
-- **Armor themes:** each monster's armor leans into four skills. Chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2, so a full set gives A3, B2, C2, D2. A is the monster's old armor perk; B, C and D are picked from its name, so no two sets match. Mixing pieces is how you build.
-- **Charms** give one skill at +2; relic charms give two (+2 and +1).
+- **Armor themes (hand-assigned, v0.20.0):** each monster's armor leans into four skills chosen to fit it. Chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2, so a full set gives A3, B2, C2, D2. Its charm gives C at +2. Rules the tests hold the table to: every skill leads at least one set; status-weapon monsters carry Afflictor; armored ones Guardian or Bludgeoner; shelled ones Razor or Guardian; regenerating ones Vigor or Herbalist; each set bonus covers 5 to 7 monsters.
+
+| Monster | Main (A, level 3) | B (2) | C (2, also its charm) | D (2) | Set bonus | Why |
+|---|---|---|---|---|---|---|
+| Fernwing | Elementalist | Hardy | Keen Eye | Herbalist | Ascendant | nature breath, poison spit: a first, steady set |
+| Quillbeak | Afflictor | Keen Edge | Nimble | Beastfriend | Bloodlust | sleep talons, bleeding pecks, a forest friend |
+| Mudclaw | Guardian | Razor | Hardy | Fortune | Bounty | a shelled hoarder in the mud |
+| Dustfang | Quick Draw | Afflictor | Tireless | Hardy | Insight | a quick, paralysing desert runner |
+| Tuskhide | Bludgeoner | Might | Guardian | Vigor | Second Wind | an armored battering ram |
+| Bogmaw | Hardy | Afflictor | Keen Eye | Herbalist | Kinship | poison in the swamp |
+| Emberwing | Might | Elementalist | Hardy | Riposte | Kinship | fire and fury |
+| Thornback | Vigor | Herbalist | Keen Edge | Guardian | Second Wind | regrowing, thorny brute |
+| Shellsnap | Razor | Afflictor | Guardian | Fortune | Bounty | a sleepy pearl crab |
+| Gustraptor | Tireless | Nimble | Elementalist | Quick Draw | Bloodlust | a frenzied thunder raptor |
+| Sandeel | Keen Eye | Hardy | Breaker | Tireless | Insight | a burrower you learn to read |
+| Cinderhide | Breaker | Afflictor | Guardian | Hardy | Ascendant | blast-hided brute |
+| Rimewing | Elementalist | Keen Edge | Hardy | Razor | Kinship | sharp ice |
+| Venomsting | Afflictor | Quick Draw | Weak Spot | Hardy | Bloodlust | a frenzied poisoner |
+| Plumecrest | Beastfriend | Fortune | Nimble | Elementalist | Bounty | a cheerful coast bird |
+| Frostmaw | Might | Hardy | Bludgeoner | Vigor | Kinship | a freezing heavyweight |
+| Tidecoil | Herbalist | Elementalist | Keen Eye | Hardy | Second Wind | a soaking, enduring serpent |
+| Voltwing | Quick Draw | Afflictor | Riposte | Nimble | Kinship | paralysing, frenzied, charged |
+| Magmaclaw | Razor | Elementalist | Guardian | Hardy | Ascendant | a molten-shelled crab |
+| Dreadbeak | Weak Spot | Keen Edge | Elementalist | Hardy | Bloodlust | a dragon predator going for the head |
+| Icehide | Guardian | Afflictor | Vigor | Hardy | Second Wind | a sleeping, armored ice brute |
+| Mirefang | Herbalist | Vigor | Hardy | Beastfriend | Insight | a regenerating swamp serpent |
+| Obsidwing | Breaker | Afflictor | Might | Tireless | Bloodlust | a blasting, frenzied glass wyvern |
+| Crystalback | Keen Edge | Razor | Weak Spot | Fortune | Bounty | a crystal crab, sharp and valuable |
+| Tempestbeak | Nimble | Elementalist | Tireless | Riposte | Insight | a storm raptor, all speed |
+| Abysscoil | Keen Eye | Hardy | Elementalist | Herbalist | Kinship | a deep-sea burrower |
+| Ruinhorn | Might | Guardian | Hardy | Bludgeoner | Ascendant | an armored dragon brute |
+| Stormwing | Elementalist | Riposte | Nimble | Keen Eye | Insight | a charging thunder wyvern |
+| Dusksting | Fortune | Afflictor | Razor | Hardy | Bounty | a treasure-guarding ruin crab |
+| Aurorawing | Vigor | Elementalist | Herbalist | Beastfriend | Second Wind | a healing, shimmering wyvern |
+| Gloomtusk | Bludgeoner | Might | Guardian | Hardy | Ascendant | apex: the armored dragon brute |
+| Tidereaver | Riposte | Nimble | Elementalist | Keen Eye | Bloodlust | apex: a striking sea serpent |
+| Pyreclaw | Afflictor | Breaker | Razor | Guardian | Ascendant | apex: a blasting, shelled crab |
+| Skyrender | Keen Edge | Quick Draw | Weak Spot | Tireless | Insight | apex: a lightning predator |
+| The Hollow Star | Weak Spot | Elementalist | Keen Edge | Vigor | Second Wind | the elder |
+
+- **Charms** are named after their monster and give its set's C skill at +2; relic charms give two (+2 and +1).
 - **Monster health** went up 10% to balance the extra power from full sets.
-- **Set bonuses (v0.19.0):** all four armor pieces from one monster switch on that monster's set bonus. Each monster has one of six, picked from its name (the Hollow Star's is Second Wind):
+- **Set bonuses (v0.19.0):** all four armor pieces from one monster switch on that monster's set bonus. Each monster has one of six, chosen to fit it (see the theme table):
 
 | Set bonus | Effect |
 |---|---|

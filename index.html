@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.19.0';
+const VER='0.20.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -208,8 +208,6 @@ const lv=(gs,k)=>(gs.perks[k]||0);
 
 // ── Gear. One weapon, one armor and one charm are worn at a time. Built from the roster.
 // A monster's weapons carry its element or its status, never both. Its armor and charm carry one perk each, by its place in the order.
-const APERK=['tireless','guardian','might','nimble','keenedge','herbal','bludgeon','keeneye','fortune','breaker'];
-const CPERK=['keeneye','bludgeon','breaker','herbal','fortune','tireless','guardian','might','nimble','keenedge'];
 // A monster's armor leans into four skills: its main one (A), two more (B, C), and a minor one (D) on the boots.
 // Pieces: chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2. A full set: A3 B2 C2 D2.
 // ── Set bonuses: all four pieces from one monster switch on its bonus
@@ -225,9 +223,47 @@ const SETB_IDS=Object.keys(SETB);
 // The monster whose four pieces are all worn, or null
 function fullSet(eq){eq=eq||SAVE.eq;const t=GEAR[eq.armor].tier;return MONSTERS[t]&&ASLOTS.every(sl=>GEAR[eq[sl]].tier===t)?t:null;}
 const setBonus=eq=>{const t=fullSet(eq);return t?MONSTERS[t].setb:null;};
-function armorTheme(id,i){
-  const r=mRng(mHash('skills:'+id)),pool=SK.filter(k=>k!==APERK[i%10]),pick=()=>pool.splice((r()*pool.length)|0,1)[0];
-  const A=APERK[i%10],B=pick(),C=pick(),D=pick();return{main:A,armor:{[A]:2,[B]:1},helm:{[A]:1,[C]:1},arms:{[B]:1,[C]:1},legs:{[D]:2}};
+// Each monster's armor theme, chosen to fit it: [main skill A, B, C, minor D, set bonus]. Its charm gives C.
+// Pieces: chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2. A full set: A3 B2 C2 D2.
+const THEMES={
+  fern:  ['elemboost','hardy','keeneye','herbal','ascend'],      // nature breath, poison spit: a first, steady set
+  quill: ['statusup','keenedge','nimble','beast','bloodlust'],   // sleep talons, bleeding pecks, a forest friend
+  mud:   ['guardian','razor','hardy','fortune','bounty'],        // a shelled hoarder in the mud
+  dust:  ['quick','statusup','tireless','hardy','insight'],      // a quick, paralysing desert runner
+  tusk:  ['bludgeon','might','guardian','vigor','secondwind'],   // an armored battering ram
+  bog:   ['hardy','statusup','keeneye','herbal','kinship'],      // poison in the swamp
+  ember: ['might','elemboost','hardy','riposte','kinship'],      // fire and fury
+  thorn: ['vigor','herbal','keenedge','guardian','secondwind'],  // regrowing, thorny brute
+  shell: ['razor','statusup','guardian','fortune','bounty'],     // a sleepy pearl crab
+  gust:  ['tireless','nimble','elemboost','quick','bloodlust'],  // a frenzied thunder raptor
+  eel:   ['keeneye','hardy','breaker','tireless','insight'],     // a burrower you learn to read
+  cinder:['breaker','statusup','guardian','hardy','ascend'],     // blast-hided brute
+  rime:  ['elemboost','keenedge','hardy','razor','kinship'],     // sharp ice
+  sting: ['statusup','quick','weakspot','hardy','bloodlust'],    // a frenzied poisoner
+  plume: ['beast','fortune','nimble','elemboost','bounty'],      // a cheerful coast bird
+  frost: ['might','hardy','bludgeon','vigor','kinship'],         // a freezing heavyweight
+  tide:  ['herbal','elemboost','keeneye','hardy','secondwind'],  // a soaking, enduring serpent
+  volt:  ['quick','statusup','riposte','nimble','kinship'],      // paralysing, frenzied, charged
+  magma: ['razor','elemboost','guardian','hardy','ascend'],      // a molten-shelled crab
+  dread: ['weakspot','keenedge','elemboost','hardy','bloodlust'],// a dragon predator going for the head
+  icehide:['guardian','statusup','vigor','hardy','secondwind'],  // a sleeping, armored ice brute
+  mire:  ['herbal','vigor','hardy','beast','insight'],           // a regenerating swamp serpent
+  obsid: ['breaker','statusup','might','tireless','bloodlust'],  // a blasting, frenzied glass wyvern
+  cryst: ['keenedge','razor','weakspot','fortune','bounty'],     // a crystal crab, sharp and valuable
+  temp:  ['nimble','elemboost','tireless','riposte','insight'],  // a storm raptor, all speed
+  abyss: ['keeneye','hardy','elemboost','herbal','kinship'],     // a deep-sea burrower
+  ruin:  ['might','guardian','hardy','bludgeon','ascend'],       // an armored dragon brute
+  storm: ['elemboost','riposte','nimble','keeneye','insight'],   // a charging thunder wyvern
+  dusk:  ['fortune','statusup','razor','hardy','bounty'],        // a treasure-guarding ruin crab
+  aurora:['vigor','elemboost','herbal','beast','secondwind'],    // a healing, shimmering wyvern
+  gloom: ['bludgeon','might','guardian','hardy','ascend'],       // apex: the armored dragon brute
+  reaver:['riposte','nimble','elemboost','keeneye','bloodlust'], // apex: a striking sea serpent
+  pyre:  ['statusup','breaker','razor','guardian','ascend'],     // apex: a blasting, shelled crab
+  render:['keenedge','quick','weakspot','tireless','insight'],   // apex: a lightning predator
+  star:  ['weakspot','elemboost','keenedge','vigor','secondwind'],// the elder
+};
+function armorTheme(id){
+  const [A,B,C,D]=THEMES[id];return{main:A,charm:C,armor:{[A]:2,[B]:1},helm:{[A]:1,[C]:1},arms:{[B]:1,[C]:1},legs:{[D]:2}};
 }
 const WCOST={gs:{scale:5,claw:2,head:1},db:{scale:4,claw:4,wings:1},hm:{scale:5,claw:2,tail:1},ln:{scale:6,claw:1,wings:1}};
 // Armor comes in four pieces. Each gives its share of the set's health; the chest carries the perk; every piece adds its share of resistance.
@@ -239,8 +275,8 @@ for(const [sl,k,,share,,lname] of APIECES)GEAR[sl==='armor'?'leather':'leather_'
 for(const wt of WT)GEAR['iron_'+wt]={slot:'weapon',tier:'iron',wt,name:'IRON '+WTYPES[wt].name,atk:1,free:true};
 HUNTS.forEach((id,i)=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat,cost=c=>Object.fromEntries(Object.entries(c).map(([k,n])=>[m[k],n]));
   for(const wt of WT)GEAR[id+'_'+wt]={slot:'weapon',tier:id,wt,name:D.short+' '+WTYPES[wt].name,atk:T.atk,elem:D.wElem,status:D.wStatus,cost:cost(WCOST[wt])};
-  const th=armorTheme(id,i);D.mainSkill=th.main;D.setb=id==='star'?'secondwind':SETB_IDS[mHash('set:'+id)%SETB_IDS.length];for(const [sl,k,nm,share,c] of APIECES)GEAR[id+'_'+k]={slot:sl,tier:id,name:D.short+' '+nm,hp:+(T.hp*share).toFixed(2),sk:th[sl],cost:cost(c)};
-  GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[CPERK[i%10]].name+' CHARM',sk:{[CPERK[i%10]]:2},cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
+  const th=armorTheme(id);D.mainSkill=th.main;D.setb=THEMES[id][4];for(const [sl,k,nm,share,c] of APIECES)GEAR[id+'_'+k]={slot:sl,tier:id,name:D.short+' '+nm,hp:+(T.hp*share).toFixed(2),sk:th[sl],cost:cost(c)};
+  GEAR[id+'_ch']={slot:'charm',tier:id,name:D.short+' CHARM',sk:{[th.charm]:2},cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
 Object.assign(GEAR,{
   relic_quick:  {slot:'charm',tier:'relic',name:'QUICK DRAW CHARM',sk:{quick:2,riposte:1},   cost:{gem:1,t_horn:1,claw:4}},
   relic_riposte:{slot:'charm',tier:'relic',name:'RIPOSTE CHARM',   sk:{riposte:2,nimble:1},  cost:{gem:1,e_wing:1,t_spike:1}},
@@ -2074,7 +2110,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests
