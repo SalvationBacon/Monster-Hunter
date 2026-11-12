@@ -431,3 +431,16 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
   - it moves to its own key and its tempo rises with rank
   - its body picks the lead instrument, its trait the drum groove (drive, stomp, shuffle, break, tribal, gallop), and a seed the bass line
 - New grooves and bass lines throughout.
+
+## v0.33.0: the new art in the game
+- **Monsters:** all 35 are drawn by the new art engine (shapes blended and lit, then outlined), each with its own body from myth: wyverns, Western dragons, a three-headed zmey, a sky lung, hydra, basilisk, tarasque, griffin, roc and more. Animations are baked into a frame cache in the background (12 frames a second) and played back; a frame that isn't ready yet shows the nearest baked one. Broken parts show on the body.
+- **Signature moves:** every monster has two of its own (70 in all), from its legend, each with its own animation and effects. They join the attack pools (the first from the start, the second once it's angry). Mechanics:
+  - **Grabs** (Crusher Grip, Trunk Toss, Roc Grab): you're held in the claw, trunk or talons. Mash to break free or take a heavy hit. **Snares** (Web Snare, Pin and Sting) work the same way with fewer taps.
+  - **Slows** (Petrifying Glare, Stone Gaze): your attacks, charging and drinking are slower for a while.
+  - **Utility moves:** Taproot and Rebirth heal (hit it hard enough and the heal breaks); Hoard Rage and Bind Breaker speed it up; Plume Veil and Smoke Snort hide the next attack's warning; Shell Bunker blocks most damage; Regrowth grows a broken head back.
+  - Melee moves step the monster in toward you and back out after, so every hit visibly connects. Screen flashes and darkness (Judgement, Lure, Eclipse) cover the whole screen.
+- **The hunter:** a new animated hunter in the same style. Each armour piece looks like its monster (helm, chest, gauntlets, boots mix freely), and every monster weapon is made from that monster. Combos, charge, heavy hits, the roll, the potion, sharpening, getting hit, falling and the victory pose each have their own animation.
+- **Icons:** material icons are drawn from each monster's own parts, and monster weapons show the real weapon as their icon.
+- **Renames to match the new looks:** Obsidwing to Trimaw, Stormwing to Stormpearl, Cinderhide to Cinderhoof, Icehide to Icetusk, Gloomtusk to Gloomfang, Magmaclaw to Magmastrider, Dusksting to Duskhorn, Bogmaw to Bogcrown, Sandeel to Sandmaw, Dustfang to Dustspur, Gustraptor to Gusthawk. Saves are unaffected (ids are the same).
+- **Part names** follow each body: Bogcrown CROWN and HOOD, Sandmaw TOOTH and SPIKE, the hydra's HEAD and LEAF, Magmastrider EYESTALK, VENT and CRUSHER, and so on.
+
