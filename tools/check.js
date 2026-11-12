@@ -163,6 +163,21 @@ const shots=process.argv[2];
     const h0=MH.gearStats().hp;MH.upgradeTap('fern_he');const h1=MH.gearStats().hp;S.lv={};S.bag={};return ch==='{"scale":3,"claw":1}'&&he==='{"scale":2,"claw":1}'&&h1-h0===Math.round(140*.2*.08)||[ch,he,h0,h1].join(' ');}),
     'helm, gauntlets and boots upgrade too, for about half the materials');
 
+  // ── set bonuses ──
+  ok(await ev(()=>{const n={};for(const id of MH.HUNTS){const b=MH.MONSTERS[id].setb;if(!MH.SETB[b])return id;n[b]=(n[b]||0)+1;}return Object.keys(n).length===6&&Object.values(n).every(v=>v>=3)||JSON.stringify(n);}),'every monster has one of six set bonuses, and each bonus turns up on several sets');
+  ok(await ev(()=>{EQ('iron_gs','fern_ar');const a=MH.setBonus();MH.SAVE.eq.legs='leather_legs';const b=MH.setBonus();MH.SAVE.eq.legs='quill_bo';const c=MH.setBonus();EQ();return a===MH.MONSTERS.fern.setb&&b===null&&c===null&&MH.fullSet()===null;}),'a set bonus needs all four pieces from the same monster');
+  const byB=b=>`MH.HUNTS.find(id=>MH.MONSTERS[id].setb==='${b}')`;
+  ok(await ev(new Function(`const id=${byB('kinship')};EQ('iron_gs',id+'_ar');const r=MH.armorRes()[MH.MONSTERS[id].elem];EQ();return r===.4||r;`)),'Kinship raises resistance to the set\'s own element to 40%');
+  ok(await ev(new Function(`const id=${byB('ascend')};EQ('iron_gs',id+'_ar');const k=MH.MONSTERS[id].mainSkill,ch=Object.keys(MH.GEAR).find(x=>MH.GEAR[x].slot==='charm'&&MH.GEAR[x].sk&&MH.GEAR[x].sk[k]);MH.SAVE.eq.charm=ch;
+    const l4=MH.skillLevels()[k],mx=MH.skillMax(k);MH.SAVE.eq.legs='leather_legs';const l3=MH.skillLevels()[k];EQ();return l4===4&&mx===4&&l3===3||[k,l4,mx,l3].join(',');`)),'Ascendant lets the set\'s main skill reach level 4');
+  ok(await ev(new Function(`const id=${byB('secondwind')};EQ('iron_gs',id+'_ar');MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=1e9;m.qteT=1e9;S.h.hp=1;m.wait=0;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}
+    const lived=S.h.hp===1&&S.h.state!=='dead';S.h.inv=0;S.h.state='idle';m.state='idle';m.wait=0;t=0;const tk=S.stats.taken;while(S.stats.taken===tk&&t<6){MH.update(1/60);t+=1/60;}EQ();return lived&&S.h.state==='dead';`)),'Second Wind survives one killing blow, but only one');
+  ok(await ev(new Function(`const id=${byB('bloodlust')};EQ('iron_gs',id+'_ar');const a=HIT('storm',{n:30}),b=HIT('storm',{n:30,pre:S=>{S.h.bl=5;}});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);
+    let t=0;while(m.state==='attack'&&m.hits[0]-m.t>.1&&t<5){MH.update(1/60);t+=1/60;}MH.actDodge(-1);t=0;while(m.state==='attack'&&m.hi===0&&t<2){MH.update(1/60);t+=1/60;}const on=S.h.bl>4;EQ();return Math.abs(b/a-1.15)<.03&&on||[a,b,S.h.bl].join(',');`)),'Bloodlust: a perfect dodge gives 15% more damage for a while');
+  ok(await ev(new Function(`const id=${byB('insight')};const gap=()=>{let n=0;for(let k=0;k<200;k++){MH.newHunt('fern');const S=MH.S;S.qte={part:'head',t:9};MH.update(1/60);n+=S.m.qteT;}return n/200;};EQ();const a=gap();EQ('iron_gs',id+'_ar');const b=gap();EQ();return Math.abs(b/a-.8)<.05||[a,b].join(',');`)),'Insight brings the weak-point circles 20% more often');
+  ok(await ev(new Function(`const id=${byB('bounty')};EQ('iron_gs',id+'_ar');MH.newHunt('fern');const l=MH.S.h.luck;EQ();MH.newHunt('fern');return l===1.5&&MH.S.h.luck===1;`)),'Bounty raises rare drop odds by half');
+  ok(await ev(()=>{const w=t=>{let n=-1;for(const ch of t)n+=(ch==='M'||ch==='W'?5:3)+1;return n;};const long=[];for(const b of Object.values(MH.SETB)){if(w(b.d)>116)long.push(b.d);if(19+w('HP 400')+4+w('SET: '+b.name)>124)long.push(b.name);}return long.length?long.join(' | '):true;}),'set bonus names and descriptions fit the screen');
+
   // ── what monsters do to the hunter ──
   ok(await ev(()=>{EQ();const S=QUIET('fern'),h=S.h;h.inv=0;MH.applyStatus('poison');const hp0=h.hp;RUN(120);const lost=hp0-h.hp;h.state='idle';MH.actPotion();RUN(60);const cured=h.poison===0;h.hp=3;MH.applyStatus('poison');RUN(600);
     return lost>=4&&lost<=8&&cured&&h.hp===1&&h.state!=='dead';}),'poison drains health, a potion cures it, and it cannot land the killing blow');

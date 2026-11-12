@@ -118,6 +118,18 @@ Perks became Monster Hunter-style skills with levels. Every armor piece and char
 - **Armor themes:** each monster's armor leans into four skills. Chest A+2 B+1, helm A+1 C+1, gauntlets B+1 C+1, boots D+2, so a full set gives A3, B2, C2, D2. A is the monster's old armor perk; B, C and D are picked from its name, so no two sets match. Mixing pieces is how you build.
 - **Charms** give one skill at +2; relic charms give two (+2 and +1).
 - **Monster health** went up 10% to balance the extra power from full sets.
+- **Set bonuses (v0.19.0):** all four armor pieces from one monster switch on that monster's set bonus. Each monster has one of six, picked from its name (the Hollow Star's is Second Wind):
+
+| Set bonus | Effect |
+|---|---|
+| Ascendant | the set's main skill can reach level 4 (with one more point from a charm) |
+| Kinship | resistance to the monster's element rises from 25% to 40% |
+| Insight | weak-point circles come 20% more often |
+| Second Wind | once per hunt, a killing blow leaves 1 health instead |
+| Bloodlust | a perfect dodge or guard gives +15% damage for 5 seconds |
+| Bounty | rare drop odds x1.5 |
+
+  The GEAR tab shows the active bonus, the skills page lists it first, and chest rows in the forge take turns showing skills, resistance and set bonus.
 
 | Skill | Per level (max 3) |
 |---|---|
