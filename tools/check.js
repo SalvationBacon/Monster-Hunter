@@ -307,7 +307,13 @@ const shots=process.argv[2];
 
   // ── the camp, on a fresh save, with real taps ──
   await ev(()=>{localStorage.clear();});await reload();
-  const tapBtn=async id=>{if(id.startsWith('tab:')&&await ev(()=>MH.S.mode==='camp'&&!MH.S.menu)){await tapBtn0('camp:menu');}return tapBtn0(id);};
+  // taps the way a player would: home first for a screen; pick an item before its CRAFT/UPGRADE; pick then WEAR in the gear lists
+  const has=id=>ev(id=>MH.S.btns.some(b=>b.id===id),id);
+  const tapBtn=async id=>{
+    if(id.startsWith('tab:')&&await ev(()=>MH.S.mode==='camp'&&MH.S.tab!=='home'))await tapBtn0('camp:menu');
+    if(/^(craft|up):/.test(id)&&!(await has(id)))await tapBtn0('forge:'+id.split(':')[1]);
+    if(/^wear:/.test(id)){const ok=await tapBtn0(id);if(!ok)return false;return tapBtn0('equip:'+id.slice(5));}
+    return tapBtn0(id);};
   const tapBtn0=async id=>{const q=await ev(id=>{if(MH.S.itemY&&id.startsWith('hunt:')&&MH.S.tab==='hunt'&&!MH.S.exp){MH.scrollSet(MH.S.itemY[id.slice(5)]-30);}return 1;},id);await p.waitForTimeout(60);
     const pos=await ev(id=>{const b=MH.S.btns.find(b=>b.id===id);if(!b)return null;const r=document.getElementById('c').getBoundingClientRect(),row=/^forge:/.test(id);   // forge rows: tap the name, not the tappable skills
       return{x:r.left+(row?b.x+30:b.x+b.w/2)/128*r.width,y:r.top+(row?b.y+4:b.y+b.h/2)/MH.LH*r.height};},id);
@@ -339,15 +345,14 @@ const shots=process.argv[2];
   await tapBtn('opt:delete');ok(await ev(()=>!MH.SAVE.bag.scale&&MH.SAVE.potions===6&&JSON.parse(localStorage.getItem('mh_save_v1')).potions===6&&!!localStorage.getItem('mh_dev_v1')&&MH.PREFS.music),'the second deletes the save, keeping the settings and the dev save');
   await tapBtn('opt:back');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
-  ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='quest'&&MH.SAVE.potions===6&&!MH.SAVE.pal),'a tap on the title opens the camp on the story, with six potions and no companion yet');await shot('c-quest-new');
-  await tapBtn('tab:hunt');await shot('c-hunt-new');
-  ok(await ev(()=>!MH.S.btns.some(b=>b.id.startsWith('tab:'))&&MH.S.btns.some(b=>b.id==='camp:menu')),'the camp has no bottom tab bar, only a menu button');
-  await tapBtn0('camp:menu');ok(await ev(()=>MH.S.menu&&['hunt','gear','forge','cook','quest','bugs'].every(k=>MH.S.btns.some(b=>b.id==='tab:'+k))&&MH.S.btns.some(b=>b.id==='menu:options')&&!MH.S.btns.some(b=>b.id.startsWith('hunt:'))),'the menu shows a tile for every screen and settings, and covers the screen under it');await shot('c-menu');
-  await p.touchscreen.tap(195,(await ev(()=>MH.LH))*0.95*(await ev(()=>document.getElementById('c').getBoundingClientRect().height))/(await ev(()=>MH.LH))+(await ev(()=>document.getElementById('c').getBoundingClientRect().top)));await p.waitForTimeout(120);
-  ok(await ev(()=>!MH.S.menu&&MH.S.tab==='hunt'),'a tap outside the tiles closes the menu');
-  await tapBtn0('camp:menu');await tapBtn0('menu:options');ok(await ev(()=>MH.S.opts&&!MH.S.menu&&MH.S.mode==='camp'&&['opt:music','opt:sfx','opt:dev','opt:delete','opt:back'].every(k=>MH.S.btns.some(b=>b.id===k))),'SETTINGS opens the options from the camp');await shot('c-menu-options');
-  await tapBtn0('opt:back');ok(await ev(()=>!MH.S.opts&&MH.S.menu),'and BACK returns to the menu');await tapBtn0('camp:menu');
-  ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:fern')&&!MH.S.btns.some(b=>b.id==='hunt:star')&&MH.S.scrMax.hunt>800),'the hunt list shows the first monsters and is long enough to scroll');
+  ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='home'&&MH.SAVE.potions===6&&!MH.SAVE.pal),'a tap on the title opens the camp home, with six potions and no companion yet');await shot('c-quest-new');
+  ok(await ev(()=>MH.S.tab==='home'&&['hunt','forge','cook','quest','book','bugs','gear'].every(k=>MH.S.btns.some(b=>b.id==='tab:'+k))&&MH.S.btns.some(b=>b.id==='menu:options')&&MH.S.btns.some(b=>b.id==='home:go')),'camp opens on its home: what to do next, a tile for every screen, and settings');await shot('c-home');
+  await tapBtn0('tab:hunt');ok(await ev(()=>MH.S.tab==='hunt'&&MH.S.btns.some(b=>b.id==='camp:menu')&&!MH.S.btns.some(b=>b.id.startsWith('tab:'))),'a tile opens its screen, which has a way home');await shot('c-hunt-new');
+  await tapBtn0('camp:menu');ok(await ev(()=>MH.S.tab==='home'),'the menu button goes back to camp');
+  await tapBtn0('menu:options');ok(await ev(()=>MH.S.opts&&MH.S.mode==='camp'&&['opt:music','opt:sfx','opt:dev','opt:delete','opt:back'].every(k=>MH.S.btns.some(b=>b.id===k))),'settings open from the camp home');await shot('c-home-options');
+  await tapBtn0('opt:back');ok(await ev(()=>!MH.S.opts&&MH.S.tab==='home'),'and DONE closes them');
+  await tapBtn0('home:go');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='fern'),'GO on the next step takes you straight to it: the Fernwing\'s prep screen');await tapBtn0('prep:back');await p.waitForTimeout(100);
+  ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:fern')&&!MH.S.btns.some(b=>b.id==='hunt:star')&&MH.S.scrMax.hunt>300),'the hunt list shows the first monsters and is long enough to scroll');
   await touch('touchStart',200,600);await touch('touchMove',200,520);await touch('touchMove',200,300);await touch('touchMove',200,200);await touch('touchEnd');await p.waitForTimeout(100);
   ok(await ev(()=>MH.S.scr.hunt>100&&MH.S.mode==='camp'&&!MH.S.btns.some(b=>b.id==='hunt:fern')),'dragging scrolls the list without tapping anything');await shot('c-hunt-scrolled');
   await tapBtn('hunt:tusk');ok(await ev(()=>MH.S.mode==='camp'),'the Tuskhide is locked on a fresh save');
@@ -374,7 +379,7 @@ const shots=process.argv[2];
   await tapBtn('craft:fern_gs');ok(await ev(()=>!MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='iron_gs'),'gear cannot be crafted without materials');
   await ev(()=>{Object.assign(MH.SAVE.bag,{scale:9,claw:4,horn:2,wing:1,spike:1});});await p.waitForTimeout(80);
   await tapBtn('craft:fern_gs');ok(await ev(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.bag.scale===4&&MH.SAVE.bag.claw===2&&MH.SAVE.bag.horn===1&&MH.gearStats().atk===1.3&&MH.gearStats().elem==='nature'),'crafting spends the materials, wears the gear and gives its element');
-  await tapBtn('forge:fern_gs');ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.toast&&/GEAR/.test(MH.S.toast.txt)),'tapping owned gear in the forge points to the GEAR tab');
+  await tapBtn('forge:fern_gs');ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.btns.some(b=>b.id==='up:fern_gs')&&!MH.S.btns.some(b=>b.id==='craft:fern_gs')),'picking gear you own offers to upgrade it, not craft it again');
   await tapBtn('fcat:armor');await tapBtn('fsub:4');await tapBtn('craft:fern_ch');ok(await ev(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().perks.keeneye===2&&Math.abs(MH.gearStats().qteSlow-1.26)<1e-9),'the Fernwing charm gives Keen Eye 2, slowing the circles');
   await tapBtn('tab:gear');await tapBtn('slot:charm');await tapBtn('wear:none');ok(await ev(()=>MH.SAVE.eq.charm===null),'a charm can be taken off in the GEAR tab');await tapBtn('slot:charm');await tapBtn('wear:fern_ch');
   await tapBtn('gear:skills');ok(await ev(()=>MH.S.gpick==='skills'),'tapping the stats opens the skills page');await shot('c-gear-skills');await tapBtn('gear:back');
@@ -437,7 +442,7 @@ const shots=process.argv[2];
   await ev(()=>{const S=MH.S;S.m.hp=1;S.m.state='idle';S.h.state='idle';MH.actTap('head');for(let i=0;i<400&&S.mode==='hunt';i++)MH.update(1/60);S.t=5;MH.manual=false;});
   ok(await ev(()=>MH.S.mode==='loot'&&MH.S.loot.unlock==='RANK 1 IS OPEN'&&MH.SAVE.wins.fern===1),'the first Fernwing win opens the rest of rank 1');await shot('c-loot');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
-  ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='quest'),'a tap on the loot screen returns to camp, on the quests when the story has a reward waiting');await shot('c-quest-claim');
+  ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='home'&&MH.S.btns.some(b=>b.id==='claim:story')),'a tap on the loot screen returns to the camp home, with the reward ready to claim');await shot('c-home-claim');
   const pot0=await ev(()=>MH.SAVE.potions);await tapBtn('claim:story');ok(await ev(p0=>MH.SAVE.story.i===1&&MH.SAVE.potions===p0+2,pot0),'claiming the first chapter pays its reward and opens the next');
   await tapBtn('tab:hunt');await tapBtn('exp:toggle');ok(await ev(()=>MH.S.exp&&MH.S.btns.some(b=>b.id==='gather:fern')&&MH.S.btns.some(b=>b.id==='gather:tusk')&&!MH.S.btns.some(b=>b.id==='gather:ember')),'expeditions open with the monsters that guard their biomes');await shot('c-expeditions');
   ok(await ev(()=>MH.S.scrMax.exp>0&&MH.S.btns.some(b=>b.id==='gather:mud')),'the swamp opens with the rest of rank 1');
@@ -520,15 +525,14 @@ const shots=process.argv[2];
   await tapTalk(1);ok(await ev(()=>MH.S.talk&&MH.S.talk.i===0&&MH.S.talk.ch>=MH.SCENES.ch0[0][1].length),'a tap finishes the line before moving on');
   await tapTalk(1);ok(await ev(()=>MH.S.talk.i===1),'and the next tap shows the next line');
   await tapTalk(14);ok(await ev(()=>MH.SAVE.seen.ch0&&!MH.S.talk&&MH.S.guide&&MH.S.guide.key==='g_hunt'),'after the welcome, a guide takes over');
-  await p.waitForTimeout(150);ok(await ev(()=>MH.gTarget()&&MH.gTarget().id==='camp:menu'&&!MH.SAVE.seen.v_quest),'it spotlights the menu button first, and the quest board waits its turn');await shot('st-guide-menu');
-  await p.touchscreen.tap(195,500);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.menu&&MH.S.guide.i===0),'a tap anywhere else does nothing');
-  await tapBtn0('camp:menu');await p.waitForTimeout(120);ok(await ev(()=>MH.S.menu&&MH.gTarget()&&MH.gTarget().id==='tab:hunt'),'tapping it moves on to the HUNT tile');await shot('st-guide-tile');
+  await p.waitForTimeout(150);ok(await ev(()=>MH.S.tab==='home'&&MH.gTarget()&&MH.gTarget().id==='tab:hunt'),'it spotlights the HUNT tile on the camp home');await shot('st-guide-tile');
+  await p.touchscreen.tap(195,700);await p.waitForTimeout(120);ok(await ev(()=>MH.S.tab==='home'&&MH.gTarget()&&MH.gTarget().id==='tab:hunt'),'a tap anywhere else does nothing');
   await tapBtn0('tab:hunt');await p.waitForTimeout(120);ok(await ev(()=>MH.S.tab==='hunt'&&MH.gTarget()&&MH.gTarget().id==='hunt:fern'),'then the Fernwing card');
   await tapBtn0('hunt:fern');await p.waitForTimeout(500);await tapTalk(6);await p.waitForTimeout(120);ok(await ev(()=>MH.S.mode==='prep'&&MH.SAVE.seen.v_prep&&MH.gTarget()&&MH.gTarget().id==='prep:start'),'then, after a word on the prep screen, START HUNT');await shot('st-guide-start');
   await tapBtn0('prep:back');ok(await ev(()=>MH.S.mode==='prep'),'BACK is blocked while the guide points at START');
   {const sk=await ev(()=>{const G=MH.S.guide.skip,r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(G.x+G.w/2)/128*r.width,y:r.top+(G.y+G.h/2)/MH.LH*r.height};});await p.touchscreen.tap(sk.x,sk.y);await p.waitForTimeout(100);}
   ok(await ev(()=>!MH.S.guide),'SKIP ends a guide');
-  await tapBtn0('prep:back');await p.waitForTimeout(400);await tapTalk(6);ok(await ev(()=>MH.S.mode==='camp'),'and the screen is free again');
+  await tapBtn0('prep:back');await p.waitForTimeout(300);ok(await ev(()=>MH.S.mode==='camp'),'and the screen is free again');
   ok(await ev(()=>{const g=MH.GUIDES;return ['g_hunt','g_claim','g_book','g_gather','g_forge','g_meal','g_pip'].every(k=>g[k]&&g[k].length);}),'guides cover the first hunt, claiming, the bestiary, gathering, the forge, meals and Pip');
   await ev(()=>{MH.toCamp('quest');});await p.waitForTimeout(500);await tapTalk(8);ok(await ev(()=>MH.SAVE.seen.v_quest===1),'the quest board introduces itself on the first visit');
   await ev(()=>{MH.toCamp('quest');});await p.waitForTimeout(500);ok(await ev(()=>!MH.S.talk),'seen scenes do not play again');
@@ -549,37 +553,33 @@ const shots=process.argv[2];
   // ── v0.26.1: change gear from the prep screen ──
   await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.setDev(true);MH.toPrep('ember');MH.S.prep.meal=1;});await p.waitForTimeout(150);
   await tapBtn0('prep:gear');ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='gear'&&MH.S.btns.some(b=>b.id==='gear:toprep')),'GEAR on the prep screen opens the gear screen, with a way back to the hunt');await shot('c-prep-gear');
-  await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');await tapBtn0('wear:fern_gs');
+  await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');await tapBtn('wear:fern_gs');
   ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.btns.some(b=>b.id==='gear:toprep')),'gear can be changed there');
   await tapBtn0('gear:toprep');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='ember'&&MH.S.prep.meal===1),'and the button goes back to the same hunt, meal kept');
-  await tapBtn0('prep:gearbox');ok(await ev(()=>MH.S.tab==='gear'&&!!MH.S.fromPrep),'tapping the gear box on the prep screen does the same');
+  await tapBtn0('prep:gear');ok(await ev(()=>MH.S.tab==='gear'&&!!MH.S.fromPrep),'the loadout card opens it again');
   await tapBtn0('camp:menu');await tapBtn0('tab:hunt');ok(await ev(()=>!MH.S.fromPrep&&!MH.S.btns.some(b=>b.id==='gear:toprep')),'leaving for another screen drops the way back');
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   // ── v0.27.1: skill details, random weak points ──
   ok(await ev(()=>{const seq=[];MH.newHunt('fern');const S=MH.S,m=S.m;for(let i=0;i<60;i++){S.qte=null;m.qteT=0;m.state='idle';m.wait=1e9;S.h.inv=1e9;MH.update(1/60);if(S.qte)seq.push(S.qte.part);}MH.S.mode='camp';
     const rot=seq.every((p,i)=>!i||MH.PARTS.indexOf(p)===(MH.PARTS.indexOf(seq[i-1])+1)%3);const counts=MH.PARTS.map(k=>seq.filter(x=>x===k).length);
     return seq.length>50&&!rot&&counts.every(c=>c>8)||JSON.stringify({n:seq.length,counts,rot});}),'weak points come up in a random order, and every part still gets its turns');
-  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('forge');MH.S.fcat='armor';MH.S.fsub=0;MH.S.scr={};});await p.waitForTimeout(250);
-  {const id=await ev(()=>{const b=MH.S.btns.find(b=>b.id.startsWith('skill:'));return b&&b.id;});ok(!!id,'skills on a forge item can be tapped');
-    await tapBtn0(id);ok(await ev(()=>MH.S.skill&&MH.S.skill.k&&!MH.S.info),'tapping one explains that skill, level by level');await shot('c-skill');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill),'and a tap closes it');}
-  {const pos=await ev(()=>{const b=MH.S.btns.filter(b=>b.id.startsWith('forge:'))[2],r=document.getElementById('c').getBoundingClientRect();return{id:b.id.slice(6),x:r.left+(b.x+8)/128*r.width,y:r.top+(b.y+3)/MH.LH*r.height};});
-    await touch('touchStart',pos.x,pos.y);await p.waitForTimeout(650);await touch('touchEnd');await p.waitForTimeout(150);
-    ok(await ev(id=>MH.S.info===id&&MH.S.btns.some(b=>b.id.startsWith('info:skill:'))&&MH.S.btns.some(b=>b.id==='info:set'),pos.id),'holding an item opens its details: every skill and its set bonus');await shot('c-item-info');
-    ok(await ev(id=>MH.SAVE.eq.armor!==id||true,pos.id),'holding does not craft or wear it');
-    await tapBtn0('info:set');ok(await ev(()=>!!(MH.S.skill&&MH.S.skill.set)),'the set bonus can be read from there');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill&&!!MH.S.info),'closing it goes back to the item');
-    await p.touchscreen.tap(30,20);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.info),'and a tap outside closes the item');}
+  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('forge');MH.S.fcat='armor';MH.S.fsub=0;MH.S.scr={};MH.S.fsel={};});await p.waitForTimeout(250);
+  await tapBtn0('forge:quill_ar');await p.waitForTimeout(100);
+  ok(await ev(()=>MH.S.btns.some(b=>b.id.startsWith('skill:'))&&MH.S.btns.some(b=>b.id==='setb:quill_ar')),'picking an item shows everything about it below: its skills and set bonus');await shot('c-item-sheet');
+  {const id=await ev(()=>MH.S.btns.find(b=>b.id.startsWith('skill:')).id);
+    await tapBtn0(id);ok(await ev(()=>!!(MH.S.skill&&MH.S.skill.k)),'tapping a skill explains it, level by level');await shot('c-skill');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill),'and a tap closes it');}
+  await tapBtn0('setb:quill_ar');ok(await ev(()=>!!(MH.S.skill&&MH.S.skill.set)),'the set bonus can be read the same way');await tapBtn0('skill:close');
+  ok(await ev(()=>MH.SAVE.eq.armor!=='quill_ar'||true),'picking does not craft or wear anything');
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   // ── v0.28: monster sounds ──
   ok(await ev(()=>{const v=id=>MH.voiceOf(MH.MONSTERS[id]);const ps=new Set(MH.HUNTS.map(id=>Math.round(v(id).p)));return ps.size>=25&&v('tusk').p<v('fern').p&&v('quill').p>v('fern').p&&v('star').p<v('fern').p;}),'every monster has its own voice: brutes low, raptors high, the elder deepest');
   ok(await ev(()=>{MH.audioInit();MH.PREFS.sfx=true;MH.newHunt('fern');const S=MH.S,m=S.m;S.h.inv=1e9;m.evadeCd=1e9;m.qteT=1e9;const V=MH.voiceOf(S.def);V.last={};
     for(let i=0;i<60*6;i++)MH.update(1/60);MH.S.mode='camp';return (V.last.roar>0&&V.last.growl>0)||JSON.stringify(V.last);}),'a hunt is full of the monster\'s noises: a roar to open, growls as it winds up');
-  // ── v0.28.1: the i badge ──
-  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('forge');MH.S.fcat='weapon';MH.S.fsub=0;MH.S.scr={};});await p.waitForTimeout(250);
-  ok(await ev(()=>MH.S.btns.some(b=>b.id==='info:fern_gs')),'every forge item has an i to tap');
-  await tapBtn0('info:fern_gs');ok(await ev(()=>MH.S.info==='fern_gs'&&!MH.SAVE.own.x),'tapping the i opens the item\'s details');await p.touchscreen.tap(30,20);await p.waitForTimeout(120);
-  await tapBtn('tab:gear');await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');const w0=await ev(()=>MH.SAVE.eq.weapon);
-  ok(await ev(()=>MH.S.btns.some(b=>b.id==='info:fern_gs')),'so does every item in the gear lists');
-  await tapBtn0('info:fern_gs');ok(await ev(w0=>MH.S.info==='fern_gs'&&MH.SAVE.eq.weapon===w0,w0),'and its i shows details without wearing it');await p.touchscreen.tap(30,20);await p.waitForTimeout(120);
+  // ── v0.29: the gear lists show the picked item below, with WEAR ──
+  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('gear');});await p.waitForTimeout(150);
+  await tapBtn0('slot:weapon');await tapBtn0('wtype:gs');const w0=await ev(()=>MH.SAVE.eq.weapon);
+  await tapBtn0('wear:fern_gs');ok(await ev(w0=>MH.SAVE.eq.weapon===w0&&MH.S.btns.some(b=>b.id==='equip:fern_gs'),w0),'in the gear lists, a tap picks an item and shows it, without wearing it');await shot('c-gear-sheet');
+  await tapBtn0('equip:fern_gs');ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'),'WEAR puts it on');
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);

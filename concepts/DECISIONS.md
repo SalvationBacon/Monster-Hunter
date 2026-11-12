@@ -362,3 +362,32 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 ## v0.28.1: the i badge
 - Every item in the forge and in the GEAR picker lists has a small blue **i** under its icon. Tapping the icon or the i opens the details card (skills, set bonus, cost). The rest of the row behaves as before (craft or wear), and holding still works.
 - The forge footer and Bram's intro point to the i.
+
+## v0.29.0: the redesign
+Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzGDr).
+- **Style kit (`UI`):**
+  - **Type:** two text sizes. Double-size for screen titles and monster names; long names fall back to the small size.
+  - **Gold:** used only for the next action (the main button, the current sub-tab, the next goal).
+  - **Icons and chips over words:** heart = health, sword = attack, colored chips for elements and statuses.
+  - **Surfaces:** soft-cornered boxes on a near-black ground in place of outlines, and gaps to separate items.
+  - **Shared parts:** `titleBar`, `uSeg` (switches), `uBtn` (gold / plain / off), `chip`, `itemSheet`, `uToast`.
+- **Camp home** replaces the pop-up menu. You land here from the title and after every hunt.
+  - A NEXT UP card shows the current story step and the character who gave it, with GO (straight to the right screen or prep) or CLAIM REWARD.
+  - Six tiles each show a live status (N OPEN, N READY, N POTIONS, N TO CLAIM, N OF 35, N OF 32), plus a GEAR row and a settings cog.
+  - The ☰ on every other screen goes home.
+- **Hunt list:** big names, weakness chips, health with a heart, and your resistance. Beaten monsters get a check. Locked monsters are slim, dimmed rows, with one "how to open" line per rank. Each rank has a thin gold progress bar. BIG HUNTS / EXPEDITIONS is a switch, and the search bar sits under it.
+- **Expeditions:** biome cards with GATHER (gold) and PACK; locked biomes are slim rows.
+- **Forge:**
+  - One-line rows: picture, name, main stat, and READY / NEED n / UP READY / WORN / OWNED.
+  - Tapping a row picks it. A panel at the bottom shows everything (stats, resist, skill chips, set bonus, cost) with one big CRAFT or UPGRADE button.
+  - Skills and the set bonus are tappable for the level-by-level card.
+  - This replaces the i badge and hold-to-inspect.
+- **Gear:** a hero card (health, attack, element chip, best resist, skills button) and a grid of slots. The lists work like the forge: tap to pick, the panel shows details, WEAR puts it on. Picker pages have a back arrow and a big title.
+- **Kitchen:** a big potion count with BREW, the pantry (tap an ingredient for where it's found), and the meal list with costs.
+- **Quests:** the story card shows the speaker's portrait, the chapter text wrapped to fit, REPLAY, and the goal with CLAIM or its rewards. Dailies, weeklies and side jobs are slim rows with colored dots.
+- **Before a hunt:**
+  - The monster fills the top, in its biome; the banner shrinks on short phones. Below are the name, then WEAK and USES chips and its tip.
+  - The loadout card shows health, attack, potions, and a hint (A GOOD PICK / IT RESISTS THIS / TRY ICE WEAPONS); tapping it opens GEAR.
+  - The meal card has arrows, the Pip card changes Pip's job, and one big gold HUNT button sits at the bottom.
+- **Results, pause, options, title buttons, panels and dialogs** are all restyled to match.
+- **Guides:** they start from the camp home (tap the tile), and the forge guide includes "tap an item to see it below".
