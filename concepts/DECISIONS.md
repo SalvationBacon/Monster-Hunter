@@ -59,7 +59,7 @@ All four are owned in iron from the start. A weapon of a monster's tier costs it
 
 | Type | Hits per second | Hold | Notes |
 |---|---|---|---|
-| Dual Blades | 5.2 | keep slashing for +20% damage, on stamina | cheaper dodge, weaker counter |
+| Dual Blades | 5.2 | Blade Dance: spends all fury on 4, 7 or 10 rapid hits (v0.21.0) | cheaper dodge, weaker counter; landed hits build fury (4 each, perfect dodges 15), which drains after 3s without hitting |
 | Lance | 3.3 | guard: a hit costs stamina and 20% damage | a guard raised in the last 0.3s is perfect and opens a counter |
 | Greatsword | 2.3 | charge a heavy hit, three levels | the all-rounder |
 | Hammer | 1.7 | charge a heavy hit | every hit builds stun, head hits most |

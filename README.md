@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.20.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, nineteen levelled skills on armor and charms, set bonuses, upgrades, music for every screen and monster, and a camp with gear, a forge, kitchen, quests, expeditions in eight biomes, a terrarium and Pip, a companion with its own gear.
+**Current state: prototype (v0.21.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, nineteen levelled skills on armor and charms, set bonuses, upgrades, music for every screen and monster, and a camp with gear, a forge, kitchen, quests, expeditions in eight biomes, a terrarium and Pip, a companion with its own gear.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -11,7 +11,7 @@ Open `index.html` in a browser. It is one file with no dependencies. Progress is
 |---|---|
 | Tap | Attack (three-hit combo) |
 | Tap a red circle | Weak-point hit. Three on the same part break it |
-| Hold | The weapon's skill: charge (greatsword, hammer), keep slashing (dual blades), guard (lance) |
+| Hold | The weapon's skill: charge (greatsword, hammer), Blade Dance from built-up fury (dual blades), guard (lance) |
 | Swipe left or right | Dodge roll. Dodge just as the ring closes for a PERFECT, then tap COUNTER |
 | Swipe up, or the potion button | Drink a potion |
 | Swipe down, or the whetstone button | Sharpen the weapon |

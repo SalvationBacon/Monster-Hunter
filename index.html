@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.20.0';
+const VER='0.21.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -38,11 +38,14 @@ const UP_MAX=5, UP_STEP=.08;                             // upgrades: each level
 // ── Weapon types. dmg/dur/hit: the three-hit tap combo. hold: what a held press does.
 const WTYPES={
   gs:{name:'GREATSWORD', hold:'charge',tip:'HOLD: CHARGE A HEAVY HIT',dmg:[15,17,27],dur:[.32,.32,.48],hit:[.12,.12,.2], heavy:[0,40,85,150],stunTap:3,stunAll:0,stunHeavy:1,  counter:120,cstun:40,dodge:25},
-  db:{name:'DUAL BLADES',hold:'flurry',tip:'HOLD: KEEP SLASHING',     dmg:[7,7,12],  dur:[.14,.14,.2], hit:[.04,.04,.07],                    stunTap:1,stunAll:0,stunHeavy:1,  counter:100,cstun:30,dodge:15},
+  db:{name:'DUAL BLADES',hold:'dance', tip:'HOLD: BLADE DANCE (FURY)', dmg:[7,7,12],  dur:[.14,.14,.2], hit:[.04,.04,.07],                    stunTap:1,stunAll:0,stunHeavy:1,  counter:100,cstun:30,dodge:15},
   hm:{name:'HAMMER',     hold:'charge',tip:'HOLD: CHARGE. BIG STUN',  dmg:[20,22,34],dur:[.44,.44,.62],hit:[.18,.18,.28],heavy:[0,45,95,165],stunTap:8,stunAll:4,stunHeavy:1.6,counter:120,cstun:60,dodge:25},
   ln:{name:'LANCE',      hold:'guard', tip:'HOLD: GUARD HITS',        dmg:[11,12,17],dur:[.22,.22,.32],hit:[.08,.08,.12],                    stunTap:2,stunAll:0,stunHeavy:1,  counter:130,cstun:40,dodge:25},
 };
-const WT=['gs','db','hm','ln'], FLURRY_COST=4, FLURRY_BONUS=1.2;
+const WT=['gs','db','hm','ln'];
+// Dual blades: landed hits fill a fury meter (perfect dodges fill it fast); holding spends it all on a Blade Dance.
+// Three levels by fury stored. Fury drains when you stop hitting.
+const FURY={hit:4,perfect:15,idle:3,drain:8,cost:[34,67,100],hits:[4,7,10],dmg:[9,9,10],gap:.09};
 // Weak points: a red circle shrinks on a part; tap it in time. Three hits break the part.
 const QTE_GAP=[1.9,2.9], QTE_FIRST=2.5, QTE_DMG=40, QTE_R=15, QTE_STUN=15;
 const PARTS=['head','wings','tail'];
@@ -976,7 +979,7 @@ function newHunt(id,o){
   o=o||{}; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
   S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0;
   S.mode='hunt'; S.t=0; S.timeLeft=D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
-  S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,flurry:false,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
+  S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,fury:0,furyT:0,dn:0,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
        potions:Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
        immune:M.immune||{},wear:M.wear||1,regen:M.regen||1,healMul:M.heal||1,luck:(M.luck||1)*(gs.setb==='bounty'?1.5:1),chargeSlow:M.chargeSlow||1,sw:gs.setb==='secondwind',bl:0,qGap:gs.setb==='insight'?.8:1};
   S.m=freshMonster(D,gs.status);
@@ -1188,7 +1191,7 @@ function mHit(i){
   if(A.fx==='sky'){S.fx.push({kind:D.elem==='ice'?'icicle':'bolt',x:hc.x,y:L.hFeet,t:0,col:D.fxc[0]});S.shake=Math.max(S.shake,.25);sfx('heavy');}
   if(A.fx==='blast'){S.fx.push({kind:'ring',x:hc.x+10,y:L.hFeet,t:0,life:.4,col:'#ff9a2e'});for(let k=0;k<20;k++)S.pt.push({x:hc.x+rnd(-6,30),y:L.hFeet,vx:rnd(-70,70),vy:rnd(-130,-30),life:rnd(.3,.7),col:k%2?'#ff9a2e':'#ffd34d',g:200});}
   if(h.state==='dead'||h.state==='win'||h.state==='counter')return;
-  const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;if(h.g.setb==='bloodlust')h.bl=5;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
+  const P=h.g.perks, perfect=txt=>{S.stats.perfect++;h.counter=COUNTER_WIN;if(h.g.W.hold==='dance'){h.fury=Math.min(100,h.fury+FURY.perfect);h.furyT=0;}if(h.g.setb==='bloodlust')h.bl=5;h.st=Math.min(100,h.st+25);S.slow=.4;addNum(hc.x+8,hc.y-22,txt,'#ffe14d',1.1);sfx('perfect');
     for(let k=0;k<10;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-50,50),vy:rnd(-70,-10),life:.5,col:'#ffe14d',g:60});};
   if(h.state==='dodge'&&h.t<DODGE_IFR+.02*(P.nimble||0)+scoutBonus()){
     S.stats.dodges++;
@@ -1311,10 +1314,11 @@ function qteTap(x,y){
   if(ph>m.phase&&!S.def.small){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
   return true;
 }
-function hStartAtk(part){const h=S.h;h.combo=(h.state==='atk'||h.comboT>0)?(h.combo+1)%3:0;h.state='atk';h.t=0;h.hitDone=false;h.flurry=false;h.target=part;h.buf=0;sfx('swing');}
+function hStartAtk(part){const h=S.h;h.combo=(h.state==='atk'||h.comboT>0)?(h.combo+1)%3:0;h.state='atk';h.t=0;h.hitDone=false;h.target=part;h.buf=0;sfx('swing');}
 function hUpdate(dt){
   const h=S.h, W=h.g.W, P=h.g.perks, held=IN.down&&!IN.swiped; h.t+=dt;
   if(h.inv>0)h.inv-=dt; if(h.buff>0)h.buff-=dt; if(h.bl>0)h.bl-=dt; if(h.counter>0)h.counter-=dt; if(h.comboT>0)h.comboT-=dt; if(h.buf>0)h.buf-=dt;
+  if(!held)h.danceTried=false; if(h.fury>0&&(h.furyT+=dt)>FURY.idle&&h.state!=='dance')h.fury=Math.max(0,h.fury-FURY.drain*dt);   // fury drains when you stop hitting
   if(h.stDelay>0)h.stDelay-=dt; else h.st=Math.min(100,h.st+32*dt*h.regen*(h.wet>0?WET.regen:1));
   if(h.freezeImm>0)h.freezeImm-=dt; if(h.numbImm>0)h.numbImm-=dt;
   for(const k of ['wet','blight','stench','mud'])if(h[k]>0)h[k]=Math.max(0,h[k]-dt);
@@ -1330,13 +1334,17 @@ function hUpdate(dt){
   if(h.state==='frozen'){if((h.frozen-=dt)<=0){h.state='idle';h.inv=.5;iceBurst();}return;}
   if(h.state==='numb'){if((h.numb-=dt)<=0){h.state='idle';h.inv=.4;}return;}
   if(h.state==='atk'){
-    if(!h.hitDone&&h.t>=W.hit[h.combo]){h.hitDone=true;dealDamage(W.dmg[h.combo]*(h.flurry?FLURRY_BONUS:1),h.target,false,h.target==='head'?W.stunTap:W.stunAll);}
+    if(!h.hitDone&&h.t>=W.hit[h.combo]){h.hitDone=true;const d0=S.stats.dealt;dealDamage(W.dmg[h.combo],h.target,false,h.target==='head'?W.stunTap:W.stunAll);
+      if(W.hold==='dance'&&S.stats.dealt>d0){h.fury=Math.min(100,h.fury+FURY.hit);h.furyT=0;}}                  // a landed hit builds fury
     if(h.state==='atk'&&W.hold==='guard'&&held&&h.hitDone&&S.clock-IN.downAt>.14){h.state='guard';h.t=0;}          // the lance can raise its shield mid-combo
     else if(h.t>=W.dur[h.combo]){if(h.buf>0&&h.state==='atk')hStartAtk(h.bufPart);else if(h.state==='atk'){h.state='idle';h.comboT=.45;}}
   }else if(h.state==='charge'){
     h.charge+=dt;const k=1-.1*(P.quick||0),l=h.charge>=CHARGE_AT[2]*k?3:h.charge>=CHARGE_AT[1]*k?2:h.charge>=CHARGE_AT[0]*k?1:0;
     if(l>h.lvl){h.lvl=l;sfx('charge',l);buzz(15);}
     if(!IN.down)hRelease();
+  }else if(h.state==='dance'){                                                  // a burst of hits, one every FURY.gap; a dodge cancels it
+    const L=h.lvl-1;while(h.dn<FURY.hits[L]&&h.t>=h.dn*FURY.gap){h.combo=h.dn%2;h.dn++;dealDamage(FURY.dmg[L],h.target,false,h.target==='head'?W.stunTap:W.stunAll);sfx('swing');if(h.state!=='dance')break;}
+    if(h.state==='dance'&&h.t>=FURY.hits[L]*FURY.gap+.15){h.state='idle';h.lvl=0;}
   }else if(h.state==='guard'){if(!held)h.state='idle';}
   else if(h.state==='heavy'){
     if(!h.hitDone&&h.t>=.14){h.hitDone=true;dealDamage(W.heavy[h.lvl],h.target,true,h.target==='head'?STUN_HEAVY[h.lvl]*W.stunHeavy:W.stunAll*h.lvl);}
@@ -1358,7 +1366,8 @@ function hUpdate(dt){
   }
   if(h.state==='idle'){
     if(h.buf>0)hStartAtk(h.bufPart);
-    else if(held&&W.hold==='flurry'){if(S.clock-IN.downAt>.18&&h.st>=FLURRY_COST){h.st-=FLURRY_COST;h.stDelay=.35;hStartAtk(IN.part);h.flurry=true;}}   // dual blades: keep slashing, harder, on stamina
+    else if(held&&W.hold==='dance'){if(S.clock-IN.downAt>.22&&!h.danceTried){h.danceTried=true;const dl=h.fury>=FURY.cost[2]?3:h.fury>=FURY.cost[1]?2:h.fury>=FURY.cost[0]?1:0;   // dual blades: spend fury on a Blade Dance
+      if(dl){h.state='dance';h.t=0;h.lvl=dl;h.dn=0;h.fury=0;h.target=IN.part;S.stats.dances=(S.stats.dances||0)+1;sfx('charge',dl);buzz(20);}else addNum(L.hx+18,L.hFeet-40,'NEED FURY','#8a93b0',.6);}}
     else if(held&&W.hold==='guard'){if(S.clock-IN.downAt>.14){h.state='guard';h.t=0;}}
     else if(held&&S.clock-IN.downAt>.22){h.state='charge';h.t=0;h.charge=0;h.lvl=0;h.target=IN.part;}
   }
@@ -1662,12 +1671,13 @@ function shadow(cx,cy,rx,ry){g.fillStyle='rgba(0,0,0,.28)';for(let y=-ry;y<=ry;y
 
 function hunterPose(){
   const h=S.h, p={kind:'stand',a:-1.2,bob:Math.sin(S.clock*4)>0?1:0,lean:0,glow:0,f:0};
-  if(h.state==='atk'){const u=clamp(h.t/(h.g.W.hit[h.combo]+.06),0,1);if(h.flurry)p.glow=1;p.bob=0;p.lean=1;
+  if(h.state==='atk'){const u=clamp(h.t/(h.g.W.hit[h.combo]+.06),0,1);p.bob=0;p.lean=1;
     p.a=h.combo===0?lerp(-2.0,.4,u):h.combo===1?lerp(.6,-1.9,u):lerp(-2.5,.7,u);if(h.combo===2)p.lean=2;}
   else if(h.state==='charge'){p.a=-2.6+(h.lvl?Math.sin(S.clock*50)*.1:0);p.bob=1;p.lean=-1;p.glow=h.lvl===3?(Math.floor(S.clock*14)%2?3:2):h.lvl;}
   else if(h.state==='heavy'){p.a=lerp(-2.7,.9,h.t/.18);p.lean=2;p.bob=0;p.glow=h.lvl;}
   else if(h.state==='counter'){p.a=lerp(-2.7,.9,h.t/.2);p.lean=2;p.bob=0;p.glow=Math.floor(S.clock*20)%2?3:1;}
   else if(h.state==='numb'){p.a=.3;p.lean=-1;p.bob=Math.floor(S.clock*20)%2;}
+  else if(h.state==='dance'){const u=(h.t/FURY.gap)%1;p.a=h.dn%2?lerp(.6,-1.9,u):lerp(-2,.4,u);p.lean=2;p.bob=0;p.glow=Math.floor(S.clock*20)%2?3:h.lvl;}
   else if(h.state==='guard'){p.a=-.5;p.guard=1;p.bob=0;if(h.t<=GUARD_PERFECT)p.glow=1;}
   else if(h.state==='dodge'){p.kind='roll';p.f=Math.floor(h.t*14)%2;}
   else if(h.state==='hurt'){p.a=-.4;p.lean=-1;p.bob=1;}
@@ -1737,6 +1747,8 @@ function drawWorld(){
     if(h.state==='frozen'){const x=L.hx+6,y=L.hy+4,bl=Math.floor(S.clock*6)%2;g.fillStyle='rgba(160,220,255,.55)';g.fillRect(x,y,24,36);g.fillStyle='#e8f8ff';g.fillRect(x,y,24,1);g.fillRect(x,y,1,36);g.fillRect(x+4,y+5,1,9);g.fillRect(x+17,y+14,1,12);
       g.fillStyle='#6cc4f0';g.fillRect(x+23,y,1,36);g.fillRect(x,y+35,24,1);text('TAP!',x+12,y-8+bl,'#ffffff',{al:1,out:OUTLINE});}
   }
+  if(h.g.W.hold==='dance'&&h.state!=='dead'){const full=h.fury>=100&&Math.floor(S.clock*8)%2;for(let i=0;i<3;i++){const f=clamp((h.fury-i*33.4)/33.3,0,1);   // fury pips
+    g.fillStyle=OUTLINE;g.fillRect(L.hx+10+i*6,L.hy-5,5,4);g.fillStyle='#2b2f45';g.fillRect(L.hx+11+i*6,L.hy-4,3,2);g.fillStyle=full?'#ffffff':'#ff6a4d';g.fillRect(L.hx+11+i*6,L.hy-4,Math.round(3*f),2);}}
   if(h.state==='charge'){for(let i=0;i<3;i++){g.fillStyle=OUTLINE;g.fillRect(L.hx+10+i*6,L.hy-5,5,4);g.fillStyle=i<h.lvl?['#ffe14d','#ff9a2e','#ffffff'][i]:'#2b2f45';g.fillRect(L.hx+11+i*6,L.hy-4,3,2);}
     if(h.lvl<3){const a=h.lvl?CHARGE_AT[h.lvl-1]:0,f=(h.charge-a)/(CHARGE_AT[h.lvl]-a);g.fillStyle='#fff';g.fillRect(L.hx+10,L.hy,Math.round(17*clamp(f,0,1)),1);}}
   if(h.counter>0){const c=L.counter,pu=Math.floor(S.clock*10)%2,f=h.counter/COUNTER_WIN;
@@ -2110,7 +2122,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests

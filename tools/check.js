@@ -105,6 +105,18 @@ const shots=process.argv[2];
   console.log('     tap damage per second: '+Object.entries(dps).map(([k,v])=>k+' '+v.dps.toFixed(1)+' ('+v.rate.toFixed(1)+' hits/s)').join(', '));
   const dv=Object.values(dps).map(v=>v.dps);ok(Math.max(...dv)/Math.min(...dv)<1.06,'all four weapon types deal the same tap damage per second, within 6%');
   ok(dps.db.rate>dps.ln.rate&&dps.ln.rate>dps.gs.rate&&dps.gs.rate>dps.hm.rate&&dps.db.rate/dps.hm.rate>2.5,'dual blades hit fastest, then lance, greatsword, hammer');
+  // dual blades: fury and the Blade Dance
+  ok(await ev(()=>{EQ('iron_db');const S=QUIET('storm'),h=S.h;S.m.hp=S.m.max=1e7;for(let i=0;i<6;i++){h.state='idle';h.comboT=0;MH.actTap('body');RUN(14);}const six=h.fury;
+    for(let i=0;i<60;i++){MH.actTap('body');RUN(10);}const cap=h.fury;RUN(60*2);const kept=h.fury;RUN(60*3);const drained=h.fury;
+    EQ('iron_gs');const T=QUIET('storm');for(let i=0;i<10;i++){MH.actTap('body');RUN(20);}return six===24&&cap===100&&kept===100&&drained<90&&T.h.fury===0||[six,cap,kept,drained,T.h.fury].join(',');}),
+    'dual blade hits build fury, 4 a hit up to 100; it holds for 3 seconds then drains, and other weapons build none');
+  ok(await ev(()=>{EQ('iron_db');const run=f=>{const S=QUIET('storm'),h=S.h;S.m.hp=S.m.max=1e7;h.fury=f;Object.assign(MH.IN,{down:true,swiped:false,downAt:S.clock-1,part:'body'});const d0=S.stats.dealt;let hits=0,last=d0,t=0;
+      MH.update(1/60);const st=h.state;while(t<2){MH.IN.down=t<.05;MH.update(1/60);t+=1/60;if(S.stats.dealt!==last){hits++;last=S.stats.dealt;}}MH.IN.down=false;return{st,hits,fury:h.fury,dealt:S.stats.dealt-d0};};
+    const none=run(20),l1=run(40),l2=run(70),l3=run(100);return none.st!=='dance'&&none.hits===0&&l1.st==='dance'&&l1.hits===4&&l2.hits===7&&l3.hits===10&&l3.fury===0&&l3.dealt>l1.dealt*2||JSON.stringify([none,l1,l2,l3]);}),
+    'holding spends all fury on a Blade Dance: 4, 7 or 10 hits by level, and nothing below a third');
+  ok(await ev(()=>{EQ('iron_db');const S=QUIET('storm'),h=S.h;h.fury=100;h.state='dance';h.t=0;h.lvl=3;h.dn=0;RUN(10);const mid=h.dn;MH.actDodge(-1);const dodged=h.state==='dodge';RUN(40);
+    const U=QUIET('fern'),m=U.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);let t=0;while(m.state==='attack'&&m.hits[0]-m.t>.1&&t<5){MH.update(1/60);t+=1/60;}MH.actDodge(-1);t=0;while(m.state==='attack'&&m.hi===0&&t<2){MH.update(1/60);t+=1/60;}
+    return mid>0&&mid<10&&dodged&&h.dn===mid&&U.h.fury===15||[mid,dodged,h.dn,U.h.fury].join(',');}),'a dodge cancels the dance, and a perfect dodge gives 15 fury');
   // average damage of one tap, for comparing rules. sharp and state can be forced.
   await ev(()=>{window.HIT=(mon,o)=>{o=o||{};let n=0;const N=o.n||40;for(let k=0;k<N;k++){const S=QUIET(mon,o.hunt),m=S.m;S.h.sharp=o.sharp==null?50:o.sharp;if(o.state){m.state=o.state;m.t=0;m.rec=99;m.staggerDur=99;m.atk=m.atk||'bite';}if(o.pre)o.pre(S);
     MH.actTap(o.part||'body');RUN(16);n+=S.stats.dealt;}return n/N;};});
@@ -378,6 +390,11 @@ const shots=process.argv[2];
   const cb=await ev(()=>{const S=MH.S;S.h.counter=1.4;S.slow=0;MH.manual=true;const r=document.getElementById('c').getBoundingClientRect(),c=MH.L.counter;return{x:r.left+(c.x+c.w/2)/128*r.width,y:r.top+(c.y+c.h/2)/MH.LH*r.height,d:S.stats.dealt};});
   await p.touchscreen.tap(cb.x,cb.y);ok(await ev(()=>MH.S.h.state==='counter'),'a tap on the COUNTER button starts a counter');
   await ev(()=>{for(let i=0;i<40;i++)MH.update(1/60);});ok(await ev(d=>MH.S.stats.dealt-d>=100&&MH.S.m.stun>=40,cb.d),'the counter lands a big hit and fills the stun meter');
+  // dual blades with a real held press
+  await ev(()=>{MH.manual=false;MH.SAVE.eq.weapon='iron_db';MH.newHunt('fern');const S=MH.S,m=S.m;m.state='idle';m.wait=99;m.evadeCd=99;m.qteT=99;S.h.fury=100;});
+  await touch('touchStart',200,600);await p.waitForTimeout(450);ok(await ev(()=>MH.S.h.state==='dance'||MH.S.stats.dances===1),'a held press with dual blades and full fury starts a Blade Dance');await shot('c-dance');
+  await touch('touchEnd');await p.waitForTimeout(1200);ok(await ev(()=>MH.S.h.fury<10&&MH.S.h.state!=='dance'),'and it plays out and spends the fury');
+  await ev(()=>{MH.SAVE.eq.weapon='fern_gs';MH.newHunt('fern');MH.S.m.evadeCd=9;});
   // quitting from the pause menu goes back to camp
   ok(await ev(()=>{const id=MH.S.def.id;MH.pauseHunt(true);MH.S.btns.find(b=>b.id==='pause:quit')||1;MH.quitHunt();const r=MH.S.mode==='camp'&&!MH.SAVE.wins[id];return r;}),'QUIT HUNT goes back to camp with no win');
   await ev(()=>{MH.toPrep('fern');});await p.waitForTimeout(80);await tapBtn('prep:start');await ev(()=>{MH.S.m.evadeCd=9;});
