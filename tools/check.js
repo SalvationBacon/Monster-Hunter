@@ -5,11 +5,14 @@ const shots=process.argv[2];
 (async()=>{
   const b=await chromium.launch();
   const p=await b.newPage({viewport:{width:390,height:780},hasTouch:true,isMobile:true});
+  await p.addInitScript(()=>{try{localStorage.setItem('mh_notalk','1');}catch(e){}});   // scenes stay out of the way, except in the story checks
   const errs=[];p.on('pageerror',e=>errs.push(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
   await p.goto('file://'+path.resolve(__dirname,'../index.html'));await p.waitForTimeout(200);
   let fail=0;const ok=(c,msg)=>{console.log((c===true?'ok   ':'FAIL ')+msg+(c===true||c===false?'':' -> '+c));if(c!==true)fail++;};
   const shot=async n=>{if(shots){await p.waitForTimeout(80);await p.screenshot({path:shots+'/'+n+'.png'});}};
   const ev=(f,a)=>p.evaluate(f,a);
+  // storage writes need a moment to reach disk before the page goes away, or a reload can start from an empty save
+  const reload=async()=>{await p.waitForTimeout(350);await p.reload();await p.waitForFunction(()=>window.MH&&MH.SAVE&&MH.loadSave);await p.waitForTimeout(150);};
   await shot('title');
   await ev(()=>{MH.manual=true;for(const k in MH.GEAR)MH.SAVE.own[k]=true;window.EQ=(w,ar,ch)=>{ar=ar||'leather';const t=ar==='leather'?null:ar.slice(0,-3);Object.assign(MH.SAVE.eq,{weapon:w||'iron_gs',armor:ar,helm:t?t+'_he':'leather_helm',arms:t?t+'_ga':'leather_arms',legs:t?t+'_bo':'leather_legs',charm:ch||null});MH.SAVE.lv={};MH.SAVE.potions=99;};
     // a quiet hunt for measuring: the monster does nothing and cannot dodge
@@ -92,7 +95,7 @@ const shots=process.argv[2];
   for(const wt of ['gs','db','hm','ln']){r=await trial(wt,'fern',set('iron',wt),.7);ok(r.wins.length>=5&&r.time>30&&r.time<75,'the iron '+wt+' wins in about a minute ('+r.time+'s)');}
   console.log('  The ladder: each monster in the gear of the one before it (average bot, 3 hunts each)');
   const order=await ev(()=>MH.HUNTS.map(id=>({id,rank:MH.MONSTERS[id].rank,time:MH.MONSTERS[id].time})));const weak=[],slow=[];
-  for(let i=1;i<order.length;i++){const o=order[i],n=o.rank===8?8:3,res=await trial(o.id+' (rank '+o.rank+') in '+order[i-1].id+' gear',o.id,set(order[i-1].id),.7,n);
+  for(let i=1;i<order.length;i++){const o=order[i],n=o.rank===8?12:3,res=await trial(o.id+' (rank '+o.rank+') in '+order[i-1].id+' gear',o.id,set(order[i-1].id),.7,n);
     if(res.wins.length<Math.ceil(n*2/3))weak.push(o.id);if(res.wins.length&&res.time>o.time*.75)slow.push(o.id+' '+res.time+'s');}
   ok(weak.length===0||weak.join(', '),'every monster can be beaten in the gear of the one before it');
   ok(slow.length===0||slow.join(', '),'and none of those hunts runs close to its time limit');
@@ -121,7 +124,7 @@ const shots=process.argv[2];
   await ev(()=>{window.HIT=(mon,o)=>{o=o||{};let n=0;const N=o.n||40;for(let k=0;k<N;k++){const S=QUIET(mon,o.hunt),m=S.m;S.h.sharp=o.sharp==null?50:o.sharp;if(o.state){m.state=o.state;m.t=0;m.rec=99;m.staggerDur=99;m.atk=m.atk||'bite';}if(o.pre)o.pre(S);
     MH.actTap(o.part||'body');RUN(16);n+=S.stats.dealt;}return n/N;};});
   ok(await ev(()=>{EQ('tusk_gs');const a=HIT('temp'),b=HIT('fern');return Math.abs(a/b-1.25)<.05;}),'an element weapon does 25% more to a monster weak to it');
-  ok(await ev(()=>{EQ();const k=HIT('storm',{sharp:100}),m=HIT('storm',{sharp:50}),d=HIT('storm',{sharp:10});return Math.abs(k/m-1.1)<.03&&Math.abs(d/m-.75)<.03;}),'a keen edge hits 10% harder and a dull one 25% softer');
+  ok(await ev(()=>{EQ();const k=HIT('storm',{sharp:100,n:160}),m=HIT('storm',{sharp:50,n:160}),d=HIT('storm',{sharp:10,n:160});return Math.abs(k/m-1.1)<.03&&Math.abs(d/m-.75)<.03;}),'a keen edge hits 10% harder and a dull one 25% softer');
   ok(await ev(()=>{EQ();const S=QUIET('storm'),h=S.h;let t=0;while(h.sharp>=MH.SHARP.lo&&t<60){MH.actTap('body');MH.update(1/60);t+=1/60;}
     const wore=t>15&&t<35;h.state='idle';MH.actSharpen();const busy=h.state==='sharpen';RUN(90);const done=h.sharp===100&&h.state==='idle';
     h.sharp=40;MH.actSharpen();h.inv=0;S.m.wait=0;let u=0;while(h.state==='sharpen'&&u<4){MH.update(1/60);u+=1/60;}return wore&&busy&&done&&h.sharp===40&&h.state!=='sharpen';}),'the edge dulls in about 25 seconds of hitting, sharpening restores it, and a hit interrupts it');
@@ -196,7 +199,7 @@ const shots=process.argv[2];
     const l4=MH.skillLevels()[k],mx=MH.skillMax(k);MH.SAVE.eq.legs='leather_legs';const l3=MH.skillLevels()[k];EQ();return l4===4&&mx===4&&l3===3||[k,l4,mx,l3].join(',');`)),'Ascendant lets the set\'s main skill reach level 4');
   ok(await ev(new Function(`const id=${byB('secondwind')};EQ('iron_gs',id+'_ar');MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=1e9;m.qteT=1e9;S.h.hp=1;m.wait=0;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}
     const lived=S.h.hp===1&&S.h.state!=='dead';S.h.inv=0;S.h.state='idle';m.state='idle';m.wait=0;t=0;const tk=S.stats.taken;while(S.stats.taken===tk&&t<6){MH.update(1/60);t+=1/60;}EQ();return lived&&S.h.state==='dead';`)),'Second Wind survives one killing blow, but only one');
-  ok(await ev(new Function(`const id='obsid';EQ('iron_gs',id+'_ar');const a=HIT('storm',{n:30}),b=HIT('storm',{n:30,pre:S=>{S.h.bl=5;}});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);
+  ok(await ev(new Function(`const id='obsid';EQ('iron_gs',id+'_ar');const a=HIT('storm',{n:160}),b=HIT('storm',{n:160,pre:S=>{S.h.bl=5;}});MH.newHunt('fern');const S=MH.S,m=S.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);
     let t=0;while(m.state==='attack'&&m.hits[0]-m.t>.1&&t<5){MH.update(1/60);t+=1/60;}MH.actDodge(-1);t=0;while(m.state==='attack'&&m.hi===0&&t<2){MH.update(1/60);t+=1/60;}const on=S.h.bl>4;EQ();return Math.abs(b/a-1.15)<.03&&on||[a,b,S.h.bl].join(',');`)),'Bloodlust: a perfect dodge gives 15% more damage for a while');
   ok(await ev(new Function(`const id=${byB('insight')};const gap=()=>{let n=0;for(let k=0;k<200;k++){MH.newHunt('fern');const S=MH.S;S.qte={part:'head',t:9};MH.update(1/60);n+=S.m.qteT;}return n/200;};EQ();const a=gap();EQ('iron_gs',id+'_ar');const b=gap();EQ();return Math.abs(b/a-.8)<.05||[a,b].join(',');`)),'Insight brings the weak-point circles 20% more often');
   ok(await ev(new Function(`const id=${byB('bounty')};EQ('iron_gs',id+'_ar');MH.newHunt('fern');const l=MH.S.h.luck;EQ();MH.newHunt('fern');return l===1.5&&MH.S.h.luck===1;`)),'Bounty raises rare drop odds by half');
@@ -303,7 +306,7 @@ const shots=process.argv[2];
   }
 
   // ── the camp, on a fresh save, with real taps ──
-  await ev(()=>{localStorage.clear();});await p.reload();await p.waitForTimeout(200);
+  await ev(()=>{localStorage.clear();});await reload();
   const tapBtn=async id=>{if(id.startsWith('tab:')&&await ev(()=>MH.S.mode==='camp'&&!MH.S.menu)){await tapBtn0('camp:menu');}return tapBtn0(id);};
   const tapBtn0=async id=>{const q=await ev(id=>{if(MH.S.itemY&&id.startsWith('hunt:')&&MH.S.tab==='hunt'&&!MH.S.exp){MH.scrollSet(MH.S.itemY[id.slice(5)]-30);}return 1;},id);await p.waitForTimeout(60);
     const pos=await ev(id=>{const b=MH.S.btns.find(b=>b.id===id);if(!b)return null;const r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(b.x+b.w/2)/128*r.width,y:r.top+(b.y+b.h/2)/MH.LH*r.height};},id);
@@ -326,7 +329,7 @@ const shots=process.argv[2];
   await tapBtn('opt:dev');ok(await ev(()=>MH.PREFS.dev&&MH.HUNTS.every(id=>MH.unlocked(id))&&Object.keys(MH.GEAR).every(k=>MH.SAVE.own[k])&&MH.SAVE.pal&&MH.SAVE.potions===99&&MH.SAVE.bag.scale===99),'DEV MODE unlocks every monster and every piece of gear, with Pip and plenty of materials');
   ok(await ev(()=>JSON.parse(localStorage.getItem('mh_save_v1')).bag.scale===5&&!!localStorage.getItem('mh_dev_v1')),'and plays on its own save, leaving the real one alone');await shot('c-options-dev');
   await tapBtn('opt:back');ok(await ev(()=>!MH.S.opts&&MH.S.btns.some(b=>b.id==='title:howto')),'BACK closes the options');await shot('c-title-dev');
-  await p.reload();await p.waitForTimeout(200);ok(await ev(()=>MH.PREFS.dev&&MH.SAVE.wins.storm===1),'dev mode is remembered after a reload');
+  await reload();ok(await ev(()=>MH.PREFS.dev&&MH.SAVE.wins.storm===1),'dev mode is remembered after a reload');
   await p.touchscreen.tap(195,300);await p.waitForTimeout(100);await ev(()=>{MH.toCamp('hunt');});await p.waitForTimeout(100);await shot('c-dev-camp');
   ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:fern')),'the camp works in dev mode');await ev(()=>{MH.S.mode='title';MH.S.opts=true;});await p.waitForTimeout(100);
   await tapBtn('opt:dev');ok(await ev(()=>!MH.PREFS.dev&&MH.SAVE.bag.scale===5&&MH.SAVE.potions===4&&!MH.SAVE.wins.storm),'switching dev mode off brings the real save back');
@@ -375,7 +378,7 @@ const shots=process.argv[2];
   await tapBtn('gear:skills');ok(await ev(()=>MH.S.gpick==='skills'),'tapping the stats opens the skills page');await shot('c-gear-skills');await tapBtn('gear:back');
   await tapBtn('tab:forge');await tapBtn('fcat:weapon');await tapBtn('fsub:0');
   ok(await tapBtn('up:fern_gs')&&await ev(()=>MH.lvOf('fern_gs')===1&&MH.SAVE.bag.scale===1&&MH.SAVE.bag.claw===1&&MH.SAVE.eq.weapon==='fern_gs'),'a tap on UP upgrades the weapon and spends materials');await shot('c-forge-crafted');
-  await p.reload();await p.waitForTimeout(200);
+  await reload();
   ok(await ev(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.eq.charm==='fern_ch'&&MH.SAVE.bag.scale===1&&MH.lvOf('fern_gs')===1),'gear, upgrade levels and materials survive a reload');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);await tapBtn('tab:hunt');await tapBtn('hunt:fern');
   ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='fern'&&!MH.S.btns.some(b=>b.id==='prep:rnext')),'a tap on the Fernwing card opens the prep screen, with no companion yet');await shot('c-prep');
@@ -482,7 +485,7 @@ const shots=process.argv[2];
   ok(await ev(()=>{const w=id=>{MH.newHunt(id);const m=MH.S.m;m.last='';MH.S.def.pools[0]=['bite'];MH.mStartAttack();return m.hits[0];};const f=w('fern'),r4=w('frost'),st=w('star');MH.S.mode='camp';
     return (st<=f*.55&&r4<f*.85&&r4>st)||[f,r4,st].join(',');}),'harder monsters wind up much faster: the elder in about half the Fernwing\'s time');
   ok(await ev(()=>{MH.newHunt('star');const m=MH.S.m;MH.S.def.pools[0]=['tri'];m.last='';MH.mStartAttack();const a=m.hits[1]-m.hits[0];MH.newHunt('fern');MH.S.def.pools[0]=['tri'];MH.S.m.last='';MH.mStartAttack();const b=MH.S.m.hits[1]-MH.S.m.hits[0];MH.S.mode='camp';MH.newHunt('fern');MH.S.mode='camp';return a<b*.8;}),'and their combos land closer together');
-  await p.reload();await p.waitForTimeout(200);await ev(()=>{MH.setDev(true);MH.toCamp('hunt');});await p.waitForTimeout(150);
+  await reload();await ev(()=>{MH.setDev(true);MH.toCamp('hunt');});await p.waitForTimeout(150);
   ok(await ev(()=>{const q=document.getElementById('q');return q.style.display==='block';}),'the hunt list has a search box');
   await ev(()=>{const q=document.getElementById('q');q.value='ember';q.dispatchEvent(new Event('input'));});await p.waitForTimeout(150);
   ok(await ev(()=>{const h=MH.S.btns.filter(b=>b.id.startsWith('hunt:')&&b.id!=='hunt:clear').map(b=>b.id);return h.length>=1&&h.includes('hunt:ember')&&!h.includes('hunt:fern')||h.join();}),'searching a name shows only matching monsters');await shot('c-search');
@@ -505,6 +508,31 @@ const shots=process.argv[2];
   ok(await ev(()=>{MH.scrollSet(1e6);return MH.S.scrMax.bdet>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id.startsWith('mat:'))))))),'a mastered page lists drops, and they can be tapped');await shot('c-bestiary-fern-drops');
   await tapBtn0('book:back');await tapBtn0('book:quill');ok(await ev(()=>MH.S.scrMax.bdet===0||!MH.S.btns.some(b=>b.id.startsWith('mat:'))),'a monster hunted once keeps its drops hidden');await shot('c-bestiary-quill');
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
+  // ── v0.26: the story ──
+  ok(await ev(()=>{const K=Object.keys(MH.SCENES);const bad=[];for(const k of K)for(const [w,t] of MH.SCENES[k])if(w&&!MH.CAST[w])bad.push(k+':'+w);
+    return bad.length?bad.join(','):K.filter(k=>/^ch\d+$/.test(k)).length===MH.STORY.length;}),'every story chapter has a scene, and every speaker is in the cast');
+  await ev(()=>{localStorage.clear();});await reload();await ev(()=>{MH.noTalk=false;});
+  await p.touchscreen.tap(195,300);await p.waitForTimeout(700);
+  ok(await ev(()=>MH.S.mode==='camp'&&MH.S.talk&&MH.S.talk.lines===MH.SCENES.ch0),'a new game opens with Wren\'s welcome');await p.waitForTimeout(1200);await shot('st-intro');
+  const tapTalk=async n=>{for(let i=0;i<n;i++){await p.touchscreen.tap(195,300);await p.waitForTimeout(40);}};
+  await tapTalk(1);ok(await ev(()=>MH.S.talk&&MH.S.talk.i===0&&MH.S.talk.ch>=MH.SCENES.ch0[0][1].length),'a tap finishes the line before moving on');
+  await tapTalk(1);ok(await ev(()=>MH.S.talk.i===1),'and the next tap shows the next line');
+  await tapTalk(20);ok(await ev(()=>MH.SAVE.seen.ch0&&MH.SAVE.seen.v_quest&&!MH.S.talk),'the welcome plays once, then the quest board explains itself');
+  await ev(()=>{MH.toCamp('quest');});await p.waitForTimeout(500);ok(await ev(()=>!MH.S.talk),'seen scenes do not play again');
+  await tapBtn0('story:replay');ok(await ev(()=>MH.S.talk&&MH.S.talk.lines===MH.SCENES.ch0),'REPLAY plays the chapter scene again');
+  {const pos=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect(),T=MH.S.talk;return{x:r.left+(128-18)/128*r.width,y:r.top+(T.by-5)/MH.LH*r.height};});await p.touchscreen.tap(pos.x,pos.y);await p.waitForTimeout(80);}
+  ok(await ev(()=>!MH.S.talk),'SKIP ends a scene');
+  await ev(()=>{MH.newHunt('fern');});await p.waitForTimeout(1000);
+  ok(await ev(()=>MH.S.talk&&MH.S.talk.lines===MH.SCENES.h_attack),'the first hunt stops to teach the controls');await shot('st-tutorial');
+  {const t0=await ev(()=>MH.S.clock);await p.waitForTimeout(300);ok(await ev(t0=>MH.S.clock===t0,t0),'and the fight is frozen while Wren talks');}
+  await tapTalk(6);ok(await ev(()=>!MH.S.talk||MH.S.talk.lines!==MH.SCENES.h_attack),'tapping through returns to the fight');
+  await ev(()=>{MH.S.talk=null;const m=MH.S.m;m.state='idle';m.wait=0;});await p.waitForTimeout(300);
+  ok(await ev(()=>MH.SAVE.seen.h_dodge&&MH.S.talk&&MH.S.talk.lines===MH.SCENES.h_dodge&&MH.S.m.state==='attack'),'its first attack stops to teach the dodge');
+  await ev(()=>{MH.S.talk=null;MH.S.mode='camp';MH.SAVE.wins.fern=1;MH.toCamp('quest');});await p.waitForTimeout(600);
+  ok(await ev(()=>MH.S.talk&&MH.S.talk.lines===MH.SCENES.fern_win),'after the first Fernwing, Oda turns up with a glowing scale');await ev(()=>{MH.S.talk.i=2;MH.S.talk.ch=999;});await p.waitForTimeout(80);await shot('st-oda');
+  ok(await ev(()=>{const v=JSON.parse(JSON.stringify(MH.SAVE));delete v.seen;v.story={i:4,p:0};v.wins={fern:1,quill:1};localStorage.setItem('mh_save_v1',JSON.stringify(v));const L=MH.loadSave();
+    return L.seen.h_attack&&L.seen.ch3&&!L.seen.ch4;}),'an older save skips the tutorial but still sees its current chapter');
+  ok(await ev(()=>{MH.setDev(true);const r=Object.keys(MH.SCENES).every(k=>MH.SAVE.seen[k]);MH.setDev(false);return r;}),'dev mode skips every scene');
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();

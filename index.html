@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.25.0';
+const VER='0.26.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -167,7 +167,7 @@ const MONSTERS={}, HUNTS=[];
 ROSTER.forEach((r,i)=>{
   const [id,name,short,rig,biome,elem,w,weak,weakSt,inflict,trait,moves,cols,flags]=r, c=cols.split(',').map(x=>'#'+x), f={};(flags||'').split(',').forEach(k=>{if(k)f[k]=1;});
   const rank=i<30?1+(i/5|0):i<34?7:8, L=i<30?i:i<34?31:33, t=L/29, m=moves.split(','), q=id in OLD_PRE?OLD_PRE[id]:id+'_';
-  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.53;dmg*=1.12;} if(trait==='armor')hp=Math.round(hp*.9/50)*50; hp=Math.round(hp*1.1/50)*50;   // a full armor set's skills add about a tenth to a hunter's power
+  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.47;dmg*=1.12;} if(trait==='armor')hp=Math.round(hp*.9/50)*50; hp=Math.round(hp*1.1/50)*50;   // a full armor set's skills add about a tenth to a hunter's power
   const s0=(1-.35*t)*(rank===8?.9:rank===7?.94:1), e0=3.4-t;     // harder monsters attack much faster: the elder winds up in about half the Fernwing's time
   const D=MONSTERS[id]={id,name,short,rig,biome:+biome,rank,stars:rank,L,elem,weak,weakSt,inflict:inflict||null,trait:trait||null,
     resSt:STATUS[w]?w:STATUS[inflict]?inflict:null,wElem:ELEM[w]?w:null,wStatus:STATUS[w]?w:null,
@@ -344,12 +344,12 @@ function bugBonus(){let hp=0,atk=0;CREATURES.forEach((c,i)=>{if(!SAVE.bugs[c.id]
 // ── Story: the main quest line. The first chapters are the tutorial. goal: [what, which or null, how many].
 const STORY=[
   {t:'THE SHY THIEF',     d:['WELCOME TO HOLLOWROOT CAMP.','A FERNWING IS IN THE HERB','GARDEN. ODD: THEY ARE SHY.'],goal:['hunt','fern',1],rw:{potion:2}},
-  {t:'STOCK THE PANTRY',  d:['THE COOK WANTS HER HERBS','BACK. TRY A GATHER RUN: OPEN','HUNT, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
-  {t:'A PROPER EDGE',     d:['THAT IRON WILL NOT LAST.','FORGE OR UPGRADE SOMETHING','AT THE FORGE.'],goal:['craft',null,1],rw:{scale:3}},
+  {t:'STOCK THE PANTRY',  d:['MOSS WANTS HER HERBS BACK.','TRY A GATHER RUN: OPEN THE','HUNTS, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
+  {t:'A PROPER EDGE',     d:['BRAM SAYS THAT IRON WILL','NOT LAST. FORGE OR UPGRADE','SOMETHING AT THE FORGE.'],goal:['craft',null,1],rw:{scale:3}},
   {t:'WORD GETS AROUND',  d:['FOUR MORE BEASTS ARE ACTING','UP NEARBY. BEAT ANY THREE','IN RANK 1 TO EARN RANK 2.'],goal:['rank',2,1],rw:{meat:3}},
   {t:'EAT FIRST',         d:['NEVER HUNT HUNGRY. PICK A','DISH ON THE PREP SCREEN','BEFORE YOUR NEXT HUNT.'],goal:['meal',null,1],rw:{honey:2}},
   {t:'SMOKE ON THE RIDGE',d:['AN EMBERWING LEFT ITS NEST,','AND ITS SCALES SHED A FAINT','GLOW. NOBODY HAS SEEN THAT.'],goal:['hunt','ember',1],rw:{pal:1}},
-  {t:'A SINGED LITTLE FRIEND',d:['A SCORCHED CRITTER TRAILED','YOU BACK. THE COOK CALLS IT','PIP. TAKE PIP ON A HUNT.'],goal:['pal',null,1],rw:{potion:2}},
+  {t:'A SINGED LITTLE FRIEND',d:['A SCORCHED CRITTER TRAILED','YOU HOME. MOSS CALLS IT','PIP. TAKE PIP ON A HUNT.'],goal:['pal',null,1],rw:{potion:2}},
   {t:'THE GLOW',          d:['EVERY BEAST YOU BRING DOWN','SHEDS THE SAME FAINT GLOW.','REACH RANK 3.'],goal:['rank',3,1],rw:{gem:1}},
   {t:'THE COLD SNAP',     d:['THE GLOW IS ON THE SNOW TOO,','AND THE TRAIL CLIMBS.','REACH RANK 4.'],goal:['rank',4,1],rw:{gem:1}},
   {t:'OLD STONES',        d:['THE RUINS IN THE EAST HUM AT','NIGHT. THE ELDERS ARE UNEASY.','REACH RANK 5.'],goal:['rank',5,1],rw:{gem:1}},
@@ -357,8 +357,111 @@ const STORY=[
   {t:'EYE OF THE STORM',  d:['EVERY TRAIL OF GLOW ENDS AT','THE PEAKS. A STORMWING','CIRCLES THERE, ON GUARD.'],goal:['hunt','storm',1],rw:{gem:2}},
   {t:'FOUR HERALDS',      d:['FOUR GREAT BEASTS HAVE RISEN,','SOAKED IN GLOW. THEY GUARD','THE WAY UP. BEAT ALL FOUR.'],goal:['apex',null,4],rw:{gem:3}},
   {t:'THE HOLLOW STAR',   d:['THE GLOW FALLS FROM THE SKY.','ITS SOURCE HAS COME DOWN TO','THE PEAK. END THIS, HUNTER.'],goal:['hunt','star',1],rw:{gem:5}},
-  {t:'QUIET SKIES',       d:['THE GLOW IS FADING AND THE','BEASTS ARE CALM AGAIN. THE','COOK HAS MADE YOU A FEAST.'],goal:['done',null,1],rw:{}},
+  {t:'QUIET SKIES',       d:['THE GLOW IS FADING AND THE','BEASTS ARE CALM AGAIN. MOSS','HAS MADE YOU A FEAST.'],goal:['done',null,1],rw:{}},
 ];
+// ── The story: a cast, scenes, and a dialogue box. Scenes play once (SAVE.seen) and can be replayed from the quest board.
+const CAST={
+  wren:{name:'WREN',role:'CAMP CHIEF',col:'#3f7a4a',bg:'#1e3a2a'},
+  bram:{name:'BRAM',role:'SMITH',col:'#c8502a',bg:'#3a1e16'},
+  moss:{name:'MOSS',role:'COOK',col:'#e0a030',bg:'#3a2c14'},
+  oda: {name:'ODA', role:'SCHOLAR',col:'#8a5ad8',bg:'#26183a'},
+  pip: {name:'PIP', role:'',col:'#5ac8b0',bg:'#163a34'}};
+const portraitSpr=k=>k==='pip'?null:shapeSpr('face:'+k,24,24,
+  {wren:{1:'#d8a07a',2:'#c8c8d0',3:'!#141826',4:'#3f7a4a',5:'#5a3a2a',6:'!#f0ead8',7:'#a8604a'},
+   bram:{1:'#c88a60',2:'#c8502a',3:'!#141826',4:'#6b4a2e',5:'#3a4060',6:'!#f0ead8',7:'#8a4a30'},
+   moss:{1:'#e8b890',2:'#7a4a2a',3:'!#141826',4:'#e0a030',5:'#e86a6a',6:'#f0ead8',7:'#c85a4a'},
+   oda: {1:'#a8704a',2:'#2a2030',3:'!#141826',4:'#6a3ab0',5:'#ffe14d',6:'!#f0ead8',7:'#7a4a30'}}[k],a=>{a.off(1,1);
+  if(k==='wren'){a.poly([[0,21],[3,16],[18,16],[21,21]],4);a.rect(9,14,4,3,1);a.ell(11,10,6,6,1);a.ell(11,5,7,3,2);a.ell(11,1,3,2,2);a.rect(4,5,2,7,2);a.rect(16,5,2,6,2);
+    a.px(8,10,3);a.rect(13,9,3,3,5);a.poly([[5,7],[13,9],[13,10],[5,8]],5);a.rect(9,14,4,1,7);a.px(7,12,7);a.poly([[9,16],[11,19],[13,16]],5);}
+  else if(k==='bram'){a.poly([[0,21],[2,15],[20,15],[21,21]],4);a.rect(6,15,10,6,5);a.ell(11,9,7,7,1);a.rect(4,4,15,2,5);a.poly([[4,10],[18,10],[17,18],[11,21],[5,18]],2);
+    a.rect(7,8,3,1,2);a.rect(13,8,3,1,2);a.px(8,9,3);a.px(14,9,3);a.rect(8,12,7,1,7);a.rect(9,13,5,1,6);a.px(3,10,1);a.px(19,10,1);}
+  else if(k==='moss'){a.poly([[1,21],[4,16],[18,16],[21,21]],4);a.rect(8,16,6,5,6);a.ell(11,11,6,6,1);a.ell(5,10,2,3,2);a.ell(17,10,2,3,2);a.rect(5,5,13,3,2);
+    a.ell(11,2,7,3,6);a.rect(6,2,11,4,6);a.px(8,11,3);a.px(14,11,3);a.px(7,13,5);a.px(15,13,5);a.rect(9,14,5,1,7);a.px(8,13,7);a.px(14,13,7);}
+  else if(k==='oda'){a.poly([[0,21],[3,15],[19,15],[22,21]],4);a.ell(11,10,9,9,4);a.ell(11,11,5,6,1);a.rect(7,5,9,2,2);a.px(6,7,2);a.px(16,7,2);
+    a.rect(6,10,4,3,5);a.rect(12,10,4,3,5);a.rect(7,11,2,1,6);a.rect(13,11,2,1,6);a.px(8,11,3);a.px(14,11,3);a.px(10,11,5);a.px(11,11,5);a.rect(9,15,4,1,7);a.poly([[15,17],[20,15],[21,17],[16,19]],6);}});
+// scenes: [speaker, line]. Speaker '' is the narrator.
+const SCENES={
+  ch0:[['wren','AH, THERE YOU ARE! THE NEW HUNTER. I\'M WREN. I RUN HOLLOWROOT CAMP, MOSTLY BY SHOUTING.'],
+       ['wren','WE HAVE A PROBLEM. A FERNWING IS EATING THE HERB GARDEN.'],
+       ['moss','MY BASIL! MY BEAUTIFUL BASIL! IT ATE THE WHOLE ROW!'],
+       ['wren','FERNWINGS ARE SHY. THEY NEVER COME THIS CLOSE TO CAMP. SOMETHING IS OFF.'],
+       ['wren','TAKE THIS OLD IRON SWORD AND DEAL WITH IT. THE HUNT LIST IS IN THE MENU, TOP RIGHT.'],
+       ['wren','I\'LL TALK YOU THROUGH THE FIGHT. TRY NOT TO GET EATEN ON DAY ONE. THE PAPERWORK IS AWFUL.']],
+  fern_win:[['wren','NOT BAD FOR A FIRST HUNT! MOSS\'S BASIL IS AVENGED.'],
+       ['oda','WAIT! DON\'T TOSS THAT SCALE. LOOK AT IT... IT\'S GLOWING.'],
+       ['oda','I\'M ODA. I STUDY MONSTERS. A FERNWING SCALE SHOULD NOT GLOW. FASCINATING. ALARMING. MOSTLY FASCINATING.'],
+       ['oda','I\'LL KEEP A PAGE ON EVERY BEAST YOU HUNT IN MY BESTIARY. THE MORE YOU HUNT ONE, THE MORE I LEARN. IT\'S IN THE MENU.'],
+       ['wren','AND CHECK THE QUEST BOARD. FINISHED JOBS PAY OUT THERE.']],
+  ch1:[['moss','HUNTER! THAT FERNWING ATE EVERYTHING. COULD YOU GATHER ME SOME HERBS?'],
+       ['moss','OPEN THE HUNTS, TAP EXPEDITIONS, THEN GATHER. TAP WHATEVER POPS UP. CATCH A BUG IF YOU\'RE QUICK!'],
+       ['moss','HERBS MAKE POTIONS. POTIONS KEEP HUNTERS ALIVE. I KEEP POTIONS. YOU SEE HOW THIS WORKS.']],
+  ch2:[['bram','OI! YOU! THAT IRON STICK WOULDN\'T SCRATCH A BEETLE.'],
+       ['bram','NAME\'S BRAM. I TURN MONSTER BITS INTO GEAR. BRING ME SCALES, I\'LL BRING YOU A BLADE.'],
+       ['bram','OPEN MY FORGE. TAP ANY MATERIAL TO SEE WHO DROPS IT. THEN MAKE SOMETHING! OR UPGRADE SOMETHING! CLANG!']],
+  ch3:[['wren','WORD\'S SPREADING. FOUR MORE BEASTS ARE ACTING ODD AROUND HERE.'],
+       ['wren','BEAT ANY THREE IN RANK 1 AND I\'LL SIGN YOU UP FOR RANK 2. BIGGER BEASTS. BIGGER LOOT.'],
+       ['oda','AND BRING ME THEIR SCALES! I NEED TO KNOW IF THEY ALL GLOW.']],
+  ch4:[['moss','YOU\'VE BEEN HUNTING ON AN EMPTY STOMACH, HAVEN\'T YOU? I CAN TELL. YOU LOOK GREY.'],
+       ['moss','PICK A MEAL ON THE PREP SCREEN BEFORE YOUR NEXT HUNT. EVERY DISH DOES SOMETHING DIFFERENT.'],
+       ['moss','A STEW FOR HEALTH, A SKEWER FOR STRENGTH. COOKING IS BASICALLY ARMOR YOU EAT.']],
+  ch5:[['wren','SMOKE ON THE RIDGE. AN EMBERWING HAS LEFT ITS NEST.'],
+       ['oda','EMBERWINGS NEVER LEAVE THEIR NESTS. AND THE SMOKE IS... GLOWING. THIS IS GETTING WORSE.'],
+       ['wren','TAKE A WATER WEAPON IF YOU HAVE ONE. AND IF YOU CATCH FIRE, ROLL. ROLLING IS IMPORTANT.']],
+  ch6:[['moss','WHAT IS THAT FOLLOWING YOU? IT\'S... SINGED. AND ADORABLE.'],
+       ['pip','PIP! PIP PIP!'],
+       ['moss','I THINK ITS NAME IS PIP. THE EMBERWING MUST HAVE CHASED IT OUT OF ITS BURROW.'],
+       ['wren','IT WANTS TO HELP. GIVE IT A JOB ON THE PREP SCREEN, AND GEAR FROM BRAM\'S FORGE.'],
+       ['pip','PIP!']],
+  ch7:[['oda','I\'VE CHECKED EVERY SCALE YOU BROUGHT BACK. THEY ALL GLOW. EVERY SINGLE ONE.'],
+       ['oda','SOMETHING IS SOAKING THE LAND IN LIGHT, AND IT\'S MAKING THE BEASTS RESTLESS.'],
+       ['wren','THEN WE FOLLOW THE LIGHT. GET TO RANK 3.']],
+  ch8:[['wren','THE GLOW IS ON THE SNOW NOW. THE TUNDRA BEASTS ARE COMING DOWN THE MOUNTAIN.'],
+       ['bram','COLD ONES, EH? WEAR SOMETHING WARM. OR BRING FIRE. FIRE IS VERY WARM.']],
+  ch9:[['oda','THE OLD RUINS HUM AT NIGHT. THE STONES ARE CARVED WITH STARS.'],
+       ['oda','THE LEGEND SAYS A STAR FELL HERE LONG AGO AND FELL ASLEEP UNDER THE PEAK. I ALWAYS THOUGHT IT WAS A BEDTIME STORY.'],
+       ['wren','LET\'S HOPE IT STILL IS.']],
+  ch10:[['wren','YOU\'VE COME A LONG WAY FROM CHASING HERB THIEVES.'],
+       ['wren','ONLY THE BEST HUNT THE HIGH TRAIL. REACH RANK 6 AND I\'LL CALL YOU ONE OF THEM.'],
+       ['bram','AND I\'LL CALL YOU MY BEST CUSTOMER. YOU ALREADY ARE. PLEASE KEEP BUYING THINGS.']],
+  ch11:[['oda','EVERY TRAIL OF GLOW LEADS TO THE STORM PEAKS. A STORMWING CIRCLES THERE.'],
+       ['oda','IT ISN\'T HUNTING. IT\'S GUARDING. BUT GUARDING WHAT?'],
+       ['wren','ONLY ONE WAY TO FIND OUT. BRING THUNDER-PROOF ARMOR.']],
+  ch12:[['wren','FOUR GREAT BEASTS HAVE RISEN, DRIPPING WITH GLOW. ODA CALLS THEM HERALDS.'],
+       ['oda','THEY AREN\'T CAUSING THE GLOW. THEY\'RE WAITING FOR SOMETHING. LIKE A WELCOME PARTY.'],
+       ['bram','BEAT ALL FOUR. I\'LL MAKE YOU SOMETHING SPECIAL FROM WHAT\'S LEFT.']],
+  ch13:[['oda','I WAS WRONG. IT WASN\'T A BEDTIME STORY.'],
+       ['oda','THE HOLLOW STAR. IT FELL AGES AGO AND SLEPT UNDER THE PEAK. NOW IT\'S WAKING, AND IT WANTS THE SKY BACK.'],
+       ['wren','THE GLOW IS IT, STIRRING. THE BEASTS FELT IT FIRST. THAT\'S WHY THE FERNWING CAME TO US.'],
+       ['wren','YOU\'RE THE BEST HUNTER HOLLOWROOT HAS EVER HAD. GO UP THERE AND PUT IT BACK TO SLEEP.'],
+       ['pip','PIP!'],
+       ['moss','COME HOME SAFE. I\'M MAKING YOUR FAVORITE. I DON\'T KNOW WHAT IT IS, SO I\'M MAKING ALL OF THEM.']],
+  ch14:[['wren','IT\'S OVER. THE GLOW IS FADING FROM THE PEAKS.'],
+       ['oda','THE BEASTS ARE CALMING DOWN. THE FERNWING WENT HOME TO ITS FOREST. SHY AS EVER.'],
+       ['moss','AND MY GARDEN IS GROWING BACK! FEAST TONIGHT! EVERYONE EATS!'],
+       ['bram','TO THE HUNTER! CLANG!'],
+       ['pip','PIP PIP PIP!'],
+       ['wren','THE HUNTS DON\'T STOP, MIND YOU. THERE\'S ALWAYS ANOTHER BEAST. BUT TONIGHT, WE CELEBRATE.'],
+       ['','THE END. THANKS FOR PLAYING! KEEP HUNTING TO FILL THE BESTIARY AND FORGE EVERY SET.']],
+  // the first hunt, taught as it happens
+  h_attack:[['wren','THERE IT IS! TAP THE MONSTER TO SWING. HITS ON THE HEAD BUILD UP A STUN.'],
+       ['wren','HOLD YOUR FINGER DOWN FOR YOUR WEAPON\'S SKILL. A GREATSWORD CHARGES ONE BIG HIT.']],
+  h_dodge:[['wren','IT\'S WINDING UP! SWIPE LEFT OR RIGHT TO ROLL OUT OF THE WAY.'],
+       ['wren','ROLL JUST AS IT HITS FOR A PERFECT DODGE. THEN TAP COUNTER FOR A BIG HIT BACK.']],
+  h_weak:[['wren','A RED CIRCLE! THAT\'S A WEAK SPOT. TAP IT BEFORE IT SHRINKS AWAY.'],
+       ['wren','THREE GOOD TAPS BREAKS THE PART. BROKEN PARTS DROP EXTRA MATERIALS FOR BRAM.']],
+  h_counter:[['wren','PERFECT DODGE! TAP COUNTER, QUICK!']],
+  h_potion:[['wren','YOU\'RE HURT. SWIPE UP TO DRINK A POTION. DON\'T BE A HERO, HEROES GET EATEN.']],
+  h_sharp:[['wren','YOUR BLADE IS GOING DULL. SWIPE DOWN TO SHARPEN IT. DULL BLADES BOUNCE OFF.']],
+  // the first visit to each part of camp
+  v_quest:[['wren','THE QUEST BOARD. STORY JOBS COME FROM ME. DAILY AND WEEKLY JOBS COME FROM WHOEVER YELLS LOUDEST.'],['wren','WHEN A JOB IS DONE, CLAIM ITS REWARD HERE.']],
+  v_gear:[['wren','YOUR KIT. SWAP WEAPONS AND ARMOR HERE. TAP YOUR STATS TO SEE YOUR SKILLS.'],['wren','WEAR ALL FOUR ARMOR PIECES FROM ONE MONSTER FOR A SET BONUS.']],
+  v_forge:[['bram','MY FORGE! WEAPONS, ARMOR, AND LITTLE THINGS FOR PIP. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.']],
+  v_cook:[['moss','MY KITCHEN! I BREW POTIONS HERE. YOU CAN TAKE A FEW ON EACH HUNT.'],['moss','MEALS ARE CHOSEN ON THE PREP SCREEN, RIGHT BEFORE YOU HEAD OUT.']],
+  v_book:[['oda','MY BESTIARY! EVERY BEAST YOU MEET GETS A PAGE.'],['oda','HUNT ONE 1, 3, 5 AND 10 TIMES AND I\'LL LEARN ITS HABITS, ITS ATTACKS, AND WHAT IT DROPS.']],
+  v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON GATHER RUNS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
+  v_prep:[['wren','ALWAYS CHECK WHAT A BEAST IS WEAK TO BEFORE YOU GO. THE RIGHT ELEMENT HITS MUCH HARDER.'],['wren','WHEN YOU\'RE READY, START THE HUNT.']],
+};
+const TUT_KEYS=Object.keys(SCENES).filter(k=>!/^ch\d/.test(k));
 const SIDES=[
   {id:'tails', goal:['tail',null,3],   rw:{gem:1}},    {id:'hammer',goal:['weapon','hm',2],rw:{herb:5}},
   {id:'dodge', goal:['perfect',null,10],rw:{honey:3}}, {id:'bugs',  goal:['catch',null,5], rw:{gem:1}},
@@ -626,6 +729,8 @@ const palSpr=f=>{const [wc,vc]=palCols();return shapeSpr('pal:'+f+wc+vc,16,14,{1
   a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);
   a.poly([[12,9],[14,1],[15,2],[13,10]],6);});};                                   // the fang it carries
 const mSprite=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.look,lk:D.id,fxc:D.fxc[0]},p),flash);
+// where to frame a monster's portrait, by body: the face, not the weak point
+const FACE={wyvern:[14,15],raptor:[19,12],serpent:[17,17],brute:[13,30],crab:[12,36],small:[10,10]};
 const POSE0={hx:0,hy:0,jaw:0,wing:0,tail:0,horn:true,spike:true,torn:false,glow:0,rage:0};
 
 // ── Hunter ──
@@ -901,7 +1006,7 @@ function buzz(ms){if(!MH.manual&&navigator.vibrate)try{navigator.vibrate(ms);}ca
 //  STATE
 // ═══════════════════════════════════════════════════
 const S={mode:'title',t:0};
-const MH=window.MH={S,manual:false};       // test hook (tools/check.js)
+const MH=window.MH={S,manual:false,noTalk:(()=>{try{return !!localStorage.getItem('mh_notalk');}catch(e){return false;}})()};       // test hook (tools/check.js)
 // ── Save: bag of materials, owned and worn gear, wins per monster. On this device only.
 const SAVE_KEY='mh_save_v1', DEV_KEY='mh_dev_v1';
 const saveKey=()=>PREFS.dev?DEV_KEY:SAVE_KEY;                                    // dev mode plays on its own save
@@ -914,6 +1019,7 @@ function loadSave(){
   v.own.leather=v.own.leather_helm=v.own.leather_arms=v.own.leather_legs=v.own.pip_fang=v.own.pip_vest=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
   const DEF={weapon:'iron_gs',armor:'leather',helm:'leather_helm',arms:'leather_arms',legs:'leather_legs',charm:null,pweapon:'pip_fang',parmor:'pip_vest'};for(const sl in DEF)if(!v.eq[sl]||!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]=DEF[sl];
   if(v.potions==null)v.potions=POT_START;v.bugs=v.bugs||{};v.story=v.story||{i:0,p:0};v.side=v.side||{};v.daily=v.daily||{key:'',q:[]};v.weekly=v.weekly||{key:'',q:[]};v.packs=v.packs||0;v.role=v.role||'fighter';
+  if(!v.seen){v.seen={};if(v.wins.fern){for(const k of TUT_KEYS)v.seen[k]=1;for(let i=0;i<v.story.i;i++)v.seen['ch'+i]=1;}}   // older saves skip the tutorial, but see their current chapter
   return v;
 }
 let SAVE=loadSave();
@@ -921,7 +1027,7 @@ function save(){try{localStorage.setItem(saveKey(),JSON.stringify(SAVE));}catch(
 // A dev save: every monster beaten, every piece of gear owned, plenty of everything
 function devSave(){
   const v={bag:{},own:{},wins:{},lv:{},dry:{},potions:99,pal:true,bugs:{},story:{i:STORY.length-1,p:0},side:{},daily:{key:'',q:[]},weekly:{key:'',q:[]},packs:0,role:'fighter'};
-  for(const id of HUNTS)v.wins[id]=1;for(const id in GEAR)v.own[id]=true;for(const id in LOOT)v.bag[id]=99;return v;
+  for(const id of HUNTS)v.wins[id]=1;for(const id in GEAR)v.own[id]=true;for(const id in LOOT)v.bag[id]=99;v.seen={};for(const k in SCENES)v.seen[k]=1;return v;
 }
 function setDev(on){save();PREFS.dev=on;savePrefs();SAVE=loadSave();save();toast(on?'DEV MODE: ALL UNLOCKED':'BACK TO YOUR SAVE',on?'#ff9a4d':'#4cc9ff');sfx('charge',2);}
 function deleteSave(){try{localStorage.removeItem(saveKey());}catch(e){}SAVE=loadSave();save();S.armDel=0;toast(PREFS.dev?'DEV SAVE RESET':'SAVE DELETED','#ff6a4d');sfx('lose');}
@@ -1426,6 +1532,7 @@ function quitHunt(){S.paused=false;save();toCamp('hunt');}
 const tapBtns=(x,y)=>{for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();return true;}return false;};
 function press(x,y){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
+  if(S.talk){talkTap(x,y);return;}
   if(S.mode==='title'){if(S.howto){S.howto=false;return;}if(!tapBtns(x,y)&&!S.opts)toCamp(SAVE.wins.fern?'hunt':'quest');return;}
   if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
   if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
@@ -1461,7 +1568,8 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 // Keyboard: J or Space attack the head (hold to charge), K the tail, A/D or arrows dodge, W or Q potion
 addEventListener('keydown',e=>{
   if(e.target===QIN){if(e.key==='Enter'||e.key==='Escape')QIN.blur();return;}
-  if(e.repeat)return; const k=e.key.toLowerCase();
+  if(e.repeat)return;
+  if(S.talk){if(e.key===' '||e.key==='Enter'){e.preventDefault();talkTap(-1,-1);}else if(e.key==='Escape'){const T=S.talk;S.talk=null;if(T.after)T.after();}return;} const k=e.key.toLowerCase();
   if(k===' '||k==='j'||k==='k'||k==='enter'){e.preventDefault();audioInit();
     if(S.mode!=='hunt'||S.paused){if(S.mode==='title'||S.mode==='loot'||S.mode==='fail'||S.mode==='gres')press(-99,-99);return;}
     if(S.h.counter>0&&actCounter())return;
@@ -1614,8 +1722,11 @@ function gatherEnd(){
 }
 function update(dt){
   S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
+  if(S.talk){talkUpdate(dt);return;}                                             // a scene pauses everything
+  if(S.mode==='camp'||S.mode==='prep')storyTick();
   if(S.mode==='gather'){gatherUpdate(dt);return;}
   if(S.mode!=='hunt'||S.paused)return;
+  huntTutor();if(S.talk)return;
   if(S.stop>0){S.stop-=dt;return;}                                               // hitstop
   if(S.slow>0){S.slow-=dt;dt*=.3;}
   S.clock+=dt;
@@ -1985,9 +2096,9 @@ const MOVE_NAME={bite:'BITE',dbl:'DOUBLE BITE',tri:'TRIPLE BITE',peck:'PECK FLUR
   pounce:'POUNCE',leap:'LEAP',blastdive:'BLAST DIVE',skydive:'SKY DIVE',erupt:'ERUPTION',starfall:'STARFALL',beam:'STAR BEAM',comet:'COMET',nova:'NOVA',eclipse:'ECLIPSE'};
 const SIL={};function silhouette(D){if(SIL[D.id])return SIL[D.id];const c=document.createElement('canvas');c.width=MS_W;c.height=MS_H;const x=c.getContext('2d');
   x.drawImage(mSprite(D,POSE0),0,0);x.globalCompositeOperation='source-atop';x.fillStyle='#2b3358';x.fillRect(0,0,MS_W,MS_H);return SIL[D.id]=c;}
-function headIcon(D,x,y,w,h,top,bot,shown){const R=RIGS[D.rig],hd=D.rig==='crab'?[14,30]:R.head(POSE0);   /* a crab's face is low and forward of its weak point */
+function headIcon(D,x,y,w,h,top,bot,shown){const hd=FACE[D.rig];
   g.save();g.beginPath();g.rect(x,Math.max(top,y),w,Math.max(0,Math.min(bot,y+h)-Math.max(top,y)));g.clip();
-  g.fillStyle='#141826';g.fillRect(x,y,w,h);g.drawImage(shown?mSprite(D,POSE0):silhouette(D),x+15-(MS_OX+hd[0]),y+h/2+3-(MS_OY+hd[1]));g.restore();}
+  g.fillStyle='#141826';g.fillRect(x,y,w,h);g.drawImage(shown?mSprite(D,POSE0):silhouette(D),x+w/2-(MS_OX+hd[0]),y+h/2-(MS_OY+hd[1]));g.restore();}
 function drawBookList(B){
   const top=13,bot=LH-3;let y=top+1-(S.scr.book||0),total=0;g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
   const seen=HUNTS.filter(id=>(SAVE.wins[id]||0)>0).length;
@@ -2042,6 +2153,53 @@ function drawBookPage(B){
   g.restore();S.scrMax.bdet=Math.max(0,total-(bot-top)+4);
   if(S.scrMax.bdet>0){const hh=bot-top,bh=Math.max(10,hh*hh/(total+4)),by=top+(hh-bh)*(S.scr.bdet||0)/S.scrMax.bdet;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
 }
+
+// wrap text to a width, by words
+function wrapText(t,w){const out=[];let line='';for(const word of t.split(' ')){const tr=line?line+' '+word:word;if(textW(tr)>w&&line){out.push(line);line=word;}else line=tr;}if(line)out.push(line);return out;}
+// start a scene. Returns true if it started. force: replay even if seen.
+function talk(key,force,after){
+  if(S.talk||!SCENES[key])return false;if(!force&&(SAVE.seen[key]||MH.noTalk))return false;
+  SAVE.seen[key]=1;save();talkLines(SCENES[key],after);return true;}
+function talkLines(lines,after){S.talk={lines,i:0,ch:0,blip:0,after};IN.down=false;S.btns=[];}
+function talkTap(x,y){const T=S.talk,full=T.lines[T.i][1].length;
+  if(x>=W-30&&y>=T.by-11&&y<=T.by){S.talk=null;sfx('charge',1);if(T.after)T.after();return;}         // SKIP
+  if(T.ch<full){T.ch=full;return;}
+  if(++T.i>=T.lines.length){S.talk=null;sfx('charge',2);if(T.after)T.after();return;}
+  T.ch=0;sfx('charge',1);}
+function talkUpdate(dt){const T=S.talk,full=T.lines[T.i][1].length;if(T.ch<full){T.ch=Math.min(full,T.ch+dt*48);if((T.blip+=dt)>.07){T.blip=0;if(AC&&PREFS.sfx){const f=T.lines[T.i][0]==='pip'?1400:T.lines[T.i][0]==='bram'?220:T.lines[T.i][0]==='oda'?640:T.lines[T.i][0]==='moss'?520:380;tone(f,f,.025,.03,'square');}}}}
+function drawTalk(){
+  const T=S.talk,[who,txt]=T.lines[T.i],C=CAST[who],shown=txt.slice(0,Math.floor(T.ch)),done=T.ch>=txt.length;
+  const tx=C?38:10,tw=W-tx-8,lines=wrapText(txt,tw),bh=Math.max(40,lines.length*8+16),by=LH-bh-4;T.by=by;
+  g.fillStyle='rgba(10,12,22,.45)';g.fillRect(0,0,W,LH);
+  panel(4,by,W-8,bh);
+  if(C){g.fillStyle='#000';g.fillRect(7,by+5,28,28);g.fillStyle=C.bg;g.fillRect(8,by+6,26,26);
+    if(who==='pip')g.drawImage(palSpr(Math.floor(S.t*4)%2),13,by+12);else g.drawImage(portraitSpr(who),9,by+7+(done?0:Math.floor(S.t*8)%2));
+    const nw=textW(C.name)+8,rw=C.role?textW(C.role)+6:0;g.fillStyle='#000';g.fillRect(6,by-9,nw+rw+2,10);g.fillStyle=C.col;g.fillRect(7,by-8,nw,8);text(C.name,7+nw/2,by-6,'#fff',{al:1});
+    if(C.role){g.fillStyle='#1c2134';g.fillRect(7+nw,by-8,rw,8);text(C.role,7+nw+rw/2,by-6,'#8a93b0',{al:1});}}
+  let n=0;lines.forEach((l,i)=>{const part=shown.length-n>=l.length?l:shown.slice(n,n+Math.max(0,shown.length-n));n+=l.length+1;text(part,tx,by+6+i*8,who?'#e8f0fc':'#ffe14d');});
+  if(done&&Math.floor(S.t*3)%2){g.fillStyle='#ffe14d';g.fillRect(W-14,by+bh-8,5,1);g.fillRect(W-13,by+bh-7,3,1);g.fillRect(W-12,by+bh-6,1,1);}
+  g.fillStyle='#000';g.fillRect(W-30,by-10,24,10);g.fillStyle='#3a4060';g.fillRect(W-29,by-9,22,8);text('SKIP',W-18,by-7,'#c8d0e8',{al:1});
+}
+// what should play next, outside a fight
+function storyTick(){
+  if(S.talk||S.menu||S.opts||S.mat||S.t<.3)return;
+  if(S.mode==='camp'){
+    if(SAVE.wins.fern&&talk('fern_win'))return;
+    if(SAVE.story.i<STORY.length&&talk('ch'+SAVE.story.i))return;
+    if(SAVE.seen.ch0)talk('v_'+S.tab);}
+  else if(S.mode==='prep'&&SAVE.seen.ch0)talk('v_prep');
+}
+// the first hunt teaches as it goes
+function huntTutor(){
+  if(S.talk||S.def.small||S.h.state==='dead'||S.h.state==='win'||S.m.state==='dead')return;const h=S.h,m=S.m;
+  if(S.clock>.6&&talk('h_attack'))return;
+  if(!SAVE.seen.h_attack)return;
+  if(m.state==='attack'&&m.t<.08&&talk('h_dodge'))return;
+  if(S.qte&&talk('h_weak'))return;
+  if(h.counter>0&&talk('h_counter'))return;
+  if(h.hp<h.max*.5&&SAVE.potions>0&&talk('h_potion'))return;
+  if(h.sharp<=SHARP.lo+5&&talk('h_sharp'))return;
+}
 function drawBurger(B){const x=W-15,on=S.menu;g.fillStyle=on?'#2b3358':'#1c2134';g.fillRect(x,1,14,10);g.fillStyle=on?'#ffe14d':'#e8f0fc';for(let i=0;i<3;i++)g.fillRect(x+3,3+i*3,8,1);
   if(!on&&TABS.some(([k])=>tabDot(k))&&Math.floor(S.t*3)%2){g.fillStyle='#4cd964';g.fillRect(x+11,1,3,3);}
   B.push({id:'camp:menu',x:W-16,y:0,w:16,h:13,fn:()=>{S.menu=!S.menu;sfx('charge',1);}});}
@@ -2065,10 +2223,10 @@ function drawCamp(){
         if(y+10>top&&y<bot){g.fillStyle='#232a4a';g.fillRect(4,y,120,9);text(rankName(r),7,y+2,ropen?'#ffe14d':'#8a93b0');
           const done=rankWins(r);text(ropen?done+'/'+HUNTS.filter(id=>MONSTERS[id].rank===r).length+' BEATEN':lockText(ids[0]),W-7,y+2,ropen?'#8a93b0':'#ff6a4d',{al:2});}
         y+=11;total+=11;
-        for(const id of ids){S.itemY[id]=total;if(y+29>top&&y<bot){const D=MONSTERS[id],open=unlocked(id),R=RIGS[D.rig],hd=R.head(POSE0),wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];
+        for(const id of ids){S.itemY[id]=total;if(y+29>top&&y<bot){const D=MONSTERS[id],open=unlocked(id),hd=FACE[D.rig],wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];
           panel(4,y,120,29);
           g.save();g.beginPath();g.rect(5,Math.max(top,y+1),36,Math.max(0,Math.min(bot,y+28)-Math.max(top,y+1)));g.clip();g.drawImage(bgFor(D.biome),20,L.ground-16,36,27,5,y+1,36,27);
-          g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:open&&Math.sin(S.t*2.4+D.L)>.3?1:0})),5+15-(MS_OX+hd[0]),y+1+13-(MS_OY+hd[1]));g.restore();
+          g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:open&&Math.sin(S.t*2.4+D.L)>.3?1:0})),5+18-(MS_OX+hd[0]),y+1+13-(MS_OY+hd[1]));g.restore();
           if(SAVE.wins[id]){g.fillStyle='#000';g.fillRect(5,y+1,9,7);g.fillStyle='#4cd964';g.fillRect(7,y+5,1,1);g.fillRect(8,y+6,1,1);g.fillRect(9,y+5,1,1);g.fillRect(10,y+4,1,1);g.fillRect(11,y+3,1,1);}
           text(D.name,45,y+3,'#ffe14d');
           text('HP '+D.hp,45,y+11,'#c8d0e8');text((resPct(gs,D.elem)?'-'+resPct(gs,D.elem)+'% ':'')+ELEM[D.elem][0],W-7,y+11,ELEM[D.elem][1],{al:2});   // its element, and how much your armor resists it
@@ -2185,10 +2343,10 @@ function drawCamp(){
     
     let y=14;const st=qs.find(q=>q.kind==='story');
     g.fillStyle='#232a4a';g.fillRect(3,y,W-6,50);
-    if(st){const D=st.def,done=qDone(st);text('STORY '+(SAVE.story.i+1)+'/'+STORY.length,5,y+2,'#8a93b0');text(D.t,5,y+10,'#ffe14d');D.d.forEach((l,i)=>text(l,5,y+18+i*7,'#c8d0e8'));
+    if(st){const D=st.def,done=qDone(st);text('STORY '+(SAVE.story.i+1)+'/'+STORY.length,5,y+2,'#8a93b0');smallBtn(B,'story:replay',W-38,y,34,'REPLAY','#3a4060',()=>talk('ch'+SAVE.story.i,true));text(D.t,5,y+10,'#ffe14d');D.d.forEach((l,i)=>text(l,5,y+18+i*7,'#c8d0e8'));
       text(goalText(D.goal),5,y+41,done?'#4cd964':'#e8f0fc');
       if(D.goal[0]!=='done'){if(done)smallBtn(B,'claim:story',W-36,y+38,32,'CLAIM',Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',()=>claim(st));else rewardRow(D.rw,W-6-(Object.keys(D.rw).length*24),y+41);}}
-    else{text('THE STORY SO FAR IS TOLD',W/2,y+18,'#ffe14d',{al:1});text('MORE IS COMING',W/2,y+27,'#8a93b0',{al:1});}
+    else{text('THE STORY SO FAR IS TOLD',W/2,y+18,'#ffe14d',{al:1});text('MORE IS COMING',W/2,y+27,'#8a93b0',{al:1});smallBtn(B,'story:replay',W/2-20,y+36,40,'THE ENDING','#3a4060',()=>talk('ch14',true));}
     y+=53;
     const row=(q,label,col)=>{const D=q.def,done=qDone(q);g.fillStyle='#1c2134';g.fillRect(3,y,W-6,16);g.fillStyle=col;g.fillRect(3,y,2,16);
       text(goalText(D.goal),8,y+2,q.st.c?'#5a6080':'#e8f0fc');text(label,8,y+9,col);
@@ -2302,10 +2460,10 @@ let last=performance.now();
 function frame(now){
   const dt=clamp((now-last)/1000,0,.05);last=now;                               // the first frame can arrive stamped before the page started
   requestAnimationFrame(frame);                                                  // schedule first, so one bad frame cannot stop the game
-  try{if(!MH.manual)update(dt);draw();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
+  try{if(!MH.manual)update(dt);draw();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

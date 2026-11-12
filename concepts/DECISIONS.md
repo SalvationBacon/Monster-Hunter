@@ -286,3 +286,21 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
   - 5 hunts: drops with rates (tappable).
   - 10 hunts: mastery (attack speed compared to the Fernwing, weak-point time, stun threshold, dodge timer). The page then shows MASTERED.
   - Monsters you haven't reached show as silhouettes.
+
+## v0.26.0: the story
+- **Portraits fixed:** the hunt list and Bestiary used to frame every monster around its weak-point "head" point. On crabs and brutes that landed on spikes, legs or empty shell. Each body type now has its own face point (`FACE`), so every thumbnail shows the monster's face.
+- **Cast** of Hollowroot Camp, each with a pixel portrait drawn in code:
+  - **Wren**, the camp chief: the mentor and tutorial voice. Dry humor, eye patch.
+  - **Bram**, the smith (forge). Loud, says CLANG.
+  - **Moss**, the cook (kitchen). The Fernwing ate her basil.
+  - **Oda**, the scholar (Bestiary). Studies the glow.
+  - **Pip** joins after the Emberwing.
+- **Dialogue box:** a portrait, a name tag with the speaker's role, and a typewriter reveal with a per-character voice blip. A tap finishes the line, the next tap moves on. SKIP is on every box. A scene pauses everything, hunts included.
+- **Scenes** play once each (`SAVE.seen`):
+  - **Chapter intros (ch0–ch14):** one per story chapter, building the mystery. Scales glow → every beast glows → the glow follows the trail up the mountain → the ruins carry star carvings and a legend → the Stormwing is guarding something → the four heralds → the Hollow Star, waking under the peak and wanting the sky back → an ending feast.
+  - **Bestiary intro:** after the first Fernwing, Oda arrives with a glowing scale and introduces the Bestiary.
+  - **First-hunt tutorial:** the hunt pauses to teach each move the first time it matters: tap and hold, then dodge on its first attack, the weak-point circle, counter, a potion at half health, and sharpening when dull.
+  - **First visit** to each camp screen and to the prep screen: a short intro from that screen's owner.
+- **Replay:** the quest board's story card has REPLAY, and THE ENDING once the story is done.
+- Older saves skip the tutorial but see their current chapter's scene once. Dev mode skips every scene.
+- Tests set `localStorage.mh_notalk` so scenes stay out of the bot hunts. The story checks turn scenes back on.
