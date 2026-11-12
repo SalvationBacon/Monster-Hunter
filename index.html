@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.16.0';
+const VER='0.17.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -162,7 +162,7 @@ const MONSTERS={}, HUNTS=[];
 ROSTER.forEach((r,i)=>{
   const [id,name,short,rig,biome,elem,w,weak,weakSt,inflict,trait,moves,cols,flags]=r, c=cols.split(',').map(x=>'#'+x), f={};(flags||'').split(',').forEach(k=>{if(k)f[k]=1;});
   const rank=i<30?1+(i/5|0):i<34?7:8, L=i<30?i:i<34?31:33, t=L/29, m=moves.split(','), q=id in OLD_PRE?OLD_PRE[id]:id+'_';
-  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.8;dmg*=1.12;} if(trait==='armor')hp=Math.round(hp*.9/50)*50;
+  let hp=L?Math.round(3700*gearLevel(L-1).atk/50)*50:3100, dmg=1+.05*L; if(rank===7){hp*=1.5;dmg*=1.15;} if(rank===8){hp*=1.53;dmg*=1.19;} if(trait==='armor')hp=Math.round(hp*.9/50)*50;
   const s0=1-.2*t, e0=3.4-t;
   const D=MONSTERS[id]={id,name,short,rig,biome:+biome,rank,stars:rank,L,elem,weak,weakSt,inflict:inflict||null,trait:trait||null,
     resSt:STATUS[w]?w:STATUS[inflict]?inflict:null,wElem:ELEM[w]?w:null,wStatus:STATUS[w]?w:null,
@@ -199,11 +199,16 @@ const PERKS={
 const APERK=['tireless','guardian','might','nimble','keenedge','herbal','bludgeon','keeneye','fortune','breaker'];
 const CPERK=['keeneye','bludgeon','breaker','herbal','fortune','tireless','guardian','might','nimble','keenedge'];
 const WCOST={gs:{scale:5,claw:2,head:1},db:{scale:4,claw:4,wings:1},hm:{scale:5,claw:2,tail:1},ln:{scale:6,claw:1,wings:1}};
-const GEAR={leather:{slot:'armor',tier:'iron',name:'LEATHER ARMOR',hp:100}};
+// Armor comes in four pieces. Each gives its share of the set's health; the chest carries the perk; every piece adds its share of resistance.
+const APIECES=[['armor','ar','MAIL',.4,{scale:7,claw:2,wings:1},'VEST'],['helm','he','HELM',.2,{scale:3,claw:1,head:1},'CAP'],
+  ['arms','ga','GAUNTLETS',.2,{scale:2,claw:3},'GLOVES'],['legs','bo','BOOTS',.2,{scale:3,tail:1},'BOOTS']];
+const ASLOTS=APIECES.map(a=>a[0]), isArmor=sl=>ASLOTS.includes(sl), aShare=sl=>APIECES.find(a=>a[0]===sl)[3];
+const GEAR={};
+for(const [sl,k,,share,,lname] of APIECES)GEAR[sl==='armor'?'leather':'leather_'+sl]={slot:sl,tier:'iron',name:'LEATHER '+lname,hp:100*share,free:sl!=='armor'||undefined};
 for(const wt of WT)GEAR['iron_'+wt]={slot:'weapon',tier:'iron',wt,name:'IRON '+WTYPES[wt].name,atk:1,free:true};
 HUNTS.forEach((id,i)=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat,cost=c=>Object.fromEntries(Object.entries(c).map(([k,n])=>[m[k],n]));
   for(const wt of WT)GEAR[id+'_'+wt]={slot:'weapon',tier:id,wt,name:D.short+' '+WTYPES[wt].name,atk:T.atk,elem:D.wElem,status:D.wStatus,cost:cost(WCOST[wt])};
-  GEAR[id+'_ar']={slot:'armor',tier:id,name:D.short+' MAIL',hp:T.hp,perk:APERK[i%10],cost:cost({scale:7,claw:2,wings:1})};
+  for(const [sl,k,nm,share,c] of APIECES)GEAR[id+'_'+k]={slot:sl,tier:id,name:D.short+' '+nm,hp:+(T.hp*share).toFixed(2),perk:sl==='armor'?APERK[i%10]:undefined,cost:cost(c)};
   GEAR[id+'_ch']={slot:'charm',tier:id,name:PERKS[CPERK[i%10]].name+' CHARM',perk:CPERK[i%10],cost:cost(D.rank<3?{head:1,wings:1,tail:1}:{head:2,wings:1,tail:1})};});
 Object.assign(GEAR,{
   relic_quick:  {slot:'charm',tier:'relic',name:'QUICK DRAW CHARM',perk:'quick',  cost:{gem:1,t_horn:1,claw:4}},
@@ -217,7 +222,7 @@ HUNTS.forEach(id=>{const D=MONSTERS[id],T=gearLevel(D.L),m=D.mat;
   GEAR[id+'_pw']={slot:'pweapon',tier:id,name:D.short+' PIP FANG',patk:T.atk,elem:D.wElem,status:D.wStatus,cost:{[m.scale]:2,[m.claw]:2}};
   GEAR[id+'_pa']={slot:'parmor',tier:id,name:D.short+' PIP VEST',care:+(1+.025*(D.L+1)).toFixed(3),cost:{[m.scale]:3,[m.wings]:1}};});
 const pipSlot=G=>G.slot==='pweapon'||G.slot==='parmor';
-const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather','pip_fang','pip_vest']},
+const FORGE_PAGES=[{title:'STARTER GEAR',ids:[...WT.map(w=>'iron_'+w),'leather','leather_helm','leather_arms','leather_legs','pip_fang','pip_vest']},
   ...HUNTS.map(id=>({title:MONSTERS[id].name,mon:id,ids:[...WT.map(w=>id+'_'+w),id+'_ar',id+'_ch',id+'_pw',id+'_pa']})),
   {title:'RELICS',ids:['relic_quick','relic_riposte','relic_weak']}];
 // ── Pantry: two ingredients per biome (the second is the scarcer one), and meat from pack hunts
@@ -555,9 +560,9 @@ const armorCol=id=>{const D=MONSTERS[GEAR[id].tier];return D?[D.look.b,D.look.h,
 const weaponCol=id=>{const G=GEAR[id];return G.elem?ELEM[G.elem][1]:G.status?STATUS[G.status].col:G.tier==='relic'?'#4cd9c0':'#dde4f0';};
 function hunterSpr(p){
   const aq=Math.round(p.a*5);                                                    // weapon angle in 0.2 rad steps
-  const eq=SAVE.eq, G=GEAR[eq.weapon], wt=G.wt, key=`hu:${p.kind}:${aq}:${p.bob}:${p.lean}:${p.glow}:${p.f}:${eq.weapon}:${eq.armor}:${p.guard|0}`;
-  const ar=armorCol(eq.armor);
-  const pal=Object.assign({},H_PAL,{2:ar[0],3:ar[1],6:ar[2],5:weaponCol(eq.weapon)});
+  const eq=SAVE.eq, G=GEAR[eq.weapon], wt=G.wt, key=`hu:${p.kind}:${aq}:${p.bob}:${p.lean}:${p.glow}:${p.f}:${eq.weapon}:${eq.armor}:${eq.helm}:${eq.arms}:${eq.legs}:${p.guard|0}`;
+  const ar=armorCol(eq.armor),he=armorCol(eq.helm),ga=armorCol(eq.arms),bo=armorCol(eq.legs);
+  const pal=Object.assign({},H_PAL,{2:ar[0],3:ar[1],6:ar[2],5:weaponCol(eq.weapon),12:he[1],13:ga[1],14:bo[0],15:bo[2]});
   return shapeSpr(key,HS_W,HS_H,pal,a=>{
     a.off(4,2);
     if(p.kind==='roll'){
@@ -567,12 +572,12 @@ function hunterSpr(p){
     }
     if(p.kind==='down'){a.rect(4,33,16,5,2);a.rect(4,35,6,3,6);a.ell(23,34,4,4,3);a.rect(28,37,12,1,5);return;}
     const b=p.bob, l=p.lean;
-    a.rect(9,31,4,7,6); a.rect(15,31,4,7,6);                                     // legs
+    a.rect(9,31,4,4,14); a.rect(15,31,4,4,14); a.rect(9,35,4,3,15); a.rect(15,35,4,3,15);   // legs and boots
     a.rect(8+l,18+b,12,14-b,2); a.rect(8+l,25+b,12,2,6);                         // armour, belt
     a.ell(14+l,13+b,5,5,1);                                                      // head
-    a.poly([[8+l,11+b],[14+l,6+b],[20+l,11+b],[20+l,14+b],[9+l,14+b]],3);        // helmet
+    a.poly([[8+l,11+b],[14+l,6+b],[20+l,11+b],[20+l,14+b],[9+l,14+b]],12);       // helmet
     a.rect(15+l,13+b,3,1,4);                                                     // visor
-    a.rect(6+l,18+b,4,4,3); a.rect(18+l,18+b,4,4,3);                             // pauldrons
+    a.rect(6+l,18+b,4,4,13); a.rect(18+l,18+b,4,4,13);                           // gauntlets' shoulder guards
     const hx=21+l,hy=24+b, c=Math.cos(aq/5), s=Math.sin(aq/5), col=p.glow?7+p.glow:5;
     const blade=(x,y,c,s,L,w)=>a.poly([[x-s*w,y+c*w],[x+s*w,y-c*w],[x+c*L+s*w,y+s*L-c*w],[x+c*(L+2),y+s*(L+2)],[x+c*L-s*w,y+s*L+c*w]],col);
     if(wt==='gs'){blade(hx,hy,c,s,17,1);a.rect(hx-1,hy-1,3,3,6);}
@@ -609,9 +614,12 @@ const bugSpr=(i,f)=>{const c=CREATURES[i];return shapeSpr('bug:'+i+':'+(f|0),12,
   else if(c.type==='moth'){if(f){a.poly([[0,2],[4,3],[4,6],[1,6]],1);a.poly([[10,2],[6,3],[6,6],[9,6]],1);}else{a.poly([[1,0],[4,3],[4,6],[0,8]],1);a.poly([[9,0],[6,3],[6,6],[10,8]],1);}a.rect(4,2,2,6,2);}
   else if(c.type==='frog'){a.ell(5,6,4,2,1);a.px(3,3,1);a.px(7,3,1);a.px(3,4,3);a.px(7,4,3);a.rect(0,7+f,2,1,2);a.rect(9,7+f,2,1,2);}
   else{a.poly([[1,5],[6,3],[9,5],[6,7]],1);a.px(8,4,3);a.rect(2,7-f*2,1,2+f*2,2);a.rect(4,7,1,2,2);a.px(9,2,2);}});};
-const gearSpr=id=>{const G=GEAR[id],col=G.slot==='armor'?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?'#4cc9ff':weaponCol(id);
+const gearSpr=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?'#4cc9ff':weaponCol(id);
   return shapeSpr('gear:'+id,12,12,{1:col,2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);
     if(G.slot==='armor'){a.poly([[1,1],[4,1],[5,2],[6,1],[9,1],[10,4],[8,5],[8,10],[2,10],[2,5],[0,4]],1);a.rect(2,7,7,1,2);}
+    else if(G.slot==='helm'){a.ell(5,5,5,4,1);a.rect(0,5,11,4,1);a.rect(3,6,5,1,2);}
+    else if(G.slot==='arms'){a.poly([[1,0],[7,0],[8,6],[10,7],[9,10],[2,10],[1,6]],1);a.rect(1,3,7,1,2);}
+    else if(G.slot==='legs'){a.poly([[2,0],[6,0],[6,6],[10,7],[10,10],[2,10]],1);a.rect(2,8,8,1,2);}
     else if(G.slot==='pweapon'){a.poly([[3,0],[8,1],[6,10],[5,10]],1);a.rect(2,0,7,2,2);}
     else if(G.slot==='parmor'){a.poly([[0,2],[10,2],[9,5],[1,5]],1);a.poly([[6,5],[9,5],[8,10],[6,10]],1);a.rect(0,2,10,1,3);}
     else if(G.slot==='charm'){a.poly([[3,0],[7,0],[5,3]],3);a.ell(5,6,3,3,2);a.ell(5,6,2,2,1);}
@@ -826,8 +834,8 @@ function loadSave(){
   if(!v){v={};try{const old=JSON.parse(localStorage.getItem('mh_proto_bag'));if(old)v.bag=old;}catch(e){}}   // loot from the first prototypes carries over
   v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.lv=v.lv||{};v.dry=v.dry||{};v.eq=Object.assign({weapon:'iron_gs',armor:'leather',charm:null},v.eq);delete v.eq.coat;
   for(const [o,n] of Object.entries(OLD_IDS)){if(v.own[o]){delete v.own[o];v.own[n]=true;}for(const sl in v.eq)if(v.eq[sl]===o)v.eq[sl]=n;}
-  v.own.leather=v.own.pip_fang=v.own.pip_vest=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
-  const DEF={weapon:'iron_gs',armor:'leather',charm:null,pweapon:'pip_fang',parmor:'pip_vest'};for(const sl in DEF)if(!v.eq[sl]||!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]=DEF[sl];
+  v.own.leather=v.own.leather_helm=v.own.leather_arms=v.own.leather_legs=v.own.pip_fang=v.own.pip_vest=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
+  const DEF={weapon:'iron_gs',armor:'leather',helm:'leather_helm',arms:'leather_arms',legs:'leather_legs',charm:null,pweapon:'pip_fang',parmor:'pip_vest'};for(const sl in DEF)if(!v.eq[sl]||!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]=DEF[sl];
   if(v.potions==null)v.potions=POT_START;v.bugs=v.bugs||{};v.story=v.story||{i:0,p:0};v.side=v.side||{};v.daily=v.daily||{key:'',q:[]};v.weekly=v.weekly||{key:'',q:[]};v.packs=v.packs||0;v.role=v.role||'fighter';
   return v;
 }
@@ -835,15 +843,16 @@ let SAVE=loadSave();
 function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}}
 // What the worn gear adds up to
 const lvOf=id=>SAVE.lv[id]||0;
-const gearAtk=id=>+(GEAR[id].atk*(1+UP_STEP*lvOf(id))).toFixed(3), gearHp=id=>Math.round(GEAR[id].hp*(1+UP_STEP*lvOf(id)));
+const gearAtk=id=>+(GEAR[id].atk*(1+UP_STEP*lvOf(id))).toFixed(3), gearHpRaw=id=>GEAR[id].hp*(1+UP_STEP*lvOf(id)), gearHp=id=>Math.round(gearHpRaw(id));
 // Cost of the next upgrade level, or null at the top (charms have no levels). Levels 4 and 5 need scales from the next monster up.
 function upCost(id){
   const G=GEAR[id],Lv=lvOf(id)+1; if(Lv>UP_MAX||G.slot==='charm'||pipSlot(G)||!SAVE.own[id])return null;
   const ti=Math.max(0,HUNTS.indexOf(G.tier)),m=MONSTERS[HUNTS[ti]].mat,N=MONSTERS[HUNTS[ti+1]];   // iron and leather use Fernwing materials; later levels need the next monster in the order
-  const part=G.slot==='armor'?m.wings:m[{gs:'head',db:'wings',hm:'tail',ln:'wings'}[G.wt]];
-  if(Lv<=2)return{[m.scale]:2+Lv,[m.claw]:Lv};
-  if(Lv===3)return{[m.scale]:5,[m.claw]:2,[part]:1};
-  const o={[m.scale]:Lv+2,[Lv===5?m.rare:part]:1};if(N)o[N.mat.scale]=(Lv-3)*2;else o[m.claw]=Lv;return o;   // the last level needs the monster's rare drop
+  const part=isArmor(G.slot)?m[{armor:'wings',helm:'head',arms:'claw',legs:'tail'}[G.slot]]:m[{gs:'head',db:'wings',hm:'tail',ln:'wings'}[G.wt]];
+  const small=o=>{if(!isArmor(G.slot)||G.slot==='armor')return o;for(const k in o)if(k!==m.rare)o[k]=Math.max(1,Math.ceil(o[k]/2));return o;};   // helm, gauntlets and boots cost about half
+  if(Lv<=2)return small({[m.scale]:2+Lv,[m.claw]:Lv});
+  if(Lv===3)return small({[m.scale]:5,[m.claw]:2,[part]:1});
+  const o={[m.scale]:Lv+2,[Lv===5?m.rare:part]:1};if(N)o[N.mat.scale]=(Lv-3)*2;else o[m.claw]=Lv;return small(o);   // the last level needs the monster's rare drop
 }
 const affords=cost=>!!cost&&Object.entries(cost).every(([k,n])=>(SAVE.bag[k]||0)>=n);
 function upgradeTap(id){
@@ -853,11 +862,14 @@ function upgradeTap(id){
   SAVE.lv[id]=lvOf(id)+1;toast(GEAR[id].name+' +'+SAVE.lv[id],'#ffe14d');sfx('win');buzz(60);qEvent('craft');save();
 }
 // What the worn gear adds up to, with the terrarium's bonus and an optional meal on top
+// Resistance to each element: each worn piece adds its share of 25% for its monster's element
+function armorRes(){const r={};for(const sl of ASLOTS){const D=MONSTERS[GEAR[SAVE.eq[sl]].tier];if(D)r[D.elem]=+((r[D.elem]||0)+(1-RESIST)*aShare(sl)).toFixed(3);}return r;}
+const resPct=(gs,el)=>Math.round((gs.res[el]||0)*100);
 function gearStats(meal){
   const e=SAVE.eq,w=GEAR[e.weapon],perks={},M=MEALS[meal]||{},bb=bugBonus();for(const sl of ['armor','charm']){const G=GEAR[e[sl]];if(G&&G.perk)perks[G.perk]=true;}
   return{wt:w.wt,W:WTYPES[w.wt],elem:w.elem||null,status:w.status||null,meal:M,
-    atk:+(gearAtk(e.weapon)*(perks.might?1.1:1)*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(gearHp(e.armor)*(M.hp||1)*(1+bb.hp)),
-    resist:(MONSTERS[GEAR[e.armor].tier]||{}).elem||null,perks,qteSlow:perks.keeneye?1.4:1,qteHits:perks.breaker?2:3};
+    atk:+(gearAtk(e.weapon)*(perks.might?1.1:1)*(M.atk||1)*(1+bb.atk)).toFixed(3),hp:Math.round(ASLOTS.reduce((t,sl)=>t+gearHpRaw(e[sl]),0)*(M.hp||1)*(1+bb.hp)),
+    res:armorRes(),perks,qteSlow:perks.keeneye?1.4:1,qteHits:perks.breaker?2:3};
 }
 // Pip's numbers, from its gear
 function palStats(){const e=SAVE.eq,w=GEAR[e.pweapon]||GEAR.pip_fang,a=GEAR[e.parmor]||GEAR.pip_vest;return{atk:w.patk,elem:w.elem||null,status:w.status||null,care:a.care};}
@@ -1113,7 +1125,7 @@ function mHit(i){
       return;}
     addNum(hc.x+6,hc.y-28,'GUARD BROKEN','#ff6a4d',.9);
   }
-  if(h.g.resist===S.def.elem)dmg=Math.max(1,Math.round(dmg*RESIST));
+  if(h.g.res[S.def.elem])dmg=Math.max(1,Math.round(dmg*(1-h.g.res[S.def.elem])));
   if(P.guardian&&Math.random()<.25){dmg=Math.ceil(dmg/2);addNum(hc.x+10,hc.y-28,'GUARDIAN','#4cc9ff',.9);}
   h.hp-=dmg;S.stats.taken+=dmg;h.state='hurt';h.t=0;h.charge=0;h.lvl=0;h.buf=0;h.buff=0;h.frozen=0;
   S.shake=Math.max(S.shake,.35);S.stop=.06;addNum(hc.x+4,hc.y-18,''+dmg,'#ff6a4d',.9);sfx('hurt');buzz(80);
@@ -1414,7 +1426,7 @@ function equip(slot,id){
   SAVE.eq[slot]=id;toast(id?GEAR[id].name+' ON':'CHARM OFF','#4cc9ff');sfx('charge',2);save();S.gpick=null;
 }
 // ── Forge categories. Each lists one kind of gear from every monster you can hunt, plus what you already own.
-const FCATS={weapon:{label:'WEAPONS',subs:WT.map(w=>[WTYPES[w].name.split(' ')[0],w])},armor:{label:'ARMOR',subs:[['ARMOR','armor'],['CHARMS','charm']]},pip:{label:'PIP',subs:[['FANGS','pweapon'],['VESTS','parmor']]}};
+const FCATS={weapon:{label:'WEAPONS',subs:WT.map(w=>[WTYPES[w].name.split(' ')[0],w])},armor:{label:'ARMOR',subs:[['CHEST','armor'],['HELM','helm'],['ARMS','arms'],['LEGS','legs'],['CHARM','charm']]},pip:{label:'PIP',subs:[['FANGS','pweapon'],['VESTS','parmor']]}};
 FCATS.weapon.subs=[['GREAT','gs'],['DUAL','db'],['HAMMER','hm'],['LANCE','ln']];
 function forgeList(cat,sub){
   const key=FCATS[cat].subs[sub][1],out=[];
@@ -1423,7 +1435,7 @@ function forgeList(cat,sub){
   for(const id of ids)if(seen(id))out.push(id);
   return{ids:out,hidden:ids.length-out.length};
 }
-const SLOTS=[['weapon','WEAPON'],['armor','ARMOR'],['charm','CHARM'],['pweapon','PIP FANG'],['parmor','PIP VEST']];
+const SLOTS=[['weapon','WEAPON'],['charm','CHARM'],['helm','HELM'],['armor','CHEST'],['arms','GAUNTLETS'],['legs','BOOTS'],['pweapon','PIP FANG'],['parmor','PIP VEST']];
 function huntTap(id){if(!unlocked(id)){toast(lockText(id),'#ff6a4d');sfx('miss');return;}toPrep(id);}
 // ── Quests ──
 const nowMs=()=>MH.fakeNow||Date.now();
@@ -1763,7 +1775,7 @@ function gearLine(id,x,y,alt){
   if(G.slot==='pweapon'){tag('PIP ATK *'+G.patk.toFixed(2),'#7fe0c0');if(wk)tag(wk[0],wk[1]);}
   else if(G.slot==='parmor')tag('PIP CARE *'+G.care.toFixed(2),'#7fe0c0');
   else if(G.slot==='weapon'){tag('ATK *'+gearAtk(id).toFixed(2),'#4cd964');if(wk)tag(wk[0],wk[1]);}
-  else if(G.slot==='armor'){tag('HP '+gearHp(id),'#4cd964');const el=(MONSTERS[G.tier]||{}).elem;if(el&&(alt||!G.perk)){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(G.perk)tag(PERKS[G.perk].desc,'#4cd964');}
+  else if(isArmor(G.slot)){tag('HP '+gearHp(id),'#4cd964');const el=(MONSTERS[G.tier]||{}).elem;if(el&&(alt||!G.perk)){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(G.perk)tag(PERKS[G.perk].desc,'#4cd964');}
   else tag(PERKS[G.perk].desc,'#4cd964');
 }
 // One line of cost icons with have/need, from x. Returns where it ended.
@@ -1791,7 +1803,7 @@ function drawCamp(){
           g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:open&&Math.sin(S.t*2.4+D.L)>.3?1:0})),5+15-(MS_OX+hd[0]),y+1+13-(MS_OY+hd[1]));g.restore();
           if(SAVE.wins[id]){g.fillStyle='#000';g.fillRect(5,y+1,9,7);g.fillStyle='#4cd964';g.fillRect(7,y+5,1,1);g.fillRect(8,y+6,1,1);g.fillRect(9,y+5,1,1);g.fillRect(10,y+4,1,1);g.fillRect(11,y+3,1,1);}
           text(D.name,45,y+3,'#ffe14d');
-          text('HP '+D.hp,45,y+11,'#c8d0e8');text((gs.resist===D.elem?'-25% ':'')+ELEM[D.elem][0],W-7,y+11,ELEM[D.elem][1],{al:2});   // its element; -25% if your armor resists it
+          text('HP '+D.hp,45,y+11,'#c8d0e8');text((resPct(gs,D.elem)?'-'+resPct(gs,D.elem)+'% ':'')+ELEM[D.elem][0],W-7,y+11,ELEM[D.elem][1],{al:2});   // its element, and how much your armor resists it
           {let x=45;text('WEAK',x,y+19,'#8a93b0');x+=20;text(ELEM[D.weak][0],x,y+19,ELEM[D.weak][1]);x+=textW(ELEM[D.weak][0])+3;text('+',x,y+19,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y+19,STATUS[D.weakSt].col);}
           if(!open){g.fillStyle='rgba(12,14,26,.8)';g.fillRect(5,y+1,118,27);text('LOCKED',W/2,y+7,'#ff6a4d',{al:1});text(lockText(id),W/2,y+16,'#c8d0e8',{al:1});}
           const cy=y+14;if(cy>top&&cy<bot)B.push({id:'hunt:'+id,x:4,y:Math.max(top,y),w:120,h:Math.min(bot,y+29)-Math.max(top,y),fn:()=>huntTap(id)});}
@@ -1832,15 +1844,17 @@ function drawCamp(){
       const gs=gearStats(),w=GEAR[SAVE.eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:['PLAIN','#8a93b0'];
       g.fillStyle='rgba(12,14,26,.7)';g.fillRect(58,py+3,64,ph-6);
       text('ATK *'+gs.atk.toFixed(2),61,py+6,'#e8f0fc');text(wk[0],61,py+14,wk[1]);text('HP '+gs.hp,61,py+22,'#e8f0fc');
-      text(gs.resist?'RES '+ELEM[gs.resist][0]:'NO RESIST',61,py+30,gs.resist?ELEM[gs.resist][1]:'#5a6080');
+      {const best=Object.entries(gs.res).sort((a,b)=>b[1]-a[1])[0];text(best?'RES '+ELEM[best[0]][0]+' '+Math.round(best[1]*100)+'%':'NO RESIST',61,py+30,best?ELEM[best[0]][1]:'#5a6080');}
       const pk=Object.keys(gs.perks).map(k=>PERKS[k].name);let pt=pk.length?pk.join(' '):'NO PERKS';if(textW(pt)>60)pt=pk[0]+' +'+(pk.length-1);   // shortened when it would not fit
       text(pt,61,py+38,pk.length?'#ffe14d':'#5a6080');
-      // the five slots
-      let y=py+ph+3;
-      for(const [sl,lab] of SLOTS){const id=SAVE.eq[sl],pipOnly=sl[0]==='p'&&!SAVE.pal,n=Object.keys(GEAR).filter(k=>GEAR[k].slot===sl&&SAVE.own[k]).length;
-        g.fillStyle='#1c2134';g.fillRect(3,y,W-6,20);text(lab,6,y+2,'#8a93b0');text(n+' OWNED',W-14,y+2,'#5a6080',{al:2});text('>',W-9,y+7,'#c8d0e8');
-        if(id){g.drawImage(gearSpr(id),6,y+8,10,10);text(GEAR[id].name+(lvOf(id)?'+'+lvOf(id):''),18,y+9,pipOnly?'#5a6080':'#e8f0fc');}else text('NONE',18,y+9,'#5a6080');
-        B.push({id:'slot:'+sl,x:3,y,w:W-6,h:20,fn:()=>{S.gpick=sl;S.scr.gpick=0;sfx('charge',1);}});y+=21;}
+      // the eight slots, two to a row
+      const short=id=>{const G=GEAR[id];return G.slot==='charm'?PERKS[G.perk].name:G.tier==='iron'?(isArmor(G.slot)?'LEATHER':G.slot[0]==='p'?'PIP':'IRON'):MONSTERS[G.tier].short;};
+      let y=py+ph+3;const cw=(W-8)>>1,rh=Math.max(20,Math.min(26,((LH-20-y-2)/4)|0));
+      SLOTS.forEach(([sl,lab],i)=>{const x=3+(i%2)*(cw+2),yy=y+(i>>1)*(rh+1),id=SAVE.eq[sl],dim=sl[0]==='p'&&!SAVE.pal;
+        g.fillStyle='#1c2134';g.fillRect(x,yy,cw,rh);text(lab,x+3,yy+2,'#8a93b0');text('>',x+cw-5,yy+2,'#5a6080');
+        if(id){g.drawImage(gearSpr(id),x+2,yy+rh-12);text(short(id)+(lvOf(id)?'+'+lvOf(id):''),x+15,yy+rh-9,dim?'#5a6080':'#e8f0fc');}else text('NONE',x+15,yy+rh-9,'#5a6080');
+        B.push({id:'slot:'+sl,x,y:yy,w:cw,h:rh,fn:()=>{S.gpick=sl;S.scr.gpick=0;sfx('charge',1);}});});
+      y+=4*(rh+1);
       if(!SAVE.pal&&y+8<LH-20)text('PIP JOINS LATER IN THE STORY',W/2,y+1,'#5a6080',{al:1});
     }
   }else if(S.tab==='forge'){
@@ -1861,7 +1875,7 @@ function drawCamp(){
       if(!own)costRow(G.cost,19,y+16);
       else if(uc){costRow(uc,19,y+16,2);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
         if(y+11>=ptop&&y+23<=pbot)B.push({id:'up:'+id,x:W-34,y:y+11,w:31,h:12,fn:()=>upgradeTap(id)});}
-      else text(G.slot==='weapon'||G.slot==='armor'?'MAX LEVEL':on?'WORN':'OWNED',19,y+16,on||G.slot==='weapon'||G.slot==='armor'?'#ffe14d':'#5a6080');
+      else text(G.slot==='weapon'||isArmor(G.slot)?'MAX LEVEL':on?'WORN':'OWNED',19,y+16,on||G.slot==='weapon'||isArmor(G.slot)?'#ffe14d':'#5a6080');
       const lab=on?'WORN':own?'OWNED':'CRAFT',bc=on?'#8a6a20':own?'#3a4060':can?'#2f8f4a':'#3a4060';
       g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,can||on?'#fff':'#8a93b0',{al:1});
       const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-36,h:bh,fn:()=>forgeTap(id)});
@@ -1926,7 +1940,7 @@ function drawPrep(){
   g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('PREPARE',4,3,'#8a93b0');text(D.small?'SNAPJAW PACK':D.name,W-4,3,'#ffe14d',{al:2});
   let y=16,x=5;text('WEAK TO',x,y,'#8a93b0');x+=textW('WEAK TO')+5;text(ELEM[D.weak][0],x,y,ELEM[D.weak][1]);x+=textW(ELEM[D.weak][0])+3;
   if(D.weakSt){text('+',x,y,'#8a93b0');x+=6;text(STATUS[D.weakSt].name,x,y,STATUS[D.weakSt].col);}
-  y+=8;text('ATTACKS WITH',5,y,'#8a93b0');text(ELEM[D.elem][0],5+textW('ATTACKS WITH')+5,y,ELEM[D.elem][1]);if(gs.resist===D.elem)text('-25%',W-5,y,'#4cd964',{al:2});
+  y+=8;text('ATTACKS WITH',5,y,'#8a93b0');text(ELEM[D.elem][0],5+textW('ATTACKS WITH')+5,y,ELEM[D.elem][1]);if(resPct(gs,D.elem))text('-'+resPct(gs,D.elem)+'%',W-5,y,'#4cd964',{al:2});
   y+=8;text(D.tip,5,y,'#ffe14d');if(D.tip2){y+=8;text(D.tip2,5,y,'#ffe14d');}
   y+=11;g.fillStyle='#1c2134';g.fillRect(3,y-2,W-6,27);
   const w=GEAR[eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:['PLAIN','#5a6080'],good=(w.elem&&w.elem===D.weak)||(w.status&&w.status===wkSt),bad=w.status&&w.status===D.resSt;
@@ -2002,7 +2016,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,ASLOTS,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests

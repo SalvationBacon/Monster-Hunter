@@ -11,7 +11,7 @@ const shots=process.argv[2];
   const shot=async n=>{if(shots){await p.waitForTimeout(80);await p.screenshot({path:shots+'/'+n+'.png'});}};
   const ev=(f,a)=>p.evaluate(f,a);
   await shot('title');
-  await ev(()=>{MH.manual=true;for(const k in MH.GEAR)MH.SAVE.own[k]=true;window.EQ=(w,ar,ch)=>{Object.assign(MH.SAVE.eq,{weapon:w||'iron_gs',armor:ar||'leather',charm:ch||null});MH.SAVE.lv={};MH.SAVE.potions=99;};
+  await ev(()=>{MH.manual=true;for(const k in MH.GEAR)MH.SAVE.own[k]=true;window.EQ=(w,ar,ch)=>{ar=ar||'leather';const t=ar==='leather'?null:ar.slice(0,-3);Object.assign(MH.SAVE.eq,{weapon:w||'iron_gs',armor:ar,helm:t?t+'_he':'leather_helm',arms:t?t+'_ga':'leather_arms',legs:t?t+'_bo':'leather_legs',charm:ch||null});MH.SAVE.lv={};MH.SAVE.potions=99;};
     // a quiet hunt for measuring: the monster does nothing and cannot dodge
     window.QUIET=(mon,o)=>{MH.newHunt(mon,o);const S=MH.S,m=S.m;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;S.h.inv=1e9;return S;};
     window.RUN=n=>{for(let i=0;i<n;i++)MH.update(1/60);};});
@@ -29,7 +29,7 @@ const shots=process.argv[2];
   ok(await ev(()=>{const M=MH.MONSTERS,H=MH.HUNTS;for(let i=1;i<30;i++){const a=M[H[i-1]],c=M[H[i]];if(c.dmg<a.dmg||c.qteTime>a.qteTime||MH.GEAR[H[i]+'_gs'].atk<=MH.GEAR[H[i-1]+'_gs'].atk)return H[i];}
     const top=M[H[29]],ap=H.slice(30,34).map(id=>M[id]),el=M.star;return ap.every(a=>a.hp>top.hp*1.3&&a.hp<el.hp&&a.dmg>top.dmg&&a.dmg<el.dmg)||'apex';}),'monsters and their gear get stronger down the order; apex monsters sit well above rank 6 and below the elder');
   ok(await ev(()=>{const w=t=>{let n=-1;for(const ch of t)n+=(ch==='M'||ch==='W'?5:3)+1;return n;};const long=[];
-    for(const id of MH.HUNTS){const D=MH.MONSTERS[id];for(const t of [D.tip,D.tip2])if(w(t)>119)long.push(t);if(w(D.name)>74)long.push(D.name);for(const k of ['gs','db','hm','ln','ar','ch','pw','pa'])if(w(MH.GEAR[id+'_'+k].name)>76)long.push(MH.GEAR[id+'_'+k].name);
+    for(const id of MH.HUNTS){const D=MH.MONSTERS[id];for(const t of [D.tip,D.tip2])if(w(t)>119)long.push(t);if(w(D.name)>74)long.push(D.name);for(const k of ['gs','db','hm','ln','ar','he','ga','bo','ch','pw','pa'])if(w(MH.GEAR[id+'_'+k].name)>76)long.push(MH.GEAR[id+'_'+k].name);
       for(const k in D.matName)if(w(D.matName[k])>70)long.push(D.matName[k]);}
     for(const t of [...MH.STORY.map(s=>[s.t,...s.d,MH.goalText(s.goal)]).flat(),...MH.SIDES.map(s=>MH.goalText(s.goal)),...MH.DAILIES.map(s=>MH.goalText(s.goal)),...Object.values(MH.MEALS).map(m=>m.desc)])if(w(t)>117)long.push(t);
     for(const r of Object.values(MH.ROLES))if(w(r[1])>90)long.push(r[1]);
@@ -122,7 +122,7 @@ const shots=process.argv[2];
   ok(await ev(()=>{EQ();const a=HIT('ember',{n:30,pre:S=>{S.m.state='sleep';S.m.t=0;}}),b=HIT('ember',{n:30});const S=QUIET('ember');S.m.state='sleep';MH.actTap('body');RUN(16);return S.m.state!=='sleep'&&Math.abs(a/b-2.5)<.2;}),'the hit that wakes a sleeping monster does 2.5 times the damage');
   ok(await ev(()=>{const S0=MH.SAVE;EQ('fern_gs','fern_ar');S0.bag={scale:99,claw:99,horn:9,wing:9,spike:9,quill_scale:99,rare:2};
     const c1=JSON.stringify(MH.upCost('fern_gs'));MH.upgradeTap('fern_gs');const a1=MH.gearStats().atk,sc=S0.bag.scale;for(let i=0;i<9;i++)MH.upgradeTap('fern_gs');for(let i=0;i<9;i++)MH.upgradeTap('fern_ar');const g=MH.gearStats();
-    const r=c1==='{"scale":3,"claw":1}'&&Math.abs(a1-1.404)<1e-6&&sc===96&&MH.lvOf('fern_gs')===5&&Math.abs(g.atk-1.82)<1e-6&&g.hp===196&&MH.upCost('fern_gs')===null&&S0.bag.quill_scale===99-12&&S0.bag.rare===0;
+    const r=c1==='{"scale":3,"claw":1}'&&Math.abs(a1-1.404)<1e-6&&sc===96&&MH.lvOf('fern_gs')===5&&Math.abs(g.atk-1.82)<1e-6&&g.hp===162&&MH.upCost('fern_gs')===null&&S0.bag.quill_scale===99-12&&S0.bag.rare===0;
     S0.lv={fern_gs:4};S0.bag={scale:99,claw:99,horn:9,wing:9,quill_scale:99};MH.upgradeTap('fern_gs');const noRare=MH.lvOf('fern_gs')===4;S0.lv={};S0.bag={};MH.upgradeTap('fern_gs');return r&&noRare&&MH.lvOf('fern_gs')===0&&MH.upCost('fern_ch')===null;}),
     'upgrades cost materials, add 8% a level and stop at +5; the last levels need the next monster\'s scales and the rare drop; charms have no levels');
   ok(await ev(()=>{const taken=ar=>{let n=0;for(let k=0;k<12;k++){EQ('iron_gs',ar);MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}n+=S.stats.taken/Math.round(MH.ATTACKS[m.atk].dmg*MH.MONSTERS.ember.dmg);}return n/12;};
@@ -136,6 +136,17 @@ const shots=process.argv[2];
     return chip&&MH.S.h.counter>0&&MH.S.stats.taken===0;}),'a lance guard blocks for chip damage and stamina, and one raised just in time is perfect and opens a counter');
   ok(await ev(()=>{EQ();const roll=(breaks,dry)=>{let n=0;for(let i=0;i<4000;i++){MH.SAVE.dry.fern=dry;MH.newHunt('fern');for(const k of ['head','wings','tail'].slice(0,breaks))MH.S.m.parts[k].broken=true;if(MH.rollLoot().drops.some(d=>d.id==='rare'))n++;}return n/4000;};
     const a=roll(0,0),c=roll(3,0),d=roll(0,20);MH.SAVE.bag={};MH.SAVE.wins={};MH.SAVE.dry={};MH.SAVE.side={};return a>.015&&a<.05&&c>.09&&c<.15&&d>.1&&d<.16;}),'the rare drop is about 3%, 12% with every part broken, and creeps up over a dry streak');
+
+  // ── armor in four pieces ──
+  ok(await ev(()=>{const G=MH.GEAR,bad=[];for(const id of MH.HUNTS){const parts=['ar','he','ga','bo'].map(k=>G[id+'_'+k]);if(parts.some(x=>!x))bad.push(id);else{const sum=parts.reduce((t,x)=>t+x.hp,0);if(Math.abs(sum-(140+8*MH.MONSTERS[id].L))>.01)bad.push(id+' '+sum);
+      if(!parts[0].perk||parts.slice(1).some(x=>x.perk))bad.push(id+' perk');}}return bad.length?bad.join(','):true;}),'every monster makes a chest, helm, gauntlets and boots; together they are worth the old armor, and only the chest carries a perk');
+  ok(await ev(()=>{EQ('iron_gs','ember_ar');const full=MH.gearStats();Object.assign(MH.SAVE.eq,{helm:'frost_he',arms:'frost_ga',legs:'frost_bo'});const mix=MH.gearStats();
+    Object.assign(MH.SAVE.eq,{armor:'leather'});const two=MH.gearStats();EQ();
+    const pk=MH.GEAR.ember_ar.perk;return full.res.fire===.25&&Math.abs(mix.res.fire-.1)<1e-9&&Math.abs(mix.res.ice-.15)<1e-9&&!two.res.fire&&Math.abs(two.res.ice-.15)<1e-9&&!!mix.perks[pk]&&!two.perks[pk]&&full.hp===140+8*MH.MONSTERS.ember.L||JSON.stringify([full.res,mix.res,two.res,full.hp]);}),
+    'mixing pieces splits the resistance by share, and the perk comes with the chest');
+  ok(await ev(()=>{const S=MH.SAVE;S.lv={};S.bag={scale:99,claw:99,horn:9,wing:9,spike:9};EQ('iron_gs','fern_ar');const ch=JSON.stringify(MH.upCost('fern_ar')),he=JSON.stringify(MH.upCost('fern_he'));
+    const h0=MH.gearStats().hp;MH.upgradeTap('fern_he');const h1=MH.gearStats().hp;S.lv={};S.bag={};return ch==='{"scale":3,"claw":1}'&&he==='{"scale":2,"claw":1}'&&h1-h0===Math.round(140*.2*.08)||[ch,he,h0,h1].join(' ');}),
+    'helm, gauntlets and boots upgrade too, for about half the materials');
 
   // ── what monsters do to the hunter ──
   ok(await ev(()=>{EQ();const S=QUIET('fern'),h=S.h;h.inv=0;MH.applyStatus('poison');const hp0=h.hp;RUN(120);const lost=hp0-h.hp;h.state='idle';MH.actPotion();RUN(60);const cured=h.poison===0;h.hp=3;MH.applyStatus('poison');RUN(600);
@@ -257,21 +268,25 @@ const shots=process.argv[2];
   await ev(()=>MH.scrollSet(1e6));await p.waitForTimeout(80);await shot('c-hunt-end');ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:star')),'the elder is at the end of the list');
   await tapBtn('exp:toggle');ok(await ev(()=>!MH.S.exp),'expeditions are locked before the first Fernwing');
   // ── the GEAR tab and the forge ──
-  await tapBtn('tab:gear');ok(await ev(()=>MH.S.tab==='gear'&&['weapon','armor','charm','pweapon','parmor'].every(k=>MH.S.btns.some(b=>b.id==='slot:'+k))),'the GEAR tab shows the hunter and five gear slots');await shot('c-gear');
+  await tapBtn('tab:gear');ok(await ev(()=>MH.S.tab==='gear'&&['weapon','charm','helm','armor','arms','legs','pweapon','parmor'].every(k=>MH.S.btns.some(b=>b.id==='slot:'+k))),'the GEAR tab shows the hunter and eight gear slots');await shot('c-gear');
   await tapBtn('slot:weapon');ok(await ev(()=>MH.S.gpick==='weapon'&&['iron_gs','iron_db','iron_hm','iron_ln'].every(k=>MH.S.btns.some(b=>b.id==='wear:'+k))&&!MH.S.btns.some(b=>b.id==='wear:fern_gs')),'a slot lists only the gear you own for it');await shot('c-gear-pick');
   await tapBtn('wear:iron_ln');ok(await ev(()=>MH.SAVE.eq.weapon==='iron_ln'&&!MH.S.gpick&&MH.gearStats().wt==='ln'),'picking one wears it and goes back to the gear screen');
   await tapBtn('slot:weapon');await tapBtn('gear:back');ok(await ev(()=>!MH.S.gpick),'BACK leaves the list without changing anything');await tapBtn('slot:weapon');await tapBtn('wear:iron_gs');
+  await ev(()=>{MH.SAVE.own.fern_he=true;});await tapBtn('slot:helm');ok(await ev(()=>MH.S.btns.some(b=>b.id==='wear:fern_he')&&!MH.S.btns.some(b=>b.id==='wear:fern_ar')),'the helm slot lists only helms');
+  await tapBtn('wear:fern_he');ok(await ev(()=>MH.SAVE.eq.helm==='fern_he'&&MH.armorRes().nature===.05&&MH.gearStats().hp===Math.round(80+28)),'wearing a Fernwing helm adds its health and a little nature resistance');await shot('c-gear-helm');
+  await tapBtn('slot:helm');await tapBtn('wear:leather_helm');await ev(()=>{delete MH.SAVE.own.fern_he;});
   await tapBtn('tab:forge');ok(await ev(()=>MH.S.tab==='forge'&&['fcat:weapon','fcat:armor','fcat:pip'].every(k=>MH.S.btns.some(b=>b.id===k))&&MH.S.fcat==='weapon'),'the forge has three categories: weapons, armor and Pip');
   ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids[0]==='iron_gs'&&ids.includes('fern_gs')&&ids.every(k=>MH.GEAR[k].wt==='gs')&&!ids.includes('bog_gs');}),'weapons open on greatswords: the starter, then one per monster you can hunt');await shot('c-forge-weapons');
   await tapBtn('fsub:1');ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('forge:')).every(b=>MH.GEAR[b.id.slice(6)].wt==='db')),'the sub-filter switches weapon type');
-  await tapBtn('fcat:armor');await tapBtn('fsub:1');ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids.length>0&&ids.every(k=>MH.GEAR[k].slot==='charm');}),'armor has charms under its own filter');await shot('c-forge-charms');
+  await tapBtn('fcat:armor');const subs=[];for(let i=0;i<5;i++){await tapBtn('fsub:'+i);subs.push(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>MH.GEAR[b.id.slice(6)].slot);return ids.length&&ids.every(s=>s===ids[0])?ids[0]:'mixed';}));if(i===1)await shot('c-forge-helms');}
+  ok(subs.join(',')==='armor,helm,arms,legs,charm'||subs.join(','),'armor has chest, helm, arms, legs and charm filters');await shot('c-forge-charms');
   await tapBtn('fcat:pip');ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids[0]==='pip_fang'&&ids.every(k=>MH.GEAR[k].slot==='pweapon');}),'Pip has its own category, fangs first');await shot('c-forge-pip');
   await tapBtn('fcat:weapon');await tapBtn('fsub:0');
   await tapBtn('craft:fern_gs');ok(await ev(()=>!MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='iron_gs'),'gear cannot be crafted without materials');
   await ev(()=>{Object.assign(MH.SAVE.bag,{scale:9,claw:4,horn:2,wing:1,spike:1});});await p.waitForTimeout(80);
   await tapBtn('craft:fern_gs');ok(await ev(()=>MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='fern_gs'&&MH.SAVE.bag.scale===4&&MH.SAVE.bag.claw===2&&MH.SAVE.bag.horn===1&&MH.gearStats().atk===1.3&&MH.gearStats().elem==='nature'),'crafting spends the materials, wears the gear and gives its element');
   await tapBtn('forge:fern_gs');ok(await ev(()=>MH.SAVE.eq.weapon==='fern_gs'&&MH.S.toast&&/GEAR/.test(MH.S.toast.txt)),'tapping owned gear in the forge points to the GEAR tab');
-  await tapBtn('fcat:armor');await tapBtn('fsub:1');await tapBtn('craft:fern_ch');ok(await ev(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
+  await tapBtn('fcat:armor');await tapBtn('fsub:4');await tapBtn('craft:fern_ch');ok(await ev(()=>MH.SAVE.eq.charm==='fern_ch'&&MH.gearStats().qteSlow===1.4),'the Keen Eye Charm slows the circles');
   await tapBtn('tab:gear');await tapBtn('slot:charm');await tapBtn('wear:none');ok(await ev(()=>MH.SAVE.eq.charm===null),'a charm can be taken off in the GEAR tab');await tapBtn('slot:charm');await tapBtn('wear:fern_ch');
   await tapBtn('tab:forge');await tapBtn('fcat:weapon');await tapBtn('fsub:0');
   ok(await tapBtn('up:fern_gs')&&await ev(()=>MH.lvOf('fern_gs')===1&&MH.SAVE.bag.scale===1&&MH.SAVE.bag.claw===1&&MH.SAVE.eq.weapon==='fern_gs'),'a tap on UP upgrades the weapon and spends materials');await shot('c-forge-crafted');
@@ -355,13 +370,13 @@ const shots=process.argv[2];
   await tapBtn('nothing');await ev(()=>{MH.toCamp('hunt');});await p.waitForTimeout(80);await tapBtn('hunt:bog');ok(await ev(()=>MH.S.mode==='camp'),'rank 2 stays locked until three rank 1 monsters are beaten');
   // ── saves and screen sizes ──
   ok(await ev(()=>{const v={bag:{scale:2},own:{iron:true,fblade:true,keen:true,coat_poison:true},eq:{weapon:'fblade',armor:'leather',charm:'keen',coat:'coat_poison'},wins:{fern:2,ember:1}};localStorage.setItem('mh_save_v1',JSON.stringify(v));const s=MH.loadSave();
-    return s.eq.weapon==='fern_gs'&&s.eq.charm==='fern_ch'&&s.eq.pweapon==='pip_fang'&&s.eq.parmor==='pip_vest'&&s.own.pip_fang&&s.own.fern_gs&&s.own.iron_hm&&!s.own.fblade&&s.bag.scale===2&&!('coat' in s.eq)&&s.potions===6;}),'an older save keeps its gear under the new names and drops its coating');
+    return s.eq.weapon==='fern_gs'&&s.eq.charm==='fern_ch'&&s.eq.helm==='leather_helm'&&s.eq.legs==='leather_legs'&&s.own.leather_arms&&s.eq.pweapon==='pip_fang'&&s.eq.parmor==='pip_vest'&&s.own.pip_fang&&s.own.fern_gs&&s.own.iron_hm&&!s.own.fblade&&s.bag.scale===2&&!('coat' in s.eq)&&s.potions===6;}),'an older save keeps its gear under the new names and drops its coating');
   await p.setViewportSize({width:1280,height:720});await p.waitForTimeout(150);
   ok(await ev(()=>{const r=document.getElementById('c').getBoundingClientRect();return r.height<=innerHeight+1&&r.width<=innerWidth&&r.height>innerHeight*.9;}),'the canvas fits a desktop window');
   await ev(()=>{MH.SAVE.wins={};for(const id of MH.HUNTS)MH.SAVE.wins[id]=1;MH.toCamp('forge');MH.S.fcat='weapon';MH.S.fsub=0;});await p.waitForTimeout(150);await shot('s-forge');
   ok(await ev(()=>{const top=MH.S.btns.filter(b=>/^(forge|craft|up):/.test(b.id)).every(b=>b.y>=38&&b.y+b.h<=MH.LH-20);MH.scrollSet(1e6);return top&&MH.S.scrMax.forgeweapon0>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='forge:star_gs')))))),'the forge list scrolls on the shortest screen, down to the elder\'s gear');await shot('s-forge-end');
   await ev(()=>{MH.SAVE.pal=true;MH.toCamp('gear');});await p.waitForTimeout(150);await shot('s-gear');
-  ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===5&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
+  ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===8&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
   await ev(()=>{MH.toCamp('hunt');MH.S.exp=true;MH.SAVE.wins={fern:1,quill:1,mud:1,dust:1,tusk:1,bog:1,ember:1,thorn:1};});await p.waitForTimeout(150);await shot('s-expeditions');
   ok(await ev(()=>{const g=MH.S.btns.filter(b=>/^(gather|pack):/.test(b.id));const fit=g.every(b=>b.y>=12&&b.y+b.h<=MH.LH-19);MH.scrollSet(1e6);return fit&&MH.S.scrMax.exp>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='gather:shell')&&!MH.S.btns.some(b=>b.id==='gather:storm')))))),'the expedition list scrolls on the shortest screen, and only open biomes can be started');await shot('s-expeditions-end');
   for(const tab of ['hunt','cook','quest','bugs']){await ev(t=>{MH.SAVE.story={i:0,p:0};MH.toCamp(t);},tab);await p.waitForTimeout(120);await shot('s-'+tab);}

@@ -21,8 +21,8 @@
 ## The loop around the fight
 
 - **Camp:** six tabs: HUNT, GEAR, FORGE, COOK, QUEST and BUGS (v0.15.0).
-- **GEAR tab:** the hunter and Pip in their current gear, a summary (attack, element or status, health, resistance, perks) and five slots: weapon, armor, charm, Pip fang and Pip vest. Tapping a slot lists the owned pieces for it; tapping one wears it. Charms can be taken off here.
-- **FORGE tab:** three categories, each with a sub-filter: WEAPONS (great, dual, hammer, lance), ARMOR (armor, charms) and PIP (fangs, vests). Each list shows the starter piece, then one per monster you can hunt; the rest are counted as "more as you rank up". The forge crafts and upgrades; a newly crafted piece is worn straight away, and owned pieces point to the GEAR tab.
+- **GEAR tab:** the hunter and Pip in their current gear, a summary (attack, element or status, health, best resistance, perks) and eight slots in a grid: weapon, charm, helm, chest, gauntlets, boots, Pip fang and Pip vest. Tapping a slot lists the owned pieces for it; tapping one wears it. Charms can be taken off here.
+- **FORGE tab:** three categories, each with a sub-filter: WEAPONS (great, dual, hammer, lance), ARMOR (chest, helm, arms, legs, charms) and PIP (fangs, vests). Each list shows the starter piece, then one per monster you can hunt; the rest are counted as "more as you rank up". The forge crafts and upgrades; a newly crafted piece is worn straight away, and owned pieces point to the GEAR tab.
 - **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.
 - **Everything is data:** monsters, weapon types, perks and gear are tables at the top of `index.html`. Gear is generated from them, so a new monster brings its weapons, armor and charm with it.
 
@@ -31,7 +31,7 @@
 35 monsters, all defined in one table (`ROSTER` in `index.html`), one line each: name, body, arena, element, what its weapons carry, weak element, weak status, the status it inflicts, a trait, its moves, its colours and look flags. Stats come from its place in the order.
 
 - **Ranks:** 30 base monsters in six ranks of five, then four apex monsters (rank 7) and the elder (rank 8). The Fernwing opens rank 1; three wins in a rank open the next; the apex rank opens after three rank 6 wins; the elder needs all four apex monsters.
-- **Scaling:** a monster's damage, attack speed, circle speed and dodge rate climb down the order, and its health matches the gear of the monster before it. Apex monsters have 1.5x health and 1.15x damage on top; the elder 1.8x and 1.12x over the strongest apex.
+- **Scaling:** a monster's damage, attack speed, circle speed and dodge rate climb down the order, and its health matches the gear of the monster before it. Apex monsters have 1.5x health and 1.15x damage on top; the elder 1.53x and 1.19x (tuned so an average hunter in apex gear wins about 15 times in 16, and one in rank 3 gear about once).
 - **Bodies:** wyvern, brute, serpent (coiled, with a neck fin), raptor (beaked biped) and crab (shelled, one great claw, a stinger). Each monster has its own colours and look flags (tusks, a club tail, glowing spines, a hot mouth, the elder's second pair of wings and starlit chest).
 - **Arenas:** forest, volcano, desert, tundra, storm peaks, swamp, coast, ruins, and the summit under the Hollow Star.
 - **Moves:** a shared library of 25 moves plus five of the elder's own (starfall, beam, comet, nova, eclipse). Every monster draws six or seven, and no two monsters share a set. New animations: a double tail spin, and a burrow where it sinks out of sight and bursts up beside the hunter.
@@ -80,6 +80,10 @@ Each monster's weapons carry either its element or a status, never both (statuse
 | Ember | x1.75 | 200 | Might | Breaker |
 | Frost | x2.05 | 240 | Nimble | Herbalist |
 | Storm | x2.4 | 290 | Keen Edge | Fortune |
+
+### Armor pieces (v0.17.0)
+
+Armor comes in four pieces from every monster: chest (40% of the set's health, and the only piece with a perk), helm, gauntlets and boots (20% each). A full set is worth what one armor piece was before. Each piece adds its share of 25% resistance to its monster's element, so a full set resists 25% and mixing splits it. Helm, gauntlets and boots upgrade for about half the materials. The hunter's helmet, shoulder guards and boots take each piece's colours. Starter pieces: leather vest, cap, gloves and boots.
 
 ### Upgrades and resistance
 

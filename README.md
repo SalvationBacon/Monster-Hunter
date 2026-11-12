@@ -2,7 +2,7 @@
 
 A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
 
-**Current state: prototype (v0.16.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, perks, upgrades, music for every screen and monster, and a camp with gear, a forge, kitchen, quests, expeditions in eight biomes, a terrarium and Pip, a companion with its own gear.
+**Current state: prototype (v0.17.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, perks, upgrades, music for every screen and monster, and a camp with gear, a forge, kitchen, quests, expeditions in eight biomes, a terrarium and Pip, a companion with its own gear.
 
 ## Play
 Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
@@ -23,7 +23,7 @@ Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` 
 1. **Quests** tell you what to do next. The main story is the tutorial.
 2. **Hunt** a monster from the prep screen, where you see its weaknesses and pick a meal. Break its parts for their drops.
 3. **Expeditions:** gather runs give ingredients and creatures; pack hunts give meat and common materials.
-4. **Forge** materials into weapons, armor, charms and Pip's gear, and upgrade them. Wear what you've made from the **GEAR** tab. **Cook** potions; meals are chosen in prep.
+4. **Forge** materials into weapons, four-piece armor (chest, helm, gauntlets, boots), charms and Pip's gear, and upgrade them. Wear what you've made from the **GEAR** tab. **Cook** potions; meals are chosen in prep.
 5. Three wins in a rank open the next rank. The four apex monsters open after rank 6, and the elder after all four apex monsters.
 
 ## Music
