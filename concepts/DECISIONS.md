@@ -164,7 +164,7 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 - **Expeditions** cover eight biomes (v0.14.0): forest, swamp, desert, volcano, coast, tundra, ruins and storm peaks. Each opens with the first monster that lives there (Fernwing, Mudclaw, Tuskhide, Emberwing, Shellsnap, Frostmaw, Dreadbeak, Stormwing). The list scrolls.
   - **Gather run (25s):** ingredients pop up and are tapped before they vanish. Each biome has a common and a scarce ingredient (12% of pop-ups, gone sooner). A creature crosses every few seconds inside a closing circle; tapping it catches it.
   - **Pack hunt:** three Snapjaws, one after another, with the normal combat. No parts to break. Pays meat and the biome monster's common materials.
-- **Terrarium:** 32 creatures, four per biome, the fourth rare (15% of sightings). Caught species wander in a tank. Each common adds 0.3% health or attack and each rare 0.6% of both, so the full set is about +9.6% health and +7.2% attack.
+- **Terrarium:** 32 creatures, four per biome, the fourth rare (15% of sightings). Caught species wander in a tank. Each common adds 0.15% health or attack and each rare 0.3% of both, so the full set of 32 is about +4.8% health and +3.6% attack. Kept low on purpose, to leave room for a rebirth system.
 - **Quests:**
   - **Main story (10 chapters):** the first chapters are the tutorial (hunt, gather, forge, eat). The lore: monsters are acting strangely, a faint glow is found on them, and every trail leads to the peaks and to an elder being the elders call the Hollow Star. The last chapter is "to be continued".
   - **Side quests (10):** one-off goals, open after the Fernwing.
