@@ -248,7 +248,10 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 
 ## Title, music and pause (v0.16.0)
 
-- **Title screen:** the logo over a showcase that cycles every 8 seconds through the monsters you have beaten, each in its own arena with its own music. HOW TO PLAY opens the controls; MUSIC turns music on or off.
+- **Title screen:** the logo over a showcase that cycles every 8 seconds through the monsters you have beaten, each in its own arena with its own music. HOW TO PLAY opens the controls; OPTIONS opens music, sound, dev mode and delete save (v0.22.0).
+- **Dev mode:** every monster beaten, every piece of gear owned, 99 of every material and potion, Pip, and the story at its last chapter. It plays on its own save (`mh_dev_v1`), so the real save is never touched, and switching it off brings the real save back. The title and camp say DEV while it is on.
+- **Delete save:** needs a second tap within 3 seconds. It deletes the current save (the dev save, in dev mode) and keeps the settings.
+- **The game loop** schedules the next frame before drawing, so one error can no longer freeze the game; the first frame's time is clamped, since it can arrive stamped before the page started.
 - **Music engine:** ported from 8-Bit Industry. A track is a recipe: tempo, key, scale, three chord progressions, a form (intro, A, B, C), lead, arpeggio, bass and drum voices. `compileSong()` writes the notes; the hook comes from the track's own seed so it is always the same, while the accompaniment is reseeded on every play. A look-ahead scheduler plays the notes every 100ms, and the music crossfades when the screen changes.
 - **Tracks:** title (Hollowroot), camp and every menu (Campfire), gather runs (Foraging), pack hunts (Snapjaws), and one per monster. A monster's track comes from what it is:
 

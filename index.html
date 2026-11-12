@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.21.0';
+const VER='0.22.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -901,9 +901,11 @@ function buzz(ms){if(!MH.manual&&navigator.vibrate)try{navigator.vibrate(ms);}ca
 const S={mode:'title',t:0};
 const MH=window.MH={S,manual:false};       // test hook (tools/check.js)
 // ── Save: bag of materials, owned and worn gear, wins per monster. On this device only.
-const SAVE_KEY='mh_save_v1';
+const SAVE_KEY='mh_save_v1', DEV_KEY='mh_dev_v1';
+const saveKey=()=>PREFS.dev?DEV_KEY:SAVE_KEY;                                    // dev mode plays on its own save
 function loadSave(){
-  let v=null; try{v=JSON.parse(localStorage.getItem(SAVE_KEY));}catch(e){}
+  let v=null; try{v=JSON.parse(localStorage.getItem(saveKey()));}catch(e){}
+  if(!v&&PREFS.dev)v=devSave();
   if(!v){v={};try{const old=JSON.parse(localStorage.getItem('mh_proto_bag'));if(old)v.bag=old;}catch(e){}}   // loot from the first prototypes carries over
   v.bag=v.bag||{};v.own=v.own||{};v.wins=v.wins||{};v.lv=v.lv||{};v.dry=v.dry||{};v.eq=Object.assign({weapon:'iron_gs',armor:'leather',charm:null},v.eq);delete v.eq.coat;
   for(const [o,n] of Object.entries(OLD_IDS)){if(v.own[o]){delete v.own[o];v.own[n]=true;}for(const sl in v.eq)if(v.eq[sl]===o)v.eq[sl]=n;}
@@ -913,7 +915,14 @@ function loadSave(){
   return v;
 }
 let SAVE=loadSave();
-function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SAVE));}catch(e){}}
+function save(){try{localStorage.setItem(saveKey(),JSON.stringify(SAVE));}catch(e){}}
+// A dev save: every monster beaten, every piece of gear owned, plenty of everything
+function devSave(){
+  const v={bag:{},own:{},wins:{},lv:{},dry:{},potions:99,pal:true,bugs:{},story:{i:STORY.length-1,p:0},side:{},daily:{key:'',q:[]},weekly:{key:'',q:[]},packs:0,role:'fighter'};
+  for(const id of HUNTS)v.wins[id]=1;for(const id in GEAR)v.own[id]=true;for(const id in LOOT)v.bag[id]=99;return v;
+}
+function setDev(on){save();PREFS.dev=on;savePrefs();SAVE=loadSave();save();toast(on?'DEV MODE: ALL UNLOCKED':'BACK TO YOUR SAVE',on?'#ff9a4d':'#4cc9ff');sfx('charge',2);}
+function deleteSave(){try{localStorage.removeItem(saveKey());}catch(e){}SAVE=loadSave();save();S.armDel=0;toast(PREFS.dev?'DEV SAVE RESET':'SAVE DELETED','#ff6a4d');sfx('lose');}
 // What the worn gear adds up to
 const lvOf=id=>SAVE.lv[id]||0;
 const gearAtk=id=>+(GEAR[id].atk*(1+UP_STEP*lvOf(id))).toFixed(3), gearHpRaw=id=>GEAR[id].hp*(1+UP_STEP*lvOf(id)), gearHp=id=>Math.round(gearHpRaw(id));
@@ -1415,7 +1424,7 @@ function quitHunt(){S.paused=false;save();toCamp('hunt');}
 const tapBtns=(x,y)=>{for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();return true;}return false;};
 function press(x,y){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
-  if(S.mode==='title'){if(S.howto){S.howto=false;return;}if(!tapBtns(x,y))toCamp(SAVE.wins.fern?'hunt':'quest');return;}
+  if(S.mode==='title'){if(S.howto){S.howto=false;return;}if(!tapBtns(x,y)&&!S.opts)toCamp(SAVE.wins.fern?'hunt':'quest');return;}
   if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
   if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
   if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres'){if(S.t>1.2)toCamp(qClaimable(quests()[0]||{st:{p:0,c:true},def:{goal:[0,0,1]}})?'quest':'hunt');return;}
@@ -1816,7 +1825,7 @@ function drawPause(){
 }
 function drawTitle(){
   // a showcase: the monsters you have met take turns, each in its arena, with its own music
-  const met=HUNTS.filter(id=>id==='fern'||SAVE.wins[id]),id=met[Math.floor(S.t/8)%met.length],D=MONSTERS[id];S.show=met.length>1||SAVE.wins.fern?id:null;
+  const met=HUNTS.filter(id=>id==='fern'||SAVE.wins[id]),id=met[Math.floor(Math.max(0,S.t)/8)%met.length],D=MONSTERS[id];S.show=met.length>1||SAVE.wins.fern?id:null;
   g.drawImage(bgFor(D.biome),-4,0);
   const hd=RIGS[D.rig].head(POSE0);shadow(L.mx+MS_OX+38,L.mFeet+2,D.rig==='crab'||D.rig==='serpent'?26:30,5);
   g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*.7)>.9?2:0})),L.mx,L.my);
@@ -1826,7 +1835,7 @@ function drawTitle(){
   // logo
   g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,8,W,40);g.fillStyle='#ffe14d';g.fillRect(0,8,W,1);g.fillRect(0,47,W,1);
   text('FERNWING',W/2,13,'#ffe14d',{al:1,s:2,out:OUTLINE});text('HUNT',W/2,27,'#fff',{al:1,s:2,out:OUTLINE});
-  text(met.length>1?'NOW: '+D.name:'V'+VER,W/2,40,'#8a93b0',{al:1});
+  text(PREFS.dev?'DEV MODE':met.length>1?'NOW: '+D.name:'V'+VER,W/2,40,PREFS.dev?'#ff9a4d':'#8a93b0',{al:1});
   if(S.howto){const y=56;panel(8,y,W-16,102);
     const rows=[['TAP','ATTACK'],['HOLD','WEAPON SKILL'],['SWIPE','DODGE'],['UP / DOWN','POTION / WHET']];
     rows.forEach((r,i)=>{text(r[0],14,y+6+i*10,'#ffb020');text(r[1],W-14,y+6+i*10,'#e8f0fc',{al:2});});
@@ -1837,7 +1846,20 @@ function drawTitle(){
   const B=S.btns=[],by=LH-22;
   const btn=(bid,x,w,lab,col,fn)=>{g.fillStyle='#000';g.fillRect(x,by,w,14);g.fillStyle=col;g.fillRect(x+1,by+1,w-2,12);text(lab,x+w/2,by+5,'#fff',{al:1});B.push({id:bid,x,y:by-2,w,h:18,fn});};
   btn('title:howto',4,58,'HOW TO PLAY','#2a6aa8',()=>{S.howto=true;sfx('charge',1);});
-  btn('title:music',66,58,'MUSIC: '+(PREFS.music?'ON':'OFF'),PREFS.music?'#2a6aa8':'#3a4060',()=>setMusic(!PREFS.music));
+  btn('title:options',66,58,'OPTIONS','#2a6aa8',()=>{S.opts=true;S.armDel=0;sfx('charge',1);});
+  if(S.opts){                                                                    // the options menu
+    S.btns=[];const ph=112,y=Math.max(52,((LH-ph)/2)|0);g.fillStyle='rgba(10,12,22,.6)';g.fillRect(0,0,W,LH);panel(10,y,W-20,ph);text('OPTIONS',W/2,y+5,'#ffe14d',{al:1});
+    const row=(id,yy,lab,col,fn,sub)=>{g.fillStyle='#000';g.fillRect(18,yy,W-36,14);g.fillStyle=col;g.fillRect(19,yy+1,W-38,12);text(lab,W/2,yy+5,'#fff',{al:1});S.btns.push({id,x:18,y:yy,w:W-36,h:14,fn});
+      if(sub)text(sub,W/2,yy+16,'#8a93b0',{al:1});};
+    row('opt:music',y+15,'MUSIC: '+(PREFS.music?'ON':'OFF'),PREFS.music?'#2a6aa8':'#3a4060',()=>setMusic(!PREFS.music));
+    row('opt:sfx',y+31,'SOUND: '+(PREFS.sfx?'ON':'OFF'),PREFS.sfx?'#2a6aa8':'#3a4060',()=>setSfx(!PREFS.sfx));
+    row('opt:dev',y+47,'DEV MODE: '+(PREFS.dev?'ON':'OFF'),PREFS.dev?'#c8701a':'#3a4060',()=>setDev(!PREFS.dev),'ALL UNLOCKED, OWN SAVE');
+    const armed=S.armDel>0&&S.t<S.armDel;
+    row('opt:delete',y+71,armed?'TAP AGAIN TO DELETE':PREFS.dev?'RESET DEV SAVE':'DELETE SAVE',armed?(Math.floor(S.t*6)%2?'#e2483d':'#a8302a'):'#7a2a2a',()=>{if(armed)deleteSave();else{S.armDel=S.t+3;sfx('warn');}});
+    row('opt:back',y+92,'BACK','#2f8f4a',()=>{S.opts=false;sfx('charge',1);});
+    if(S.toast){const tw=textW(S.toast.txt)+10;g.fillStyle='#000';g.fillRect((W-tw)/2-1,y+ph+4,tw+2,13);g.fillStyle='#1c2134';g.fillRect((W-tw)/2,y+ph+5,tw,11);text(S.toast.txt,W/2,y+ph+8,S.toast.col,{al:1});}
+    return;
+  }
   if(Math.floor(S.t*2)%2)text('TAP TO START',W/2,by-16,'#fff',{al:1,out:OUTLINE});
 }
 function drawLoot(){
@@ -1879,7 +1901,7 @@ function smallBtn(B,id,x,y,w,lab,col,fn,on){g.fillStyle='#000';g.fillRect(x,y,w,
 const TABS=[['hunt','HUNT'],['gear','GEAR'],['forge','FORGE'],['cook','COOK'],['quest','QUEST'],['bugs','BUGS']];
 function drawCamp(){
   const B=S.btns=[]; g.drawImage(bgFor(0),-4,0); g.fillStyle='rgba(12,14,26,.88)';g.fillRect(0,0,W,LH);
-  g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('CAMP',4,3,'#ffe14d');
+  g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('CAMP',4,3,'#ffe14d');if(PREFS.dev)text('DEV',24,3,'#ff9a4d');
   const eq=SAVE.eq, gs=gearStats(), qs=quests();
   if(S.tab==='hunt'){
     const open=!!SAVE.wins.fern;                                                 // expeditions open after the first Fernwing
@@ -2116,16 +2138,17 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){if(S.mode=
 
 let last=performance.now();
 function frame(now){
-  const dt=Math.min(.05,(now-last)/1000);last=now;
-  if(!MH.manual)update(dt);
-  draw();requestAnimationFrame(frame);
+  const dt=clamp((now-last)/1000,0,.05);last=now;                               // the first frame can arrive stamped before the page started
+  requestAnimationFrame(frame);                                                  // schedule first, so one bad frame cannot stop the game
+  try{if(!MH.manual)update(dt);draw();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
-  IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
+  IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
-Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests
+Object.defineProperty(MH,'AC',{get:()=>AC});
+Object.defineProperty(MH,'SAVE',{get:()=>SAVE,set:v=>{SAVE=v;}});                                    // live, for the tests
 requestAnimationFrame(frame);
 </script>
 </body></html>
