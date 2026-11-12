@@ -184,6 +184,23 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 | Gatherer | one more of each common drop, and 2 x care of the biome's ingredient |
 | Resting | stays at camp |
 
+## Title, music and pause (v0.16.0)
+
+- **Title screen:** the logo over a showcase that cycles every 8 seconds through the monsters you have beaten, each in its own arena with its own music. HOW TO PLAY opens the controls; MUSIC turns music on or off.
+- **Music engine:** ported from 8-Bit Industry. A track is a recipe: tempo, key, scale, three chord progressions, a form (intro, A, B, C), lead, arpeggio, bass and drum voices. `compileSong()` writes the notes; the hook comes from the track's own seed so it is always the same, while the accompaniment is reseeded on every play. A look-ahead scheduler plays the notes every 100ms, and the music crossfades when the screen changes.
+- **Tracks:** title (Hollowroot), camp and every menu (Campfire), gather runs (Foraging), pack hunts (Snapjaws), and one per monster. A monster's track comes from what it is:
+
+| Monster trait | Musical choice |
+|---|---|
+| Element | key and scale: nature dorian, earth mixolydian, fire phrygian, ice lydian, thunder minor, water dorian, dragon harmonic minor |
+| Rank | tempo, from about 110 BPM in rank 1 to about 140 for the apex monsters |
+| Body | lead voice: wyvern square, brute saw, serpent and raptor pulse waves, crab square |
+| Trait | drums: armored four-on-the-floor, charge breakbeat, shell half time, frenzy gallop |
+| Name | chord progression, motifs and bass pattern, picked from its name's hash, so no two match |
+
+  Hunt tracks loop with no gap and skip their intro on repeats. The Hollow Star's track is hand-made.
+- **Pause:** a button in the top-right corner of a hunt (or P or Esc). The hunt freezes: clock, timer and monster. The menu has resume, music on or off, sound on or off, and quit hunt (back to camp, no win). Leaving the app mid-hunt pauses it. Music ducks while paused. Settings are saved on the device.
+
 ## Decided for later (not built yet)
 
 - **More gear perks for part breaking:** a bigger tap area, or circles that favour one chosen part.
