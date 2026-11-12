@@ -20,6 +20,10 @@ Ideas agreed on but not built yet. Newest first.
   - Pre-bake animation frames, because rendering live costs about 20–50 ms a frame.
   - Grow the hunter's sprite canvas.
   - Rename Mudclaw's parts (feelers, shell crest, crusher claw; no sting) and their materials.
+- **Armour looks (agreed):** every set looks like its monster, with the same stats as now. The shape comes from the monster's body type: wyvern (horns, wing pauldron, membrane coattails), brute (fur mane, tusks or horn, fur mantle), serpent (fin crest, banded mail, fin sash), raptor (beak visor, crest feathers, feather skirt), crab (shell dome, feelers, shell pauldron). The element adds an accent and the monster's colours paint it. Each piece keeps its own monster's look when mixed.
+  - Signature sets that break the pattern: **Fernwing** (leaf ranger: fern fronds, leaf cape) and **Emberwing** (charcoal flame knight: great red horns, flame crest, ember core, smouldering wing cape). The Hollow Star set has a star crown and a starry cape.
+  - Helms tilt with the head, and shoulders and crests are cut away around the face so nothing covers it in any animation.
+  - Potion: the weapon swings onto the back, then the bottle comes up from the belt and is held in front of the chin. One continuous motion.
 
 ## Earlier ideas still open
 - Variants and ranks of existing monsters (deferred until there are more monsters).
