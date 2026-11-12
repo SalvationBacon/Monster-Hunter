@@ -20,7 +20,7 @@
 
 ## The loop around the fight
 
-- **Camp:** six tabs: HUNT, GEAR, FORGE, COOK, QUEST and BUGS (v0.15.0).
+- **Camp:** six tabs: HUNT, GEAR, FORGE, COOK, QUEST and BUGS (v0.15.0). In v0.24.0 the bottom tab bar was replaced by a hamburger menu (top right) with a tile per screen (HUNT, GEAR, FORGE, COOK, QUEST, TERRARIUM) plus SETTINGS. BUGS was renamed TERRARIUM so it doesn't read as "report a bug". A green dot on the menu button and on a tile means something is waiting there.
 - **GEAR tab:** the hunter and Pip in their current gear, a summary (attack, element or status, health, best resistance, perks) and eight slots in a grid: weapon, charm, helm, chest, gauntlets, boots, Pip fang and Pip vest. Tapping a slot lists the owned pieces for it; tapping one wears it. Charms can be taken off here.
 - **FORGE tab:** three categories, each with a sub-filter: WEAPONS (great, dual, hammer, lance), ARMOR (chest, helm, arms, legs, charms) and PIP (fangs, vests). Each list shows the starter piece, then one per monster you can hunt; the rest are counted as "more as you rank up". The forge crafts and upgrades; a newly crafted piece is worn straight away, and owned pieces point to the GEAR tab.
 - **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.

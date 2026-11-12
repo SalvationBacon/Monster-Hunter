@@ -304,7 +304,8 @@ const shots=process.argv[2];
 
   // ── the camp, on a fresh save, with real taps ──
   await ev(()=>{localStorage.clear();});await p.reload();await p.waitForTimeout(200);
-  const tapBtn=async id=>{const q=await ev(id=>{if(MH.S.itemY&&id.startsWith('hunt:')&&MH.S.tab==='hunt'&&!MH.S.exp){MH.scrollSet(MH.S.itemY[id.slice(5)]-30);}return 1;},id);await p.waitForTimeout(60);
+  const tapBtn=async id=>{if(id.startsWith('tab:')&&await ev(()=>MH.S.mode==='camp'&&!MH.S.menu)){await tapBtn0('camp:menu');}return tapBtn0(id);};
+  const tapBtn0=async id=>{const q=await ev(id=>{if(MH.S.itemY&&id.startsWith('hunt:')&&MH.S.tab==='hunt'&&!MH.S.exp){MH.scrollSet(MH.S.itemY[id.slice(5)]-30);}return 1;},id);await p.waitForTimeout(60);
     const pos=await ev(id=>{const b=MH.S.btns.find(b=>b.id===id);if(!b)return null;const r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(b.x+b.w/2)/128*r.width,y:r.top+(b.y+b.h/2)/MH.LH*r.height};},id);
     if(!pos)return false;await p.touchscreen.tap(pos.x,pos.y);await p.waitForTimeout(120);return true;};
   const cdp=await p.context().newCDPSession(p);
@@ -336,6 +337,12 @@ const shots=process.argv[2];
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='quest'&&MH.SAVE.potions===6&&!MH.SAVE.pal),'a tap on the title opens the camp on the story, with six potions and no companion yet');await shot('c-quest-new');
   await tapBtn('tab:hunt');await shot('c-hunt-new');
+  ok(await ev(()=>!MH.S.btns.some(b=>b.id.startsWith('tab:'))&&MH.S.btns.some(b=>b.id==='camp:menu')),'the camp has no bottom tab bar, only a menu button');
+  await tapBtn0('camp:menu');ok(await ev(()=>MH.S.menu&&['hunt','gear','forge','cook','quest','bugs'].every(k=>MH.S.btns.some(b=>b.id==='tab:'+k))&&MH.S.btns.some(b=>b.id==='menu:options')&&!MH.S.btns.some(b=>b.id.startsWith('hunt:'))),'the menu shows a tile for every screen and settings, and covers the screen under it');await shot('c-menu');
+  await p.touchscreen.tap(195,(await ev(()=>MH.LH))*0.95*(await ev(()=>document.getElementById('c').getBoundingClientRect().height))/(await ev(()=>MH.LH))+(await ev(()=>document.getElementById('c').getBoundingClientRect().top)));await p.waitForTimeout(120);
+  ok(await ev(()=>!MH.S.menu&&MH.S.tab==='hunt'),'a tap outside the tiles closes the menu');
+  await tapBtn0('camp:menu');await tapBtn0('menu:options');ok(await ev(()=>MH.S.opts&&!MH.S.menu&&MH.S.mode==='camp'&&['opt:music','opt:sfx','opt:dev','opt:delete','opt:back'].every(k=>MH.S.btns.some(b=>b.id===k))),'SETTINGS opens the options from the camp');await shot('c-menu-options');
+  await tapBtn0('opt:back');ok(await ev(()=>!MH.S.opts&&MH.S.menu),'and BACK returns to the menu');await tapBtn0('camp:menu');
   ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:fern')&&!MH.S.btns.some(b=>b.id==='hunt:star')&&MH.S.scrMax.hunt>800),'the hunt list shows the first monsters and is long enough to scroll');
   await touch('touchStart',200,600);await touch('touchMove',200,520);await touch('touchMove',200,300);await touch('touchMove',200,200);await touch('touchEnd');await p.waitForTimeout(100);
   ok(await ev(()=>MH.S.scr.hunt>100&&MH.S.mode==='camp'&&!MH.S.btns.some(b=>b.id==='hunt:fern')),'dragging scrolls the list without tapping anything');await shot('c-hunt-scrolled');
