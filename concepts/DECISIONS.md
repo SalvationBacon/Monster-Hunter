@@ -20,7 +20,9 @@
 
 ## The loop around the fight
 
-- **Camp:** after the title, a camp screen with two tabs. HUNT lists the monsters; FORGE has a page of gear per monster, a starter page and a relics page.
+- **Camp:** six tabs: HUNT, GEAR, FORGE, COOK, QUEST and BUGS (v0.15.0).
+- **GEAR tab:** the hunter and Pip in their current gear, a summary (attack, element or status, health, resistance, perks) and five slots: weapon, armor, charm, Pip fang and Pip vest. Tapping a slot lists the owned pieces for it; tapping one wears it. Charms can be taken off here.
+- **FORGE tab:** three categories, each with a sub-filter: WEAPONS (great, dual, hammer, lance), ARMOR (armor, charms) and PIP (fangs, vests). Each list shows the starter piece, then one per monster you can hunt; the rest are counted as "more as you rank up". The forge crafts and upgrades; a newly crafted piece is worn straight away, and owned pieces point to the GEAR tab.
 - **Gear slots:** one weapon, one armor and one charm. Crafting spends materials and equips the piece. Progress is saved on the device.
 - **Everything is data:** monsters, weapon types, perks and gear are tables at the top of `index.html`. Gear is generated from them, so a new monster brings its weapons, armor and charm with it.
 

@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.14.1';
+const VER='0.15.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1224,23 +1224,37 @@ function rollLoot(){
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
-const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?(S.fpick?'forge':'page'):null;
+const scrollKey=()=>S.mode!=='camp'?null:S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?'forge'+S.fcat+S.fsub:S.tab==='gear'&&S.gpick?'gpick':null;
 const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
 function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
-function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fpick=false;S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
+function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fcat=S.fcat||'weapon';S.fsub=S.fsub||0;S.gpick=null;S.mode='camp';S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
 function toast(txt,col){S.toast={txt,col:col||'#fff',t:0};}
+// The forge crafts; the GEAR tab is where gear is worn. A freshly crafted piece is worn straight away.
 function forgeTap(id){
-  const G=GEAR[id],eq=SAVE.eq;
-  if(SAVE.own[id]){
-    if(eq[G.slot]===id){if(G.slot!=='charm')return;eq.charm=null;toast('CHARM TAKEN OFF');}
-    else{eq[G.slot]=id;toast(G.name+' EQUIPPED','#4cc9ff');}
-    sfx('charge',2);
-  }else if(G.cost&&canAfford(id)){
+  const G=GEAR[id];
+  if(SAVE.own[id]){toast(SAVE.eq[G.slot]===id?'WORN. CHANGE IT IN GEAR':'OWNED. WEAR IT IN GEAR','#8a93b0');return;}
+  if(G.cost&&canAfford(id)){
     for(const [k,n] of Object.entries(G.cost))SAVE.bag[k]-=n;
-    SAVE.own[id]=true;eq[G.slot]=id;toast(G.name+' CRAFTED!','#ffe14d');sfx('win');buzz(60);qEvent('craft');
+    SAVE.own[id]=true;SAVE.eq[G.slot]=id;toast(G.name+' CRAFTED!','#ffe14d');sfx('win');buzz(60);qEvent('craft');
   }else{toast('NOT ENOUGH MATERIALS','#ff6a4d');sfx('miss');return;}
   save();
 }
+// Wear a piece from the GEAR tab. null takes the charm off.
+function equip(slot,id){
+  if(id&&!SAVE.own[id])return; if(!id&&slot!=='charm')return;
+  SAVE.eq[slot]=id;toast(id?GEAR[id].name+' ON':'CHARM OFF','#4cc9ff');sfx('charge',2);save();S.gpick=null;
+}
+// ── Forge categories. Each lists one kind of gear from every monster you can hunt, plus what you already own.
+const FCATS={weapon:{label:'WEAPONS',subs:WT.map(w=>[WTYPES[w].name.split(' ')[0],w])},armor:{label:'ARMOR',subs:[['ARMOR','armor'],['CHARMS','charm']]},pip:{label:'PIP',subs:[['FANGS','pweapon'],['VESTS','parmor']]}};
+FCATS.weapon.subs=[['GREAT','gs'],['DUAL','db'],['HAMMER','hm'],['LANCE','ln']];
+function forgeList(cat,sub){
+  const key=FCATS[cat].subs[sub][1],out=[];
+  const pick=id=>{const G=GEAR[id];return cat==='weapon'?G.slot==='weapon'&&G.wt===key:G.slot===key;};
+  const ids=Object.keys(GEAR).filter(pick),seen=id=>{const T=GEAR[id].tier;return !MONSTERS[T]||unlocked(T)||SAVE.own[id];};
+  for(const id of ids)if(seen(id))out.push(id);
+  return{ids:out,hidden:ids.length-out.length};
+}
+const SLOTS=[['weapon','WEAPON'],['armor','ARMOR'],['charm','CHARM'],['pweapon','PIP FANG'],['parmor','PIP VEST']];
 function huntTap(id){if(!unlocked(id)){toast(lockText(id),'#ff6a4d');sfx('miss');return;}toPrep(id);}
 // ── Quests ──
 const nowMs=()=>MH.fakeNow||Date.now();
@@ -1558,11 +1572,21 @@ function drawFail(){
   text(S.def.name+' HP '+Math.round(S.m.hp/S.m.max*100)+'%',W/2,y+30,'#8a93b0',{al:1});
   if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,y+43,'#fff',{al:1});
 }
+// One piece of gear's line of numbers: attack and element, health and resistance, a perk, or Pip's stats
+function gearLine(id,x,y,alt){
+  const G=GEAR[id],lv=lvOf(id),tag=(t,c)=>{text(t,x,y,c);x+=textW(t)+4;};
+  const wk=G.elem?ELEM[G.elem]:G.status?[STATUS[G.status].name,STATUS[G.status].col]:null;
+  if(G.slot==='pweapon'){tag('PIP ATK *'+G.patk.toFixed(2),'#7fe0c0');if(wk)tag(wk[0],wk[1]);}
+  else if(G.slot==='parmor')tag('PIP CARE *'+G.care.toFixed(2),'#7fe0c0');
+  else if(G.slot==='weapon'){tag('ATK *'+gearAtk(id).toFixed(2),'#4cd964');if(wk)tag(wk[0],wk[1]);}
+  else if(G.slot==='armor'){tag('HP '+gearHp(id),'#4cd964');const el=(MONSTERS[G.tier]||{}).elem;if(el&&(alt||!G.perk)){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(G.perk)tag(PERKS[G.perk].desc,'#4cd964');}
+  else tag(PERKS[G.perk].desc,'#4cd964');
+}
 // One line of cost icons with have/need, from x. Returns where it ended.
 function costRow(cost,x,y,gap){for(const [k,n] of Object.entries(cost)){const have=Math.min(99,k==='potion'?SAVE.potions:SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);text(t,x+10,y,have>=n?'#4cd964':'#ff6a4d');x+=10+textW(t)+(gap||4);}return x;}
 function rewardRow(rw,x,y){for(const [k,n] of Object.entries(rw)){if(k==='pal'){g.drawImage(palSpr(0),0,0,16,14,x,y-3,11,10);x+=14;continue;}g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);const t='*'+n;text(t,x+10,y,'#ffe14d');x+=10+textW(t)+4;}return x;}
 function smallBtn(B,id,x,y,w,lab,col,fn,on){g.fillStyle='#000';g.fillRect(x,y,w,11);g.fillStyle=col;g.fillRect(x+1,y+1,w-2,9);text(lab,x+w/2,y+3,on===false?'#8a93b0':'#fff',{al:1});B.push({id,x:x-2,y:y-2,w:w+4,h:15,fn});}
-const TABS=[['hunt','HUNT'],['forge','FORGE'],['cook','COOK'],['quest','QUEST'],['bugs','BUGS']];
+const TABS=[['hunt','HUNT'],['gear','GEAR'],['forge','FORGE'],['cook','COOK'],['quest','QUEST'],['bugs','BUGS']];
 function drawCamp(){
   const B=S.btns=[]; g.drawImage(bgFor(0),-4,0); g.fillStyle='rgba(12,14,26,.88)';g.fillRect(0,0,W,LH);
   g.fillStyle=OUTLINE;g.fillRect(0,0,W,12);text('CAMP',4,3,'#ffe14d');
@@ -1603,45 +1627,64 @@ function drawCamp(){
       const tot=EXPED.length*32+2;S.scrMax.exp=Math.max(0,tot-(bot-top));
       if(S.scrMax.exp>0){const hh=bot-top,bh=Math.max(10,hh*hh/tot),by=top+(hh-bh)*(S.scr.exp||0)/S.scrMax.exp;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
     }
+  }else if(S.tab==='gear'){
+    text('GEAR',W-4,3,'#8a93b0',{al:2});
+    if(S.gpick){                                                                 // choosing a piece for one slot; the list scrolls
+      const sl=S.gpick,lab=SLOTS.find(x=>x[0]===sl)[1],ids=Object.keys(GEAR).filter(k=>GEAR[k].slot===sl&&SAVE.own[k]);if(sl==='charm')ids.unshift(null);
+      smallBtn(B,'gear:back',3,14,30,'BACK','#3a4060',()=>{S.gpick=null;sfx('charge',1);});text('CHOOSE '+lab,W-5,17,'#ffe14d',{al:2});
+      const top=28,bot=LH-20;let y=top+1-(S.scr.gpick||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
+      for(const id of ids){if(y+19>top&&y<bot){const on=SAVE.eq[sl]===id;g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,19);if(on){g.fillStyle='#ffe14d';g.fillRect(3,y,2,19);}
+          if(id){g.drawImage(gearSpr(id),6,y+3);text(GEAR[id].name+(lvOf(id)?'+'+lvOf(id):''),20,y+3,'#e8f0fc');gearLine(id,20,y+11,false);}else text('NO CHARM',20,y+7,'#8a93b0');
+          if(on)text('ON',W-7,y+3,'#ffe14d',{al:2});
+          const by=Math.max(top,y),bh=Math.min(bot,y+19)-by;if(bh>8)B.push({id:'wear:'+(id||'none'),x:3,y:by,w:W-6,h:bh,fn:()=>equip(sl,id)});}
+        y+=20;}
+      g.restore();const tot=ids.length*20+2;S.scrMax.gpick=Math.max(0,tot-(bot-top));
+      if(S.scrMax.gpick>0){const hh=bot-top,bh=Math.max(10,hh*hh/tot),by=top+(hh-bh)*(S.scr.gpick||0)/S.scrMax.gpick;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
+    }else{
+      // the hunter and Pip, in what they wear
+      const py=14,ph=48;g.drawImage(bgFor(0),20,L.ground-32,124,ph,3,py,122,ph);g.fillStyle='rgba(12,14,26,.35)';g.fillRect(3,py,122,ph);
+      shadow(24,py+ph-6,9,2);g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),6,py+ph-46);
+      if(SAVE.pal)g.drawImage(palSpr(Math.floor(S.t*4)%2),38,py+ph-17);
+      const gs=gearStats(),w=GEAR[SAVE.eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:['PLAIN','#8a93b0'];
+      g.fillStyle='rgba(12,14,26,.7)';g.fillRect(58,py+3,64,ph-6);
+      text('ATK *'+gs.atk.toFixed(2),61,py+6,'#e8f0fc');text(wk[0],61,py+14,wk[1]);text('HP '+gs.hp,61,py+22,'#e8f0fc');
+      text(gs.resist?'RES '+ELEM[gs.resist][0]:'NO RESIST',61,py+30,gs.resist?ELEM[gs.resist][1]:'#5a6080');
+      const pk=Object.keys(gs.perks).map(k=>PERKS[k].name);let pt=pk.length?pk.join(' '):'NO PERKS';if(textW(pt)>60)pt=pk[0]+' +'+(pk.length-1);   // shortened when it would not fit
+      text(pt,61,py+38,pk.length?'#ffe14d':'#5a6080');
+      // the five slots
+      let y=py+ph+3;
+      for(const [sl,lab] of SLOTS){const id=SAVE.eq[sl],pipOnly=sl[0]==='p'&&!SAVE.pal,n=Object.keys(GEAR).filter(k=>GEAR[k].slot===sl&&SAVE.own[k]).length;
+        g.fillStyle='#1c2134';g.fillRect(3,y,W-6,20);text(lab,6,y+2,'#8a93b0');text(n+' OWNED',W-14,y+2,'#5a6080',{al:2});text('>',W-9,y+7,'#c8d0e8');
+        if(id){g.drawImage(gearSpr(id),6,y+8,10,10);text(GEAR[id].name+(lvOf(id)?'+'+lvOf(id):''),18,y+9,pipOnly?'#5a6080':'#e8f0fc');}else text('NONE',18,y+9,'#5a6080');
+        B.push({id:'slot:'+sl,x:3,y,w:W-6,h:20,fn:()=>{S.gpick=sl;S.scr.gpick=0;sfx('charge',1);}});y+=21;}
+      if(!SAVE.pal&&y+8<LH-20)text('PIP JOINS LATER IN THE STORY',W/2,y+1,'#5a6080',{al:1});
+    }
   }else if(S.tab==='forge'){
     text('FORGE',W-4,3,'#8a93b0',{al:2});
-    const pg=FORGE_PAGES[S.fpage], n=FORGE_PAGES.length;
-    if(S.fpick){                                                                 // the list of every source of gear; it scrolls
-      const top=13,bot=LH-20;let y=top+1-(S.scr.forge||0);g.save();g.beginPath();g.rect(0,top,W,bot-top);g.clip();
-      FORGE_PAGES.forEach((P,i)=>{if(y+13>top&&y<bot){const D=MONSTERS[P.mon],have=P.ids.filter(k=>SAVE.own[k]).length,can=P.ids.some(k=>GEAR[k].cost&&!SAVE.own[k]&&canAfford(k));
-          g.fillStyle=i===S.fpage?'#232a4a':'#1c2134';g.fillRect(4,y,118,12);text(P.title,8,y+3,D&&!unlocked(P.mon)?'#5a6080':'#e8f0fc');
-          if(D){const wk=D.wElem?ELEM[D.wElem]:[STATUS[D.wStatus].name,STATUS[D.wStatus].col];text(wk[0],W-28,y+3,wk[1],{al:2});}
-          text(have+'/'+P.ids.length,W-9,y+3,have===P.ids.length?'#4cd964':'#8a93b0',{al:2});if(can){g.fillStyle='#4cd964';g.fillRect(5,y+4,2,4);}
-          const cy=y+6;if(cy>top&&cy<bot)B.push({id:'pick:'+i,x:4,y:Math.max(top,y),w:118,h:12,fn:()=>{S.fpage=i;S.fpick=false;S.scr.page=0;sfx('charge',1);}});}
-        y+=13;});
-      g.restore();const total=FORGE_PAGES.length*13;S.scrMax.forge=Math.max(0,total-(bot-top)+2);
-      if(S.scrMax.forge>0){const hh=bot-top,bh=Math.max(10,hh*hh/total),by=top+(hh-bh)*(S.scr.forge||0)/S.scrMax.forge;g.fillStyle='#3a4060';g.fillRect(W-2,top,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
-    }else{
-    g.fillStyle='#232a4a';g.fillRect(3,14,W-6,11);text('<',9,17,'#fff');text('>',W-12,17,'#fff');text(pg.title,W/2,17,'#ffe14d',{al:1});
-    B.push({id:'page:pick',x:31,y:12,w:W-62,h:15,fn:()=>{S.fpick=true;S.scr.forge=clamp(S.fpage*13-40,0,1e4);sfx('charge',1);}});
-    B.push({id:'page:prev',x:0,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+n-1)%n;S.scr.page=0;sfx('charge',1);}});B.push({id:'page:next',x:W-30,y:12,w:30,h:15,fn:()=>{S.fpage=(S.fpage+1)%n;S.scr.page=0;sfx('charge',1);}});
-    const ptop=26,pbot=LH-20,rows=[];g.save();g.beginPath();g.rect(0,ptop,W,pbot-ptop);g.clip();          // the rows scroll when they do not fit
-    pg.ids.forEach((id,i)=>{const G=GEAR[id],y=27+i*24-(S.scr.page||0),own=!!SAVE.own[id],on=eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2,loose=G.slot==='charm',pip=pipSlot(G);
+    // category tabs, then the sub-filter, then the list (it scrolls)
+    const cats=Object.keys(FCATS),cw=Math.floor((W-6)/cats.length);
+    cats.forEach((k,i)=>{const x=3+i*cw,act=S.fcat===k;g.fillStyle='#000';g.fillRect(x,13,cw-1,12);g.fillStyle=act?'#2b3358':'#1c2134';g.fillRect(x+1,14,cw-3,10);if(act){g.fillStyle='#ffe14d';g.fillRect(x+1,14,cw-3,1);}
+      text(FCATS[k].label,x+cw/2,17,act?'#fff':'#8a93b0',{al:1});B.push({id:'fcat:'+k,x,y:12,w:cw,h:14,fn:()=>{S.fcat=k;S.fsub=0;sfx('charge',1);}});});
+    const subs=FCATS[S.fcat].subs,sw=Math.floor((W-6)/subs.length);
+    subs.forEach(([lab],i)=>{const x=3+i*sw,act=S.fsub===i;g.fillStyle=act?'#232a4a':'#141826';g.fillRect(x,27,sw-1,9);text(lab,x+sw/2,29,act?'#ffe14d':'#5a6080',{al:1});
+      B.push({id:'fsub:'+i,x,y:26,w:sw,h:11,fn:()=>{S.fsub=i;sfx('charge',1);}});});
+    const L2=forgeList(S.fcat,S.fsub),ptop=38,pbot=LH-20,sk='forge'+S.fcat+S.fsub,off=S.scr[sk]||0;g.save();g.beginPath();g.rect(0,ptop,W,pbot-ptop);g.clip();
+    L2.ids.forEach((id,i)=>{const G=GEAR[id],y=ptop+1+i*24-off,own=!!SAVE.own[id],on=SAVE.eq[G.slot]===id,can=!own&&canAfford(id),lv=lvOf(id),uc=upCost(id),alt=Math.floor(S.t/2.5)%2;
       if(y+23<ptop||y>pbot)return;
-      g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);
+      g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);if(on){g.fillStyle='#ffe14d';g.fillRect(3,y,2,23);}
       g.drawImage(gearSpr(id),5,y+2);text(G.name+(lv?'+'+lv:''),19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');
-      if(pip){const d=G.slot==='pweapon'?'PIP ATK *'+G.patk.toFixed(2):'PIP CARE *'+G.care.toFixed(2);text(d,19,y+9,'#7fe0c0');const wk=G.elem?ELEM[G.elem]:G.status?[STATUS[G.status].name,STATUS[G.status].col]:null;if(wk)text(wk[0],19+textW(d)+5,y+9,wk[1]);}
-      else if(G.slot==='weapon'){const d=G.free&&alt?WTYPES[G.wt].tip:'ATK *'+gearAtk(id).toFixed(2);text(d,19,y+9,'#4cd964');if(G.elem){const ex=19+textW(d)+5;text(ELEM[G.elem][0],ex,y+9,ELEM[G.elem][1]);if(G.status)text(STATUS[G.status].name,ex+textW(ELEM[G.elem][0])+4,y+9,STATUS[G.status].col);}}
-      else if(G.slot==='armor'){const d='HP '+gearHp(id)+'  ',el=(MONSTERS[G.tier]||{}).elem;text(d,19,y+9,'#4cd964');      // armor line takes turns: perk, then resistance
-        if(el&&(alt||!G.perk)){text('RESISTS',19+textW(d)+4,y+9,'#4cd964');text(ELEM[el][0],19+textW(d)+4+textW('RESISTS')+4,y+9,ELEM[el][1]);}else if(G.perk)text(PERKS[G.perk].desc,19+textW(d)+4,y+9,'#4cd964');}
-      else if(G.slot==='coat'){text('BUILDS',19,y+9,'#4cd964');text(STATUS[G.status].name,19+textW('BUILDS')+4,y+9,STATUS[G.status].col);}
-      else text(PERKS[G.perk].desc,19,y+9,'#4cd964');
-      const costRow=(cost,gap)=>{let cx=19;for(const [k,n] of Object.entries(cost)){const have=Math.min(99,SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,cx,y+14,9,9);text(t,cx+10,y+16,have>=n?'#4cd964':'#ff6a4d');cx+=10+textW(t)+gap;}};
-      if(!own)costRow(G.cost,4);
-      else if(uc){costRow(uc,2);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
+      gearLine(id,19,y+9,alt);
+      if(!own)costRow(G.cost,19,y+16);
+      else if(uc){costRow(uc,19,y+16,2);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
         if(y+11>=ptop&&y+23<=pbot)B.push({id:'up:'+id,x:W-34,y:y+11,w:31,h:12,fn:()=>upgradeTap(id)});}
-      else text(loose||pip?(on?'EQUIPPED':'OWNED'):'MAX LEVEL',19,y+16,on||!(loose||pip)?'#ffe14d':'#5a6080');
-      const lab=on?(loose?'OFF':'ON'):own?'EQUIP':'CRAFT', bc=on?'#8a6a20':own?'#2a6aa8':can?'#2f8f4a':'#3a4060';
-      g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,own||can?'#fff':'#8a93b0',{al:1});
-      const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-6,h:bh,fn:()=>forgeTap(id)});});
-    g.restore();S.scrMax.page=Math.max(0,pg.ids.length*24+1-(pbot-ptop));
-    if(S.scrMax.page>0){const hh=pbot-ptop,tot=pg.ids.length*24+1,bh=Math.max(10,hh*hh/tot),by=ptop+(hh-bh)*(S.scr.page||0)/S.scrMax.page;g.fillStyle='#3a4060';g.fillRect(W-2,ptop,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
-    }
+      else text(G.slot==='weapon'||G.slot==='armor'?'MAX LEVEL':on?'WORN':'OWNED',19,y+16,on||G.slot==='weapon'||G.slot==='armor'?'#ffe14d':'#5a6080');
+      const lab=on?'WORN':own?'OWNED':'CRAFT',bc=on?'#8a6a20':own?'#3a4060':can?'#2f8f4a':'#3a4060';
+      g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,can||on?'#fff':'#8a93b0',{al:1});
+      const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-36,h:bh,fn:()=>forgeTap(id)});
+      if(!own&&y>=ptop&&y+9<=pbot)B.push({id:'craft:'+id,x:W-34,y,w:31,h:11,fn:()=>forgeTap(id)});});
+    let ey=ptop+1+L2.ids.length*24-off;if(L2.hidden){text(L2.hidden+' MORE AS YOU RANK UP',W/2,ey+3,'#5a6080',{al:1});ey+=12;}
+    g.restore();const tot=L2.ids.length*24+(L2.hidden?13:2);S.scrMax[sk]=Math.max(0,tot-(pbot-ptop));
+    if(S.scrMax[sk]>0){const hh=pbot-ptop,bh=Math.max(10,hh*hh/tot),by=ptop+(hh-bh)*off/S.scrMax[sk];g.fillStyle='#3a4060';g.fillRect(W-2,ptop,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
   }else if(S.tab==='cook'){
     text('KITCHEN',W-4,3,'#8a93b0',{al:2});
     g.fillStyle='#1c2134';g.fillRect(3,14,W-6,30);g.drawImage(lootSpr('potion'),5,16);text('POTIONS',19,16,'#e8f0fc');text('*'+SAVE.potions,19+textW('POTIONS')+5,16,'#ffe14d');
@@ -1689,7 +1732,7 @@ function drawCamp(){
     const dot=k==='forge'?Object.keys(GEAR).some(id=>(GEAR[id].cost&&!SAVE.own[id]&&canAfford(id))||(SAVE.eq[GEAR[id].slot]===id&&affords(upCost(id)))):k==='quest'?qs.some(qClaimable):false;
     g.fillStyle='#000';g.fillRect(x,ty,w,20);g.fillStyle=act?'#2b3358':'#141826';g.fillRect(x+1,ty+1,w-1,19);if(act){g.fillStyle='#ffe14d';g.fillRect(x+1,ty+1,w-1,2);}
     text(lab,x+w/2,ty+9,act?'#fff':'#8a93b0',{al:1});if(dot&&Math.floor(S.t*3)%2){g.fillStyle='#4cd964';g.fillRect(x+w-6,ty+4,3,3);}
-    B.push({id:'tab:'+k,x,y:ty,w,h:20,fn:()=>{S.tab=k;S.exp=false;sfx('charge',1);}});});
+    B.push({id:'tab:'+k,x,y:ty,w,h:20,fn:()=>{S.tab=k;S.exp=false;S.gpick=null;sfx('charge',1);}});});
   if(S.toast){const w=textW(S.toast.txt)+10;g.fillStyle='#000';g.fillRect((W-w)/2-1,LH-37,w+2,13);g.fillStyle='#1c2134';g.fillRect((W-w)/2,LH-36,w,11);text(S.toast.txt,W/2,LH-33,S.toast.col,{al:1});}
 }
 // ── Prep screen ──
@@ -1774,7 +1817,7 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
 requestAnimationFrame(frame);
