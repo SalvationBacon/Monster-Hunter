@@ -37,4 +37,4 @@ Composed in the browser as it plays, the same way as 8-Bit Industry: each track 
 |---|---|
 | `index.html` | The whole game |
 | `tools/check.js` | Headless test: bots play full hunts with every weapon type and up the whole monster ladder, then every system and the real touch flows are checked. `node tools/check.js` (needs Playwright) |
-| `concepts/` | Tone mockups and the design decisions so far |
+| `concepts/` | Tone mockups, the design decisions so far (`DECISIONS.md`) and the to-do list (`TODO.md`) |
