@@ -20,7 +20,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.15.0';
+const VER='0.16.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -629,6 +629,7 @@ function audioInit(){
   if(AC||MH.manual)return;
   try{AC=new (window.AudioContext||window.webkitAudioContext)();
     NOISE=AC.createBuffer(1,AC.sampleRate*.4,AC.sampleRate);const d=NOISE.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}catch(e){AC=null;}
+  musicStart();
 }
 function tone(f0,f1,dur,vol,type,delay){
   if(!AC)return; const t=AC.currentTime+(delay||0),o=AC.createOscillator(),v=AC.createGain();
@@ -648,7 +649,169 @@ const SFX={
   win(){[523,659,784,1047].forEach((f,i)=>tone(f,f,.18,.15,'square',i*.13));}, lose(){[392,330,262,196].forEach((f,i)=>tone(f,f,.25,.15,'square',i*.2));},
   loot(){tone(1047,1568,.08,.12);}, miss(){tone(180,140,.06,.06);}
 };
-function sfx(n,a){if(AC)SFX[n](a);}
+function sfx(n,a){if(AC&&PREFS.sfx)SFX[n](a);}
+// ── Device settings: music and sound on or off ──
+const PREFS_KEY='mh_prefs';
+const PREFS=(()=>{let v={};try{v=JSON.parse(localStorage.getItem(PREFS_KEY))||{};}catch(e){}return Object.assign({music:true,sfx:true},v);})();
+function savePrefs(){try{localStorage.setItem(PREFS_KEY,JSON.stringify(PREFS));}catch(e){}}
+function setMusic(on){PREFS.music=on;savePrefs();if(on){audioInit();musicStart();}else musicStop();}
+function setSfx(on){PREFS.sfx=on;savePrefs();if(on)sfx('charge',1);}
+
+// ═══════════════════════════════════════════════════
+//  MUSIC: the same approach as 8-Bit Industry. Each track is a recipe (tempo, key, scale, chords, instruments,
+//  drums); compileSong() turns it into notes as it plays. The melody hook comes from the track's own seed, so it
+//  is the same every time; the accompaniment is reseeded each loop. A look-ahead scheduler (mTick, every 100ms)
+//  plays the notes, and the music crossfades when the screen changes (musicCtx).
+//  Every monster has its own track, built from what it is: its element picks the key and scale, its rank the
+//  tempo, its body the lead voice and its trait the drums. Hunt tracks loop with no gap.
+// ═══════════════════════════════════════════════════
+const MSCALE={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10],mixo:[0,2,4,5,7,9,10],phryg:[0,1,3,5,7,8,10],lydian:[0,2,4,6,7,9,11],harm:[0,2,3,5,7,8,11]};
+// Lead motifs: one bar each, [16th step, length, scale steps above the chord root]
+const MMOT=[[[0,4,0],[4,4,2],[8,8,4]],[[0,2,4],[2,2,2],[4,4,0],[8,4,2],[12,4,4]],[[0,6,2],[6,2,1],[8,8,0]],[[0,3,0],[3,3,2],[6,2,4],[8,8,2]],
+  [[0,8,4],[8,8,2]],[[0,2,0],[2,2,1],[4,2,2],[6,2,4],[8,8,2]],[[0,4,4],[6,2,2],[8,4,0],[12,4,2]],[[0,3,4],[3,3,4],[6,2,2],[8,4,0],[12,4,1]]];
+const MCAD_OPEN=[[0,4,2],[4,12,4]], MCAD_HOME=[[0,4,2],[4,12,0]];
+const MFORMS={song:['intro',4,'A',8,'B',8,'A',8,'C',8,'B',8,'A',8,'outro',4],ambient:['intro',4,'A',8,'B',8,'C',8,'A',8,'outro',4],
+  hunt:['intro',2,'A',8,'B',8,'A',8,'C',4,'B',8]};
+const MROLES={intro:{lead:0,bass:'long',drums:'intro',arp:1},A:{lead:'mid',bass:'track',drums:'track',arp:0},B:{lead:'high',bass:'track',drums:'track',arp:1},
+  C:{lead:'slow',bass:'pulse',drums:'half',arp:1},outro:{lead:'mid',bass:'long',drums:'intro',arp:0}};
+const MDRUMS={four:{k:[0,4,8,12],s:[4,12],h:[2,6,10,14]},back:{k:[0,8,10],s:[4,12],h:[0,2,4,6,8,10,12,14]},half:{k:[0],s:[8],h:[0,4,8,12]},
+  break:{k:[0,6,10],s:[4,12],h:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},tick:{k:[],s:[],h:[2,6,10,14]},gallop:{k:[0,3,8,11],s:[4,12],h:[0,2,4,6,8,10,12,14]}};
+const MV={pulse25:.032,pulse12:.03,square:.024,tri:.06,saw:.024,bell:.04,pad:.011,kick:.18,snare:.05,hat:.016};
+const PROGS=[[[0,5,3,4],[3,4,0,5],[5,3,0,4]],[[0,6,3,0],[3,4,0,6],[5,3,6,4]],[[0,3,5,4],[3,0,4,5],[5,4,3,4]],[[0,5,6,4],[3,0,4,4],[5,6,0,6]],
+  [[0,1,0,6],[5,6,0,0],[3,1,6,0]],[[0,3,0,6],[3,3,0,0],[5,6,3,4]],[[0,6,5,4],[0,6,5,4],[3,4,5,6]],[[0,2,5,6],[5,6,0,0],[3,4,5,4]]];
+const MTRACKS={
+  title: {name:'HOLLOWROOT',bpm:112,root:60,scale:'major',prog:PROGS[0],form:'song',lead:'pulse25',arp:'pulse12',bass:'tri',drums:'back',bassPat:'octave',rhy:[0,1,6,3],fx:.18},
+  camp:  {name:'CAMPFIRE',  bpm:92, root:62,scale:'major',prog:PROGS[2],form:'ambient',lead:'tri',arp:'bell',bass:'tri',drums:'half',bassPat:'walk',rhy:[2,0,4,6],pad:1,swing:.25,fx:.22,vol:1.1},
+  gather:{name:'FORAGING',  bpm:108,root:65,scale:'lydian',prog:PROGS[5],form:'ambient',lead:'bell',arp:'pulse12',bass:'tri',drums:'tick',bassPat:'pulse',rhy:[1,5,3,0],swing:.2,fx:.25},
+  pack:  {name:'SNAPJAWS',  bpm:132,root:57,scale:'minor',prog:PROGS[1],form:'hunt',lead:'square',arp:'pulse12',bass:'saw',drums:'four',bassPat:'octave',rhy:[5,1,3,0],fx:.1,loop:1},
+  star:  {name:'THE HOLLOW STAR',bpm:126,root:50,scale:'harm',prog:[[0,5,3,4],[5,3,4,4],[0,1,5,4]],form:'hunt',lead:'saw',arp:'bell',bass:'saw',drums:'break',bassPat:'synco',rhy:[4,7,3,6],pad:1,fx:.35,loop:1,vol:.9},
+};
+const ELEM_KEY={nature:['dorian',57],earth:['mixo',55],fire:['phryg',52],ice:['lydian',62],thunder:['minor',57],water:['dorian',60],dragon:['harm',50]};
+const RIG_LEAD={wyvern:'square',brute:'saw',serpent:'pulse25',raptor:'pulse12',crab:'square'};
+const TRAIT_DRUMS={armor:'four',charge:'break',shell:'half',burrow:'back',regen:'back',frenzy:'gallop'};
+function mRng(seed){let s=(seed>>>0)||1;return()=>{s^=s<<13;s>>>=0;s^=s>>>17;s^=s<<5;s>>>=0;return s/4294967296;};}
+function mHash(str){let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);return h>>>0;}
+// A monster's own track, from what it is
+function monsterTrack(D){
+  if(MTRACKS[D.id])return MTRACKS[D.id];
+  const h=mHash(D.id),[scale,root]=ELEM_KEY[D.elem],r=mRng(h);
+  return MTRACKS[D.id]={name:D.name,bpm:Math.min(144,104+D.rank*5+(D.trait==='frenzy'?6:0)+(h%5)),root:root+((h>>>3)%5)-2,scale,prog:PROGS[(h>>>7)%PROGS.length],form:'hunt',
+    lead:RIG_LEAD[D.rig],arp:D.elem==='ice'||D.elem==='water'?'bell':'pulse12',bass:D.rank>=4||D.rig==='brute'?'saw':'tri',drums:TRAIT_DRUMS[D.trait]||(D.rank>=4?'four':'back'),
+    bassPat:['octave','root8','synco','pulse','walk'][(h>>>11)%5],rhy:[0,1,2,3].map(()=>(r()*MMOT.length)|0),pad:D.rank>=6?1:0,swing:D.elem==='nature'?.15:0,fx:.12+((h>>>15)%3)*.06,loop:1};
+}
+function compileSong(tr,n){
+  const sc=MSCALE[tr.scale], st=60/tr.bpm/4, bar=st*16, ev=[], form=MFORMS[tr.form];
+  const freq=deg=>{const o=Math.floor(deg/7), k=((deg%7)+7)%7; return 440*Math.pow(2,(tr.root+12*o+sc[k]-69)/12);};
+  let t=0;
+  const add=(s,len,deg,i,v,x)=>{const sw=s%4===2?(tr.swing||0)*st:0; ev.push(Object.assign({t:t+s*st+sw,f:deg===null?0:freq(deg),d:len*st,v:v*(tr.vol||1),i},x||{}));};
+  const lp=i=>i==='saw'?{lp:1800}:null, occ={};
+  for(let k=0;k<form.length;k+=2){
+    const sec=form[k], bars=form[k+1], role=MROLES[sec]; occ[sec]=(occ[sec]||0)+1;
+    if(sec==='intro'&&tr.loop&&n>1)continue;                                     // a looping hunt track skips its intro after the first time
+    const prog=tr.prog[sec==='B'?1:sec==='C'?2:0], rng=mRng(mHash(tr.name+':'+sec+':'+n+':'+occ[sec]));
+    const drums=role.drums==='track'?tr.drums:role.drums==='intro'?'tick':role.drums==='half'?(tr.drums==='tick'?'tick':'half'):null;
+    const bassPat=role.bass==='track'?tr.bassPat:role.bass;
+    for(let b=0;b<bars;b++){
+      const c=prog[b%prog.length], nc=prog[(b+1)%prog.length];
+      const fade=sec==='intro'?Math.min(1,.35+.65*b/bars):sec==='outro'?Math.max(.15,1-b/bars):1;
+      if(tr.pad||sec==='intro'||sec==='outro')for(const d of[c,c+2,c+4])add(0,16,d,'pad',MV.pad*fade);
+      if(role.lead){
+        const hi=role.lead==='high', slow=role.lead==='slow', phraseEnd=b%4===3;
+        const mot=slow?(b%2?[[0,16,0]]:[[0,8,4],[8,8,2]]):MMOT[(hi?tr.rhy[n%2?2:3]:tr.rhy[0])%MMOT.length];
+        const notes=phraseEnd&&!slow?(b===bars-1&&!tr.loop?MCAD_HOME:MCAD_OPEN):mot;
+        const centre=hi?11:8; let base=c; while(base<centre-3)base+=7; while(base>centre+3)base-=7;
+        for(const[s,len,off]of notes)add(s,len*.9,base+off,tr.lead,MV[tr.lead]*fade*(slow?.8:1),Object.assign({vib:len>=6},lp(tr.lead)));
+      }
+      if(role.arp){const tones=[c,c+2,c+4,c+7,c+9,c+7,c+4,c+2];for(let s=0,j=0;s<16;s+=2,j++)add(s,1.6,tones[j%tones.length],tr.arp,MV[tr.arp]*.42*fade);}
+      let bd=c-14; while(freq(bd)<58)bd+=7;
+      const bv=MV[tr.bass]*1.05*fade, bx=tr.bass==='saw'?{lp:520}:null, B=(s,len,d)=>add(s,len,d,tr.bass,bv,bx);
+      if(bassPat==='long')B(0,15,bd);
+      else if(bassPat==='pulse')[0,4,8,12].forEach(s=>B(s,3,bd));
+      else if(bassPat==='root8')for(let s=0;s<16;s+=2)B(s,1.6,bd);
+      else if(bassPat==='octave')for(let s=0;s<16;s+=2)B(s,1.6,s%4?bd+7:bd);
+      else if(bassPat==='walk'){let ap=bd+(nc-c)+(rng()<.5?-1:1); while(freq(ap)<58)ap+=7; B(0,3.6,bd);B(4,3.6,bd+2);B(8,3.6,bd+4);B(12,3.6,ap);}
+      else if(bassPat==='synco')[[0,3,0],[3,3,0],[6,2,4],[8,3,0],[11,3,7],[14,2,4]].forEach(([s,l,o])=>B(s,l*.9,bd+o));
+      if(drums){const D=MDRUMS[drums];
+        if(drums==='tick'&&b%2===0)add(0,2,null,'kick',MV.kick*.7*fade);
+        D.k.forEach(s=>add(s,2,null,'kick',MV.kick*fade));D.s.forEach(s=>add(s,2,null,'snare',MV.snare*fade));D.h.forEach(s=>add(s,1,null,'hat',MV.hat*(s%4===2?1:.6)*fade));
+        if(b===bars-1&&(sec==='A'||sec==='B')&&drums!=='tick')[12,13,14,15].forEach((s,j)=>add(s,1,null,'snare',MV.snare*(.4+j*.2)));}
+      t+=bar;
+    }
+  }
+  ev.sort((x,y)=>x.t-y.t);
+  return {ev,len:t};
+}
+const _music={running:false,gain:null,bus:null,send:null,delay:null,timer:null,song:null,idx:0,t0:0,key:null,cur:null,plays:{},fading:0};
+let _pulseWaves={};
+function mPulse(duty){
+  if(!_pulseWaves[duty]){const N=32,re=new Float32Array(N),im=new Float32Array(N);for(let n=1;n<N;n++)re[n]=2/(n*Math.PI)*Math.sin(n*Math.PI*duty);_pulseWaves[duty]=AC.createPeriodicWave(re,im);}
+  return _pulseWaves[duty];
+}
+function mPlay(e,t){
+  const c=AC, g=c.createGain(), end=t+e.d;
+  g.connect(_music.bus);
+  const done=n=>{n.onended=()=>{try{n.disconnect();g.disconnect();}catch(err){}};};
+  if(e.i==='kick'){const o=c.createOscillator();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(42,t+.12);
+    g.gain.setValueAtTime(e.v,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);o.connect(g);o.start(t);o.stop(t+.24);done(o);return;}
+  if(e.i==='snare'||e.i==='hat'){const n=c.createBufferSource(),f=c.createBiquadFilter();n.buffer=NOISE;
+    f.type=e.i==='hat'?'highpass':'bandpass';f.frequency.value=e.i==='hat'?7000:1800;const len=e.i==='hat'?.035:.13;
+    g.gain.setValueAtTime(e.v,t);g.gain.exponentialRampToValueAtTime(.001,t+len);n.connect(f);f.connect(g);n.start(t,Math.random()*.2);n.stop(t+len+.02);done(n);return;}
+  if(e.i==='pad'){const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=1100;f.connect(g);
+    g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(e.v,t+Math.min(.5,e.d*.3));g.gain.setValueAtTime(e.v,end-Math.min(.4,e.d*.2));g.gain.linearRampToValueAtTime(.0001,end+.3);
+    for(const dt of[-8,8]){const o=c.createOscillator();o.type='sawtooth';o.frequency.value=e.f;o.detune.value=dt;o.connect(f);o.start(t);o.stop(end+.35);done(o);}return;}
+  if(e.i==='bell'){const o=c.createOscillator(),o2=c.createOscillator(),g2=c.createGain(),dec=Math.max(.6,Math.min(1.6,e.d*2));
+    o.frequency.value=e.f;o2.frequency.value=e.f*2.76;g2.gain.value=.25;o2.connect(g2);g2.connect(g);o.connect(g);
+    g.gain.setValueAtTime(e.v,t);g.gain.exponentialRampToValueAtTime(.001,t+dec);if(_music.send)g.connect(_music.send);
+    o.start(t);o2.start(t);o.stop(t+dec+.05);o2.stop(t+dec+.05);done(o);done(o2);return;}
+  const o=c.createOscillator();
+  if(e.i==='pulse25')o.setPeriodicWave(mPulse(.25));else if(e.i==='pulse12')o.setPeriodicWave(mPulse(.125));else o.type=e.i==='tri'?'triangle':e.i==='saw'?'sawtooth':'square';
+  o.frequency.setValueAtTime(e.f,t);
+  if(e.vib){const l=c.createOscillator(),lg=c.createGain();l.frequency.value=5.5;lg.gain.setValueAtTime(0,t);lg.gain.linearRampToValueAtTime(e.f*.008,t+.3);l.connect(lg);lg.connect(o.frequency);l.start(t);l.stop(end+.05);done(l);}
+  let src=o;if(e.lp){const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=e.lp;o.connect(f);src=f;}
+  src.connect(g);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(e.v,t+.006);g.gain.setValueAtTime(e.v*.75,t+Math.min(e.d*.5,.12));g.gain.exponentialRampToValueAtTime(.001,end+.04);
+  if(_music.send&&e.i!=='tri'&&e.d<1.5)g.connect(_music.send);
+  o.start(t);o.stop(end+.06);done(o);
+}
+// Which track the screen wants
+function musicCtx(){
+  if(S.mode==='title')return S.show?'mon:'+S.show:'title';
+  if(S.mode==='gather')return 'gather';
+  if(S.mode==='hunt'&&S.def)return S.def.small?'pack':'mon:'+S.def.id;
+  return 'camp';
+}
+const trackFor=key=>key.startsWith('mon:')?monsterTrack(MONSTERS[key.slice(4)]):MTRACKS[key];
+function mNext(key,at){
+  const tr=trackFor(key),id=key;_music.plays[id]=(_music.plays[id]||0)+1;
+  _music.cur=tr;_music.key=key;_music.song=compileSong(tr,_music.plays[id]);_music.idx=0;_music.t0=at;
+  try{_music.send.gain.setValueAtTime(tr.fx||0,AC.currentTime);_music.delay.delayTime.setValueAtTime(Math.min(.9,45/tr.bpm),AC.currentTime);}catch(e){}
+}
+function mTick(){
+  if(!_music.running||!AC)return;
+  const now=AC.currentTime,want=musicCtx();
+  try{_music.duck.gain.setTargetAtTime(S.paused?.3:1,now,.1);}catch(e){}           // quieter while paused
+  if(_music.song&&_music.key!==want&&!_music.fading){
+    _music.fading=now+.9;try{_music.bus.gain.setValueAtTime(_music.bus.gain.value,now);_music.bus.gain.linearRampToValueAtTime(.0001,now+.8);}catch(e){}}
+  if(_music.fading){if(now<_music.fading)return;
+    _music.fading=0;try{_music.bus.gain.cancelScheduledValues(now);_music.bus.gain.setValueAtTime(1,now);}catch(e){}mNext(want,now+.1);}
+  if(!_music.song)mNext(want,now+.1);
+  const s=_music.song;
+  while(_music.idx<s.ev.length&&_music.t0+s.ev[_music.idx].t<now+.5){const e=s.ev[_music.idx++],when=_music.t0+e.t;if(when>=now-.05)try{mPlay(e,Math.max(when,now));}catch(err){}}
+  if(_music.idx>=s.ev.length&&now>=_music.t0+s.len-.05)mNext(want,_music.cur.loop?_music.t0+s.len:now+2);   // hunt tracks loop with no gap; others breathe first
+}
+function musicStart(){
+  if(_music.running||!AC||!PREFS.music)return;
+  try{const c=AC,mg=c.createGain();mg.gain.setValueAtTime(.7,c.currentTime);mg.connect(c.destination);
+    const duck=c.createGain();duck.connect(mg);const comp=c.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(duck);
+    const bus=c.createGain();bus.connect(comp);const send=c.createGain(),dl=c.createDelay(1),fb=c.createGain(),wet=c.createGain();
+    send.gain.value=0;fb.gain.value=.32;wet.gain.value=.6;send.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(wet);wet.connect(bus);
+    Object.assign(_music,{gain:mg,duck,bus,send,delay:dl,running:true,song:null,fading:0});_music.timer=setInterval(mTick,100);mTick();}catch(e){}
+}
+function musicStop(){
+  _music.running=false;if(_music.timer){clearInterval(_music.timer);_music.timer=null;}_music.song=null;_music.fading=0;_music.key=null;
+  const mg=_music.gain;if(mg&&AC){try{mg.gain.cancelScheduledValues(AC.currentTime);mg.gain.setValueAtTime(mg.gain.value,AC.currentTime);mg.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.3);setTimeout(()=>{try{mg.disconnect();}catch(e){}},400);}catch(e){}}
+  _music.gain=null;
+}
 function buzz(ms){if(!MH.manual&&navigator.vibrate)try{navigator.vibrate(ms);}catch(e){}}
 
 // ═══════════════════════════════════════════════════
@@ -733,7 +896,7 @@ function newHunt(id,o){
   S.qte=null;
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
   S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0,qteHit:0,qteMiss:0};
-  S.loot=null; S.fail='';
+  S.loot=null; S.fail=''; S.paused=false;
 }
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
@@ -1146,9 +1309,14 @@ function actPotion(){const h=S.h;
 // ═══════════════════════════════════════════════════
 const IN={down:false,downAt:0,x0:0,y0:0,swiped:false,part:'body',id:-1};
 function toLogical(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*LH};}
+function pauseHunt(on){if(S.mode!=='hunt'||S.h.state==='dead'||S.h.state==='win')return;S.paused=on;IN.down=false;S.btns=[];sfx('charge',on?1:2);}
+function quitHunt(){S.paused=false;save();toCamp('hunt');}
+const tapBtns=(x,y)=>{for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();return true;}return false;};
 function press(x,y){
   audioInit(); if(AC&&AC.state==='suspended')AC.resume();
-  if(S.mode==='title'){toCamp(SAVE.wins.fern?'hunt':'quest');return;}
+  if(S.mode==='title'){if(S.howto){S.howto=false;return;}if(!tapBtns(x,y))toCamp(SAVE.wins.fern?'hunt':'quest');return;}
+  if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
+  if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
   if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres'){if(S.t>1.2)toCamp(qClaimable(quests()[0]||{st:{p:0,c:true},def:{goal:[0,0,1]}})?'quest':'hunt');return;}
   if(S.mode==='camp'||S.mode==='prep'){for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();break;}return;}
   if(S.mode==='gather'){gatherTap(x,y);return;}
@@ -1182,11 +1350,12 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('keydown',e=>{
   if(e.repeat)return; const k=e.key.toLowerCase();
   if(k===' '||k==='j'||k==='k'||k==='enter'){e.preventDefault();audioInit();
-    if(S.mode!=='hunt'){press(0,0);return;}
+    if(S.mode!=='hunt'||S.paused){if(S.mode==='title'||S.mode==='loot'||S.mode==='fail'||S.mode==='gres')press(-99,-99);return;}
     if(S.h.counter>0&&actCounter())return;
     if(S.qte){const pp=partPos(S.qte.part,mPose());if(qteTap(pp.x,pp.y))return;}   // keyboard: the attack key also hits an open weak point
     IN.down=true;IN.downAt=S.clock;IN.swiped=false;IN.part=k==='k'?'tail':'head';actTap(IN.part);}
-  else if(S.mode==='hunt'){
+  else if(S.mode==='hunt'&&(k==='escape'||k==='p')){pauseHunt(!S.paused);}
+  else if(S.mode==='hunt'&&!S.paused){
     if(k==='a'||k==='arrowleft')actDodge(-1);else if(k==='d'||k==='arrowright')actDodge(1);
     else if(k==='w'||k==='q'||k==='arrowup')actPotion();
     else if(k==='s'||k==='arrowdown')actSharpen();
@@ -1331,7 +1500,7 @@ function gatherEnd(){
 function update(dt){
   S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
   if(S.mode==='gather'){gatherUpdate(dt);return;}
-  if(S.mode!=='hunt')return;
+  if(S.mode!=='hunt'||S.paused)return;
   if(S.stop>0){S.stop-=dt;return;}                                               // hitstop
   if(S.slow>0){S.slow-=dt;dt*=.3;}
   S.clock+=dt;
@@ -1497,15 +1666,16 @@ function fmtTime(s){s=Math.max(0,Math.ceil(s));return((s/60)|0)+':'+('0'+s%60).s
 function drawHud(){
   const h=S.h,m=S.m;
   g.fillStyle=OUTLINE;g.fillRect(0,0,W,HUD_T);
-  text(S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name,3,2,'#e8f0fc');
+  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name.replace('THE ','');text(hn,3,2,'#e8f0fc');
   // part status
   // parts: icon and three pips each, one per weak-point hit
-  const px0=Math.max(46,textW(S.def.small?S.def.name+' 1/3':S.def.name)+7);   // part icons sit after the name, however long
+  const px0=Math.max(46,textW(hn)+7);   // part icons sit after the name, however long
   if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*16,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
     g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,0,9,9);g.globalAlpha=1;
     if(P.broken){g.fillStyle='#e2483d';g.fillRect(x+1,4,7,1);}
     for(let j=0;j<S.qteHits;j++){g.fillStyle=j<P.hits?'#ffe14d':act?'#ff4030':'#3a4060';g.fillRect(x+10,6-j*3,3,2);}});
-  text(fmtTime(S.timeLeft),W-3,2,S.timeLeft<30?'#ff6a4d':'#c8d0e8',{al:2});
+  text(fmtTime(S.timeLeft),W-16,2,S.timeLeft<30?'#ff6a4d':'#c8d0e8',{al:2});
+  g.fillStyle='#2b3358';g.fillRect(W-13,1,11,8);g.fillStyle='#e8f0fc';g.fillRect(W-10,2,2,6);g.fillRect(W-6,2,2,6);   // pause button
   bar(3,10,W-6,3,m.hp/m.max,m.phase===2?'#ff4030':m.phase===1?'#f08030':'#e2483d','#2b2f45');
   g.fillStyle='#000';g.fillRect(3+Math.round((W-6)/3),10,1,3);g.fillRect(3+Math.round((W-6)*2/3),10,1,3);
   const sf=m.stunned&&m.state==='stagger'?1-m.t/m.staggerDur:m.stun/m.stunMax;
@@ -1531,26 +1701,40 @@ function drawHud(){
   text('*'+h.potions,b.x+13,b.y+8,h.potions>0?'#fff':'#5a6080');
 }
 function panel(x,y,w,h){g.fillStyle='#000';g.fillRect(x-1,y-1,w+2,h+2);g.fillStyle='#c8d0e8';g.fillRect(x,y,w,h);g.fillStyle='#1c2134';g.fillRect(x+1,y+1,w-2,h-2);}
+function drawPause(){
+  const B=S.btns=[];g.fillStyle='rgba(10,12,22,.75)';g.fillRect(0,0,W,LH);
+  const ph=96,y=Math.max(16,((LH-ph)/2)|0);panel(14,y,W-28,ph);text('PAUSED',W/2,y+7,'#ffe14d',{al:1,s:2});
+  const btn=(id,yy,lab,col,fn)=>{g.fillStyle='#000';g.fillRect(22,yy,W-44,14);g.fillStyle=col;g.fillRect(23,yy+1,W-46,12);text(lab,W/2,yy+5,'#fff',{al:1});B.push({id,x:22,y:yy,w:W-44,h:14,fn});};
+  btn('pause:resume',y+24,'RESUME','#2f8f4a',()=>pauseHunt(false));
+  btn('pause:music',y+41,'MUSIC: '+(PREFS.music?'ON':'OFF'),PREFS.music?'#2a6aa8':'#3a4060',()=>setMusic(!PREFS.music));
+  btn('pause:sfx',y+58,'SOUND: '+(PREFS.sfx?'ON':'OFF'),PREFS.sfx?'#2a6aa8':'#3a4060',()=>setSfx(!PREFS.sfx));
+  btn('pause:quit',y+75,'QUIT HUNT','#a8302a',quitHunt);
+}
 function drawTitle(){
-  g.drawImage(bgFor(0),-4,0);
-  shadow(L.mx+MS_OX+38,L.mFeet+2,30,5);
-  g.drawImage(mSprite(MONSTERS.fern,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0})),L.mx,L.my);
-  shadow(L.hx+18,L.hFeet+1,9,2);
-  g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),L.hx,L.hy);
-  g.fillStyle='rgba(10,12,22,.55)';g.fillRect(0,0,W,LH);
-  text('FERNWING',W/2,14,'#ffe14d',{al:1,s:2,out:OUTLINE});
-  text('HUNT',W/2,28,'#fff',{al:1,s:2,out:OUTLINE});
-  text('FIGHT PROTOTYPE V'+VER,W/2,43,'#8a93b0',{al:1});
-  const y=50;panel(8,y,W-16,102);
-  const rows=[['TAP','ATTACK'],['HOLD','WEAPON SKILL'],['SWIPE','DODGE'],['UP / DOWN','POTION / WHET']];
-  rows.forEach((r,i)=>{text(r[0],14,y+6+i*10,'#ffb020');text(r[1],W-14,y+6+i*10,'#e8f0fc',{al:2});});
-  text('DODGE AS THE RING CLOSES',W/2,y+47,'#c8d0e8',{al:1});
-  text('PERFECT DODGE: COUNTER!',W/2,y+54,'#ffe14d',{al:1});
-  text('HIT THE HEAD TO STUN IT',W/2,y+64,'#c8d0e8',{al:1});
-  text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
-  text('TAP THE RED CIRCLES:',W/2,y+84,'#ff6a4d',{al:1});
-  text('3 HITS BREAK A PART',W/2,y+91,'#c8d0e8',{al:1});
-  if(Math.floor(S.t*2)%2)text('TAP TO START',W/2,y+112,'#fff',{al:1,out:OUTLINE});
+  // a showcase: the monsters you have met take turns, each in its arena, with its own music
+  const met=HUNTS.filter(id=>id==='fern'||SAVE.wins[id]),id=met[Math.floor(S.t/8)%met.length],D=MONSTERS[id];S.show=met.length>1||SAVE.wins.fern?id:null;
+  g.drawImage(bgFor(D.biome),-4,0);
+  const hd=RIGS[D.rig].head(POSE0);shadow(L.mx+MS_OX+38,L.mFeet+2,D.rig==='crab'||D.rig==='serpent'?26:30,5);
+  g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*.7)>.9?2:0})),L.mx,L.my);
+  shadow(L.hx+18,L.hFeet+1,9,2);g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),L.hx,L.hy);
+  if(SAVE.pal)g.drawImage(palSpr(Math.floor(S.t*4)%2),L.hx-6,L.hFeet-13);
+  g.fillStyle='rgba(10,12,22,.35)';g.fillRect(0,0,W,LH);
+  // logo
+  g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,8,W,40);g.fillStyle='#ffe14d';g.fillRect(0,8,W,1);g.fillRect(0,47,W,1);
+  text('FERNWING',W/2,13,'#ffe14d',{al:1,s:2,out:OUTLINE});text('HUNT',W/2,27,'#fff',{al:1,s:2,out:OUTLINE});
+  text(met.length>1?'NOW: '+D.name:'V'+VER,W/2,40,'#8a93b0',{al:1});
+  if(S.howto){const y=56;panel(8,y,W-16,102);
+    const rows=[['TAP','ATTACK'],['HOLD','WEAPON SKILL'],['SWIPE','DODGE'],['UP / DOWN','POTION / WHET']];
+    rows.forEach((r,i)=>{text(r[0],14,y+6+i*10,'#ffb020');text(r[1],W-14,y+6+i*10,'#e8f0fc',{al:2});});
+    text('DODGE AS THE RING CLOSES',W/2,y+47,'#c8d0e8',{al:1});text('PERFECT DODGE: COUNTER!',W/2,y+54,'#ffe14d',{al:1});
+    text('HIT THE HEAD TO STUN IT',W/2,y+64,'#c8d0e8',{al:1});text('WINGS UP: IT WILL DODGE',W/2,y+74,'#c8d0e8',{al:1});
+    text('TAP THE RED CIRCLES:',W/2,y+84,'#ff6a4d',{al:1});text('3 HITS BREAK A PART',W/2,y+91,'#c8d0e8',{al:1});
+    text('TAP TO CLOSE',W/2,y+108,'#fff',{al:1,out:OUTLINE});S.btns=[];return;}
+  const B=S.btns=[],by=LH-22;
+  const btn=(bid,x,w,lab,col,fn)=>{g.fillStyle='#000';g.fillRect(x,by,w,14);g.fillStyle=col;g.fillRect(x+1,by+1,w-2,12);text(lab,x+w/2,by+5,'#fff',{al:1});B.push({id:bid,x,y:by-2,w,h:18,fn});};
+  btn('title:howto',4,58,'HOW TO PLAY','#2a6aa8',()=>{S.howto=true;sfx('charge',1);});
+  btn('title:music',66,58,'MUSIC: '+(PREFS.music?'ON':'OFF'),PREFS.music?'#2a6aa8':'#3a4060',()=>setMusic(!PREFS.music));
+  if(Math.floor(S.t*2)%2)text('TAP TO START',W/2,by-16,'#fff',{al:1,out:OUTLINE});
 }
 function drawLoot(){
   const R=S.loot; g.fillStyle='rgba(10,12,22,.7)';g.fillRect(0,0,W,LH);
@@ -1795,7 +1979,7 @@ function draw(){
   if(S.mode==='prep'){drawPrep();return;}
   if(S.mode==='gather'){drawGather();return;}
   if(S.mode==='gres'){drawGres();return;}
-  drawWorld();drawHud();
+  drawWorld();drawHud();if(S.mode==='hunt'&&S.paused)drawPause();
   if(S.mode==='loot')drawLoot();else if(S.mode==='fail')drawFail();
 }
 
@@ -1808,6 +1992,7 @@ function resize(){
   layout();BGS={};BG=bgFor(S.def?S.def.biome:0);
 }
 addEventListener('resize',resize);resize();
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(S.mode==='hunt'&&!S.paused)pauseHunt(true);if(AC&&AC.state==='running')AC.suspend();}else if(AC&&AC.state==='suspended')AC.resume();});
 
 let last=performance.now();
 function frame(now){
@@ -1817,9 +2002,10 @@ function frame(now){
 }
 // test hooks
 Object.assign(MH,{update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
-  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
+  actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,get SAVE(){return SAVE;},set SAVE(v){SAVE=v;},loadSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
+Object.defineProperty(MH,'AC',{get:()=>AC});                                    // live, for the tests
 requestAnimationFrame(frame);
 </script>
 </body></html>

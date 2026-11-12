@@ -40,6 +40,21 @@ const shots=process.argv[2];
       while(t<8&&m.state!=='recover'){MH.update(1/60);t+=1/60;if(m.state==='attack'&&JSON.stringify(MH.mPose())!==p0)moved=true;}D.pools=pool;D.trait=tr;
       if(m.state!=='recover'||!moved||S.stats.taken<=0)return id+':'+a;}return true;}),'every move of every monster animates, lands its hits and ends');
 
+  // ── music ──
+  ok(await ev(()=>{const sig=MH.HUNTS.map(id=>{const t=MH.monsterTrack(MH.MONSTERS[id]);return JSON.stringify([t.scale,t.root,t.prog,t.rhy,t.lead,t.drums,t.bpm,t.bassPat]);});
+    const bpm=r=>{const ids=MH.HUNTS.filter(id=>MH.MONSTERS[id].rank===r);return ids.reduce((s,id)=>s+MH.monsterTrack(MH.MONSTERS[id]).bpm,0)/ids.length;};
+    return new Set(sig).size===35&&bpm(1)<bpm(3)&&bpm(3)<bpm(6)&&bpm(6)<bpm(7)&&MH.monsterTrack(MH.MONSTERS.star)===MH.MTRACKS.star;}),'every monster has its own track, and tracks speed up with rank');
+  ok(await ev(()=>{for(const k of ['title','camp','gather','pack','star'])if(!MH.compileSong(MH.MTRACKS[k],1).ev.length)return k;
+    const t=MH.monsterTrack(MH.MONSTERS.fern),a=MH.compileSong(t,1),b=MH.compileSong(t,2),lead=s=>JSON.stringify(s.ev.filter(e=>e.i===t.lead).slice(0,6).map(e=>[+e.f.toFixed(1),+e.d.toFixed(3)]));
+    const ok1=a.len>40&&a.len<100&&b.len<a.len;const a2=MH.compileSong(t,1);return ok1&&lead(a)===lead(a2)||[a.len,b.len].join(',');}),'every track compiles; a hunt loop runs about a minute, skips its intro when it repeats, and keeps its hook');
+  ok(await ev(()=>{const S=MH.S,save=S.mode,out=[];S.mode='title';S.show=null;out.push(MH.musicCtx());S.show='ember';out.push(MH.musicCtx());S.mode='camp';out.push(MH.musicCtx());S.mode='prep';out.push(MH.musicCtx());
+    S.mode='gather';out.push(MH.musicCtx());MH.newHunt('tusk');out.push(MH.musicCtx());MH.newHunt(null,{small:'fern'});out.push(MH.musicCtx());S.mode='loot';out.push(MH.musicCtx());S.mode=save;S.show=null;
+    return out.join(',')==='title,mon:ember,camp,camp,gather,mon:tusk,pack,camp'||out.join(',');}),'the music follows the screen: title, camp and menus, gather runs, pack hunts, and each monster');
+  // ── pause ──
+  ok(await ev(()=>{EQ();MH.newHunt('fern');const S=MH.S;S.m.wait=0;RUN(30);const c0=S.clock,t0=S.timeLeft,m0=JSON.stringify([S.m.t,S.m.state]);MH.pauseHunt(true);RUN(300);
+    const still=S.clock===c0&&S.timeLeft===t0&&JSON.stringify([S.m.t,S.m.state])===m0;MH.actTap('head');MH.update(1/60);const noAct=S.clock===c0;MH.pauseHunt(false);RUN(10);return S.paused===false&&still&&noAct&&S.clock>c0;}),
+    'pausing freezes the hunt: the clock, the timer and the monster all stop until it resumes');
+
   // ── bots ──
   // skill: chance to dodge each incoming hit and to tap each weak point. It counters, sharpens, drinks, rolls out fire and taps out of ice.
   const bot=(monster,eq,skill)=>ev(({monster,eq,skill})=>{
@@ -224,6 +239,14 @@ const shots=process.argv[2];
     if(!pos)return false;await p.touchscreen.tap(pos.x,pos.y);await p.waitForTimeout(120);return true;};
   const cdp=await p.context().newCDPSession(p);
   const touch=(type,x,y)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:type==='touchEnd'?[]:[{x,y}]});
+  await shot('c-title-new');
+  ok(await ev(()=>MH.S.mode==='title'&&MH.S.btns.some(b=>b.id==='title:howto')&&MH.S.btns.some(b=>b.id==='title:music')&&!MH.S.show),'the title screen has HOW TO PLAY and MUSIC buttons, and shows the Fernwing on a fresh save');
+  await tapBtn('title:howto');ok(await ev(()=>MH.S.howto&&MH.S.mode==='title'),'HOW TO PLAY opens the controls');await shot('c-title-howto');
+  await p.touchscreen.tap(195,300);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.howto&&MH.S.mode==='title'),'and a tap closes them without starting');
+  ok(await ev(()=>MH.AC&&MH.AC.state==='running'&&MH.music.running&&MH.PREFS.music),'the first tap starts the sound and the music');
+  await p.waitForTimeout(400);ok(await ev(()=>MH.music.key==='title'&&MH.music.song&&MH.music.idx>0),'the title theme is playing');
+  await tapBtn('title:music');ok(await ev(()=>!MH.PREFS.music&&!MH.music.running&&JSON.parse(localStorage.getItem('mh_prefs')).music===false),'MUSIC turns it off, and the choice is saved');
+  await tapBtn('title:music');ok(await ev(()=>MH.PREFS.music&&MH.music.running),'and back on');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='quest'&&MH.SAVE.potions===6&&!MH.SAVE.pal),'a tap on the title opens the camp on the story, with six potions and no companion yet');await shot('c-quest-new');
   await tapBtn('tab:hunt');await shot('c-hunt-new');
@@ -258,12 +281,24 @@ const shots=process.argv[2];
   ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='fern'&&!MH.S.btns.some(b=>b.id==='prep:rnext')),'a tap on the Fernwing card opens the prep screen, with no companion yet');await shot('c-prep');
   await tapBtn('prep:mnext');ok(await ev(()=>MH.S.prep.meal===0),'the arrows pick a meal');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='prep'),'a meal cannot be eaten without its ingredients');await tapBtn('prep:mprev');await tapBtn('prep:start');
   ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='fern'&&MH.S.h.atk===1.404&&Math.abs(MH.S.qteTime-.7)<1e-9),'START HUNT begins the hunt with the worn gear');
+  await p.waitForTimeout(1300);ok(await ev(()=>MH.music.key==='mon:fern'),'the music crosses over to the Fernwing\'s own track');
+  const pz=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(128-8)/128*r.width,y:r.top+5/MH.LH*r.height};});
+  await p.touchscreen.tap(pz.x,pz.y);await p.waitForTimeout(100);
+  ok(await ev(()=>MH.S.paused&&['pause:resume','pause:music','pause:sfx','pause:quit'].every(k=>MH.S.btns.some(b=>b.id===k))),'the pause button in the corner pauses the hunt and shows the menu');await shot('c-paused');
+  const ck=await ev(()=>MH.S.clock);await p.waitForTimeout(500);ok(await ev(c0=>MH.S.clock===c0,ck),'the hunt stays frozen while paused');
+  await tapBtn('pause:sfx');ok(await ev(()=>!MH.PREFS.sfx),'SOUND switches the sound effects off');await tapBtn('pause:sfx');
+  await tapBtn('pause:resume');await p.waitForTimeout(150);ok(await ev(c0=>!MH.S.paused&&MH.S.clock>c0,ck),'RESUME carries on');
+  await p.keyboard.press('p');ok(await ev(()=>MH.S.paused),'P pauses from the keyboard');await p.keyboard.press('Escape');ok(await ev(()=>!MH.S.paused),'and Escape resumes');
+  await ev(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});
+  ok(await ev(()=>MH.S.paused),'leaving the app mid-hunt pauses it');
+  await ev(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'));});await tapBtn('pause:resume');
 
   // ── real touch input in a hunt ──
   const head=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect(),pp=MH.partPos('head',MH.mPose());return{x:r.left+pp.x/128*r.width,y:r.top+pp.y/MH.LH*r.height};});
   await ev(()=>{MH.S.m.evadeCd=9;});await p.touchscreen.tap(head.x,head.y);await p.waitForTimeout(250);
   ok(await ev(()=>MH.S.stats.dealt>0&&MH.S.m.stun>0),'a tap on the head damages the head');
-  await p.waitForTimeout(500);await touch('touchStart',200,600);await touch('touchMove',150,600);await touch('touchMove',110,602);await p.waitForTimeout(50);
+  await p.waitForTimeout(500);await ev(()=>{const S=MH.S,m=S.m;m.state='idle';m.wait=10;m.evadeCd=99;m.qteT=99;S.qte=null;S.h.state='idle';S.h.inv=0;S.h.st=100;});
+  await touch('touchStart',200,600);await touch('touchMove',150,600);await touch('touchMove',110,602);await p.waitForTimeout(50);
   ok(await ev(()=>MH.S.h.state==='dodge'),'a swipe dodges');await touch('touchEnd');await p.waitForTimeout(700);
   const quiet=()=>ev(()=>{const S=MH.S,m=S.m;m.state='idle';m.wait=10;m.evadeCd=99;m.qteT=99;S.qte=null;S.h.state='idle';S.h.inv=0;S.h.poison=0;});
   await quiet();const before=await ev(()=>MH.S.stats.dealt);
@@ -285,6 +320,9 @@ const shots=process.argv[2];
   const cb=await ev(()=>{const S=MH.S;S.h.counter=1.4;S.slow=0;MH.manual=true;const r=document.getElementById('c').getBoundingClientRect(),c=MH.L.counter;return{x:r.left+(c.x+c.w/2)/128*r.width,y:r.top+(c.y+c.h/2)/MH.LH*r.height,d:S.stats.dealt};});
   await p.touchscreen.tap(cb.x,cb.y);ok(await ev(()=>MH.S.h.state==='counter'),'a tap on the COUNTER button starts a counter');
   await ev(()=>{for(let i=0;i<40;i++)MH.update(1/60);});ok(await ev(d=>MH.S.stats.dealt-d>=100&&MH.S.m.stun>=40,cb.d),'the counter lands a big hit and fills the stun meter');
+  // quitting from the pause menu goes back to camp
+  ok(await ev(()=>{const id=MH.S.def.id;MH.pauseHunt(true);MH.S.btns.find(b=>b.id==='pause:quit')||1;MH.quitHunt();const r=MH.S.mode==='camp'&&!MH.SAVE.wins[id];return r;}),'QUIT HUNT goes back to camp with no win');
+  await ev(()=>{MH.toPrep('fern');});await p.waitForTimeout(80);await tapBtn('prep:start');await ev(()=>{MH.S.m.evadeCd=9;});
   // win → loot → story → the rest of the camp
   await ev(()=>{const S=MH.S;S.m.hp=1;S.m.state='idle';S.h.state='idle';MH.actTap('head');for(let i=0;i<400&&S.mode==='hunt';i++)MH.update(1/60);S.t=5;MH.manual=false;});
   ok(await ev(()=>MH.S.mode==='loot'&&MH.S.loot.unlock==='RANK 1 IS OPEN'&&MH.SAVE.wins.fern===1),'the first Fernwing win opens the rest of rank 1');await shot('c-loot');
