@@ -1,4 +1,4 @@
-# Signature moves (proposal, awaiting approval)
+# Signature moves (approved; animated in the drafts, not in the game yet)
 
 Every monster keeps a few shared basics (bite, sweep, spit and so on) and gets one or two moves of its own, taken from its legend.
 Each entry: the move, what it does, how you beat it. "Dodge" means the normal dodge timing; "hits" are separate dodge prompts.
@@ -25,7 +25,7 @@ Each entry: the move, what it does, how you beat it. "Dodge" means the normal do
 
 ## Shelled ones
 - **Mudclaw** (Karkinos). *Crusher Grip*: grabs you in its crusher. Mash to escape. *Mud Bubbles*: 3 slowing bubbles.
-- **Shellsnap** (hermit crab). *Shell Bunker*: hides in its conch and takes almost no damage for 3 s, then bursts out.
+- **Shellsnap** (hermit crab). *Shell Bunker*: hides in its conch and takes almost no damage for 3 s, then bursts out. *Conch Cannon*: blasts a jet of water through its spiral conch, 2 hits, soaks.
 - **Venomsting** (giant scorpion). *Pin and Sting*: pincers pin you, then the sting, 2 hits, poisons. *Tail Barrage*: 4 fast stings.
 - **Magmastrider** (spider crab). *Stilt Stomp*: its long legs stamp in a line toward you, 4 hits. *Vent Burst*: its shell vents erupt, burns.
 - **Crystalback** (horseshoe crab). *Crystal Shards*: shakes off crystals that ring the ground, 3 hits. *Telson Flip*: flips its tail spike, 1 hit.
