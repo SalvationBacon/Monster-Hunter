@@ -273,3 +273,16 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 - **Ranged weapons** (bow), which need aiming and are a bigger change to the fight.
 - **Branching upgrade trees and armor in several pieces**, as in Monster Hunter.
 - **A rebirth system** at the end of the ladder. Perks are sized with this in mind.
+
+## v0.25.0: speed, search, materials, bestiary
+- **Harder monsters attack much faster.** Base speed is `(1 - 0.35 × t)`, where t runs 0 to 1 across the 30 base monsters. Apex monsters get a further ×0.94 and the elder ×0.9. Angry and enraged phases multiply by ×0.88 and ×0.78 (previously they subtracted a flat amount). The elder's wind-up is now about 54% of the Fernwing's (it was 77%). Combo hits tighten with speed (gap ×(0.4 + 0.6s)) and recovery shortens a little (×(0.6 + 0.4s)). The pause between attacks only shrinks half as much (×(0.5 + 0.5s)), so fast monsters read as fast without being constant. Elder damage went ×1.19 → ×1.12 to keep the ladder winnable (the bot wins 6–7 of 8 in Render gear).
+- **GEAR → weapon** asks for the weapon type first (Greatsword, Dual Blades, Hammer, Lance, each with an owned count), then lists only that type. BACK steps back one level.
+- **Hunt search:** a search bar at the top of the hunt list matches by name, element, biome, or weakness. Names of monsters you haven't unlocked aren't searchable. Phones get their real keyboard through an invisible text field over the bar.
+- **Material info:** tap any material in a forge or kitchen cost. A card shows which monster drops it, how (carved 2–4 or 1–2, part break always or 10% without, rare 3% +3% per break with a pity bonus, gem 8%), pack hunts, and gathering biomes. Unknown monsters show as "AN UNKNOWN RANK N MONSTER". Tapping a monster line opens its bestiary page.
+- **Bestiary** (new menu tile): every monster, learned through hunting.
+  - Unlocked: basics (health, element, weaknesses, the element its gear gives).
+  - 1 hunt: field notes (resists, inflicts, trait).
+  - 3 hunts: the attack list (heavy hits in red, angry and enraged moves tagged).
+  - 5 hunts: drops with rates (tappable).
+  - 10 hunts: mastery (attack speed compared to the Fernwing, weak-point time, stun threshold, dodge timer). The page then shows MASTERED.
+  - Monsters you haven't reached show as silhouettes.

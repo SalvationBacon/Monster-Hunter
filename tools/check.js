@@ -351,9 +351,11 @@ const shots=process.argv[2];
   await tapBtn('exp:toggle');ok(await ev(()=>!MH.S.exp),'expeditions are locked before the first Fernwing');
   // ── the GEAR tab and the forge ──
   await tapBtn('tab:gear');ok(await ev(()=>MH.S.tab==='gear'&&['weapon','charm','helm','armor','arms','legs','pweapon','parmor'].every(k=>MH.S.btns.some(b=>b.id==='slot:'+k))),'the GEAR tab shows the hunter and eight gear slots');await shot('c-gear');
-  await tapBtn('slot:weapon');ok(await ev(()=>MH.S.gpick==='weapon'&&['iron_gs','iron_db','iron_hm','iron_ln'].every(k=>MH.S.btns.some(b=>b.id==='wear:'+k))&&!MH.S.btns.some(b=>b.id==='wear:fern_gs')),'a slot lists only the gear you own for it');await shot('c-gear-pick');
+  await tapBtn('slot:weapon');ok(await ev(()=>MH.S.gpick==='weapon'&&!MH.S.gwt&&['gs','db','hm','ln'].every(k=>MH.S.btns.some(b=>b.id==='wtype:'+k))&&!MH.S.btns.some(b=>b.id.startsWith('wear:'))),'the weapon slot asks for a weapon type first');await shot('c-gear-wtype');
+  await tapBtn('wtype:ln');ok(await ev(()=>MH.S.gwt==='ln'&&MH.S.btns.some(b=>b.id==='wear:iron_ln')&&!MH.S.btns.some(b=>b.id==='wear:iron_gs')&&!MH.S.btns.some(b=>b.id==='wear:fern_ln')),'then lists only owned weapons of that type');await shot('c-gear-pick');
+  await tapBtn('gear:back');ok(await ev(()=>MH.S.gpick==='weapon'&&!MH.S.gwt),'BACK from the list returns to the weapon types');await tapBtn('wtype:ln');
   await tapBtn('wear:iron_ln');ok(await ev(()=>MH.SAVE.eq.weapon==='iron_ln'&&!MH.S.gpick&&MH.gearStats().wt==='ln'),'picking one wears it and goes back to the gear screen');
-  await tapBtn('slot:weapon');await tapBtn('gear:back');ok(await ev(()=>!MH.S.gpick),'BACK leaves the list without changing anything');await tapBtn('slot:weapon');await tapBtn('wear:iron_gs');
+  await tapBtn('slot:weapon');await tapBtn('gear:back');ok(await ev(()=>!MH.S.gpick),'BACK leaves the picker without changing anything');await tapBtn('slot:weapon');await tapBtn('wtype:gs');await tapBtn('wear:iron_gs');
   await ev(()=>{MH.SAVE.own.fern_he=true;});await tapBtn('slot:helm');ok(await ev(()=>MH.S.btns.some(b=>b.id==='wear:fern_he')&&!MH.S.btns.some(b=>b.id==='wear:fern_ar')),'the helm slot lists only helms');
   await tapBtn('wear:fern_he');ok(await ev(()=>MH.SAVE.eq.helm==='fern_he'&&MH.armorRes().nature===.05&&MH.gearStats().hp===Math.round(80+28)),'wearing a Fernwing helm adds its health and a little nature resistance');await shot('c-gear-helm');
   await tapBtn('slot:helm');await tapBtn('wear:leather_helm');await ev(()=>{delete MH.SAVE.own.fern_he;});
@@ -476,6 +478,33 @@ const shots=process.argv[2];
   await p.setViewportSize({width:390,height:780});await p.waitForTimeout(150);await ev(()=>{MH.SAVE.role='fighter';});
   const seen=[];for(let i=0;i<6;i++){seen.push(await ev(()=>MH.SAVE.role));if(i===3)await shot('c-prep-scout');await tapBtn('prep:rnext');}
   ok(seen.join(',')==='fighter,healer,trapper,scout,gatherer,rest'&&await ev(()=>MH.SAVE.role==='fighter')||seen.join(','),'the prep screen cycles Pip through all six roles');
+  // ── v0.25: faster harder monsters, search, materials, bestiary ──
+  ok(await ev(()=>{const w=id=>{MH.newHunt(id);const m=MH.S.m;m.last='';MH.S.def.pools[0]=['bite'];MH.mStartAttack();return m.hits[0];};const f=w('fern'),r4=w('frost'),st=w('star');MH.S.mode='camp';
+    return (st<=f*.55&&r4<f*.85&&r4>st)||[f,r4,st].join(',');}),'harder monsters wind up much faster: the elder in about half the Fernwing\'s time');
+  ok(await ev(()=>{MH.newHunt('star');const m=MH.S.m;MH.S.def.pools[0]=['tri'];m.last='';MH.mStartAttack();const a=m.hits[1]-m.hits[0];MH.newHunt('fern');MH.S.def.pools[0]=['tri'];MH.S.m.last='';MH.mStartAttack();const b=MH.S.m.hits[1]-MH.S.m.hits[0];MH.S.mode='camp';MH.newHunt('fern');MH.S.mode='camp';return a<b*.8;}),'and their combos land closer together');
+  await p.reload();await p.waitForTimeout(200);await ev(()=>{MH.setDev(true);MH.toCamp('hunt');});await p.waitForTimeout(150);
+  ok(await ev(()=>{const q=document.getElementById('q');return q.style.display==='block';}),'the hunt list has a search box');
+  await ev(()=>{const q=document.getElementById('q');q.value='ember';q.dispatchEvent(new Event('input'));});await p.waitForTimeout(150);
+  ok(await ev(()=>{const h=MH.S.btns.filter(b=>b.id.startsWith('hunt:')&&b.id!=='hunt:clear').map(b=>b.id);return h.length>=1&&h.includes('hunt:ember')&&!h.includes('hunt:fern')||h.join();}),'searching a name shows only matching monsters');await shot('c-search');
+  await ev(()=>{const q=document.getElementById('q');q.value='fire';q.dispatchEvent(new Event('input'));});await p.waitForTimeout(150);
+  ok(await ev(()=>{const h=MH.S.btns.filter(b=>b.id.startsWith('hunt:')&&b.id!=='hunt:clear').map(b=>b.id.slice(5));return h.length>1&&h.every(id=>MH.MONSTERS[id].elem==='fire'||MH.MONSTERS[id].weak==='fire'||MH.MONSTERS[id].name.includes('FIRE'));}),'searching an element finds monsters that use it or fear it');
+  await tapBtn0('hunt:clear');ok(await ev(()=>!MH.S.q&&MH.S.btns.some(b=>b.id==='hunt:fern')),'X clears the search');
+  await tapBtn('tab:gear');ok(await ev(()=>document.getElementById('q').style.display==='none'),'the search box hides on other screens');
+  await tapBtn('tab:forge');await tapBtn0('fcat:armor');await ev(()=>{MH.S.fsub=0;});await p.waitForTimeout(150);
+  {const mid=await ev(()=>{const b=MH.S.btns.find(b=>b.id.startsWith('mat:'));return b&&b.id.slice(4);});ok(!!mid,'forge costs can be tapped');
+    await tapBtn0('mat:'+mid);ok(await ev(()=>MH.S.mat&&MH.S.btns.some(b=>b.id==='mat:close')),'tapping a material shows where it comes from');await shot('c-material');}
+  ok(await ev(()=>{const s=MH.matSources(MH.MONSTERS.ember.mat.head).map(r=>r.txt).join('|');const r=MH.matSources(MH.MONSTERS.ember.mat.rare).map(r=>r.txt).join('|');const h=MH.matSources('honey').map(r=>r.txt).join('|');
+    return s.includes('EMBERWING')&&s.includes('BREAK ITS')&&r.includes('RARE')&&h.includes('GATHER RUNS: FOREST')||[s,r,h].join(' / ');}),'it names the monster, the part to break, rare odds, and where to gather');
+  await ev(()=>{MH.S.mat=MH.MONSTERS.ember.mat.head;});await p.waitForTimeout(100);await tapBtn0('matgo:0');
+  ok(await ev(()=>MH.S.tab==='book'&&MH.S.bpick==='ember'&&!MH.S.mat),'and its monster opens in the bestiary');await tapBtn0('book:back');
+  await ev(()=>{MH.SAVE.wins.fern=10;MH.SAVE.wins.quill=1;delete MH.SAVE.wins.mud;MH.SAVE.wins.dust=3;MH.SAVE.wins.tusk=5;});
+  ok(await ev(()=>MH.know('fern')===4&&MH.know('quill')===1&&MH.know('mud')===0&&MH.know('dust')===2&&MH.know('tusk')===3),'the bestiary learns more at 1, 3, 5 and 10 hunts');
+  ok(await ev(()=>{localStorage.setItem('x',1);return 1;})&&await ev(()=>{const s=MH.SAVE;const was=s.wins.star;delete s.wins.star;const r=MH.unlocked('star')?MH.know('star')===0:MH.know('star')===-1;if(was)s.wins.star=was;return r;}),'monsters you have not reached stay hidden');
+  await p.waitForTimeout(100);ok(await ev(()=>['fern','quill','dust'].every(id=>MH.S.btns.some(b=>b.id==='book:'+id))),'the bestiary lists every monster you know');await shot('c-bestiary');
+  await tapBtn0('book:fern');ok(await ev(()=>MH.S.bpick==='fern'),'tapping one opens its page');await shot('c-bestiary-fern');
+  ok(await ev(()=>{MH.scrollSet(1e6);return MH.S.scrMax.bdet>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id.startsWith('mat:'))))))),'a mastered page lists drops, and they can be tapped');await shot('c-bestiary-fern-drops');
+  await tapBtn0('book:back');await tapBtn0('book:quill');ok(await ev(()=>MH.S.scrMax.bdet===0||!MH.S.btns.some(b=>b.id.startsWith('mat:'))),'a monster hunted once keeps its drops hidden');await shot('c-bestiary-quill');
+  await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();
