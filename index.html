@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.26.1';
+const VER='0.27.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -206,7 +206,7 @@ const PERKS={
   hardy:    {name:'HARDY',       tag:'HARD', max:3,d:L=>'AILMENTS '+20*L+'% SHORTER'},
   herbal:   {name:'HERBALIST',   tag:'HERB',  max:3,d:L=>'POTIONS +'+17*L+'%'+(L>=3?', +1 POTION':'')},
   fortune:  {name:'FORTUNE',     tag:'LUCK',  max:3,d:L=>'BETTER DROPS'+(L>=2?', MORE LOOT':'')},
-  beast:    {name:'BEASTFRIEND', tag:'PIP',   max:3,d:L=>'PIP +'+8*L+'%'},
+  beast:    {name:'BEASTFRIEND', tag:'BEAST', max:3,d:L=>SAVE.pal?'PIP +'+8*L+'%':'FOR A FRIEND, LATER'},
 };
 const SK=Object.keys(PERKS);
 const lv=(gs,k)=>(gs.perks[k]||0);
@@ -410,7 +410,8 @@ const SCENES={
   ch6:[['moss','WHAT IS THAT FOLLOWING YOU? IT\'S... SINGED. AND ADORABLE.'],
        ['pip','PIP! PIP PIP!'],
        ['moss','I THINK ITS NAME IS PIP. THE EMBERWING MUST HAVE CHASED IT OUT OF ITS BURROW.'],
-       ['wren','IT WANTS TO HELP. GIVE IT A JOB ON THE PREP SCREEN, AND GEAR FROM BRAM\'S FORGE.'],
+       ['wren','IT WANTS TO HELP. YOU CAN GIVE IT A JOB ON THE PREP SCREEN.'],
+       ['bram','AND I CAN MAKE IT LITTLE FANGS AND VESTS! THERE\'S A NEW PIP TAB IN MY FORGE.'],
        ['pip','PIP!']],
   ch7:[['oda','I\'VE CHECKED EVERY SCALE YOU BROUGHT BACK. THEY ALL GLOW. EVERY SINGLE ONE.'],
        ['oda','SOMETHING IS SOAKING THE LAND IN LIGHT, AND IT\'S MAKING THE BEASTS RESTLESS.'],
@@ -455,10 +456,11 @@ const SCENES={
   // the first visit to each part of camp
   v_quest:[['wren','THE QUEST BOARD. STORY JOBS COME FROM ME. DAILY AND WEEKLY JOBS COME FROM WHOEVER YELLS LOUDEST.'],['wren','WHEN A JOB IS DONE, CLAIM ITS REWARD HERE.']],
   v_gear:[['wren','YOUR KIT. SWAP WEAPONS AND ARMOR HERE. TAP YOUR STATS TO SEE YOUR SKILLS.'],['wren','WEAR ALL FOUR ARMOR PIECES FROM ONE MONSTER FOR A SET BONUS.']],
-  v_forge:[['bram','MY FORGE! WEAPONS, ARMOR, AND LITTLE THINGS FOR PIP. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.']],
+  v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.']],
   v_cook:[['moss','MY KITCHEN! I BREW POTIONS HERE. YOU CAN TAKE A FEW ON EACH HUNT.'],['moss','MEALS ARE CHOSEN ON THE PREP SCREEN, RIGHT BEFORE YOU HEAD OUT.']],
   v_book:[['oda','MY BESTIARY! EVERY BEAST YOU MEET GETS A PAGE.'],['oda','HUNT ONE 1, 3, 5 AND 10 TIMES AND I\'LL LEARN ITS HABITS, ITS ATTACKS, AND WHAT IT DROPS.']],
   v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON GATHER RUNS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
+  v_gather:[['moss','HERE WE GO! TAP THE HERBS AND HONEY AS THEY POP UP, BEFORE THEY VANISH.'],['moss','IF A BUG SHOWS UP, TAP IT WHILE THE RING IS AROUND IT. ONLY ONE PER RUN, SO DON\'T MISS!']],
   v_prep:[['wren','ALWAYS CHECK WHAT A BEAST IS WEAK TO BEFORE YOU GO. THE RIGHT ELEMENT HITS MUCH HARDER.'],['wren','WHEN YOU\'RE READY, START THE HUNT.']],
 };
 const TUT_KEYS=Object.keys(SCENES).filter(k=>!/^ch\d/.test(k));
@@ -1537,7 +1539,7 @@ function press(x,y){
   if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
   if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
   if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres'){if(S.t>1.2)toCamp(qClaimable(quests()[0]||{st:{p:0,c:true},def:{goal:[0,0,1]}})?'quest':'hunt');return;}
-  if(S.mode==='camp'||S.mode==='prep'){for(const b of S.btns)if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){b.fn();break;}return;}
+  if(S.mode==='camp'||S.mode==='prep'){const b=S.btns.find(b=>x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h);if(!guideGate(b,x,y))return;if(b)b.fn();return;}
   if(S.mode==='gather'){gatherTap(x,y);return;}
   if(S.mode!=='hunt')return;
   const b=L.potion; if(x>=b.x-1&&x<=b.x+b.w+2&&y>=b.y-2){actPotion();return;}
@@ -1725,8 +1727,10 @@ function gatherEnd(){
 function update(dt){
   S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
   if(S.talk){talkUpdate(dt);return;}                                             // a scene pauses everything
+  guideTick();
   if(S.mode==='camp'||S.mode==='prep')storyTick();
-  if(S.mode==='gather'){gatherUpdate(dt);return;}
+  if(S.mode==='gather'){if(S.t>.4&&talk('v_gather'))return;gatherUpdate(dt);return;}
+  if(S.hint&&(S.hint.t+=dt)>3.5)S.hint=null;
   if(S.mode!=='hunt'||S.paused)return;
   huntTutor();if(S.talk)return;
   if(S.stop>0){S.stop-=dt;return;}                                               // hitstop
@@ -2017,7 +2021,7 @@ function gearLine(id,x,y,alt){
 function costRow(cost,x,y,gap,B,top,bot){for(const [k,n] of Object.entries(cost)){const have=Math.min(99,k==='potion'?SAVE.potions:SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);text(t,x+10,y,have>=n?'#4cd964':'#ff6a4d');
   const w=10+textW(t),bw=Math.min(w+2,W-36-x);if(B&&bw>6&&y-3>=(top||0)&&y+8<=(bot||LH))B.push({id:'mat:'+k,x:x-1,y:y-3,w:bw,h:11,fn:()=>{S.mat=k;sfx('charge',1);}});      // tap a material to see where it comes from
   x+=w+(gap||4);}return x;}
-function rewardRow(rw,x,y){for(const [k,n] of Object.entries(rw)){if(k==='pal'){g.drawImage(palSpr(0),0,0,16,14,x,y-3,11,10);x+=14;continue;}g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);const t='*'+n;text(t,x+10,y,'#ffe14d');x+=10+textW(t)+4;}return x;}
+function rewardRow(rw,x,y){for(const [k,n] of Object.entries(rw)){if(k==='pal'){if(SAVE.pal)g.drawImage(palSpr(0),0,0,16,14,x,y-3,11,10);else text('???',x,y,'#ffe14d');x+=14;continue;}g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);const t='*'+n;text(t,x+10,y,'#ffe14d');x+=10+textW(t)+4;}return x;}
 function smallBtn(B,id,x,y,w,lab,col,fn,on){g.fillStyle='#000';g.fillRect(x,y,w,11);g.fillStyle=col;g.fillRect(x+1,y+1,w-2,9);text(lab,x+w/2,y+3,on===false?'#8a93b0':'#fff',{al:1});B.push({id,x:x-2,y:y-2,w:w+4,h:15,fn});}
 const TABS=[['hunt','HUNT'],['gear','GEAR'],['forge','FORGE'],['cook','COOK'],['quest','QUEST'],['bugs','TERRARIUM'],['book','BESTIARY']];
 // 9x9 pixel icons for the menu tiles
@@ -2072,7 +2076,7 @@ function matSources(id){
   if(id==='gem'){t('ANY BIG MONSTER: '+GEM_CH*100+'%','#ffe14d');t('THE FORTUNE SKILL HELPS');t('SOME QUESTS GIVE GEMS');return L;}
   if(id==='meat'){t('PACK HUNTS: 2-3 EACH','#ffe14d');t('OPEN EXPEDITIONS, THEN PACK HUNT',null,1);return L;}
   const bi=BIOME_ING.findIndex(p=>p.includes(id));
-  if(bi>=0){const scarce=BIOME_ING[bi][1]===id;t('GATHER RUNS: '+BIOME_NAME[bi],'#ffe14d');t(scarce?'THE SCARCER ONE THERE':'COMMON THERE',null,1);t('EXPEDITIONS > GATHER',null,1);if(!scarce)t('PIP AS GATHERER BRINGS SOME');return L;}
+  if(bi>=0){const scarce=BIOME_ING[bi][1]===id;t('GATHER RUNS: '+BIOME_NAME[bi],'#ffe14d');t(scarce?'THE SCARCER ONE THERE':'COMMON THERE',null,1);t('EXPEDITIONS > GATHER',null,1);if(!scarce&&SAVE.pal)t('PIP AS GATHERER BRINGS SOME');return L;}
   for(const mid of HUNTS){const D=MONSTERS[mid],k=Object.keys(D.mat).find(k=>D.mat[k]===id);if(!k)continue;
     const kn=unlocked(mid),go=kn?()=>{S.mat=null;S.menu=false;S.tab='book';S.bpick=mid;S.scr.bdet=0;sfx('charge',1);}:null;
     t(kn?D.name+(go?' >':''):'AN UNKNOWN RANK '+D.rank+' MONSTER',kn?'#ffe14d':'#8a93b0',0,go);
@@ -2161,7 +2165,7 @@ function wrapText(t,w){const out=[];let line='';for(const word of t.split(' ')){
 // start a scene. Returns true if it started. force: replay even if seen.
 function talk(key,force,after){
   if(S.talk||!SCENES[key])return false;if(!force&&(SAVE.seen[key]||MH.noTalk))return false;
-  SAVE.seen[key]=1;save();talkLines(SCENES[key],after);return true;}
+  SAVE.seen[key]=1;save();if(!after&&/^h_/.test(key))after=()=>{S.hint={k:key,t:0};};talkLines(SCENES[key],after);return true;}
 function talkLines(lines,after){S.talk={lines,i:0,ch:0,blip:0,after};IN.down=false;S.btns=[];}
 function talkTap(x,y){const T=S.talk,full=T.lines[T.i][1].length;
   if(x>=W-30&&y>=T.by-11&&y<=T.by){S.talk=null;sfx('charge',1);if(T.after)T.after();return;}         // SKIP
@@ -2182,13 +2186,72 @@ function drawTalk(){
   if(done&&Math.floor(S.t*3)%2){g.fillStyle='#ffe14d';g.fillRect(W-14,by+bh-8,5,1);g.fillRect(W-13,by+bh-7,3,1);g.fillRect(W-12,by+bh-6,1,1);}
   g.fillStyle='#000';g.fillRect(W-30,by-10,24,10);g.fillStyle='#3a4060';g.fillRect(W-29,by-9,22,8);text('SKIP',W-18,by-7,'#c8d0e8',{al:1});
 }
+
+// ── Guided steps: spotlight the exact button to tap, and wait for it. One guide per story beat, played once (SAVE.seen).
+const gMenu=k=>({t:'OPEN THE MENU',id:'camp:menu',done:()=>S.mode!=='camp'||S.menu||S.tab===k});
+const gTab=(k,lab)=>({k,t:'TAP '+lab,id:'tab:'+k,done:()=>S.mode!=='camp'||(S.tab===k&&!S.menu)});
+const gGo=(k,lab)=>[gMenu(k),gTab(k,lab)];
+const gPickMon={t:'PICK A MONSTER TO HUNT',find:b=>/^hunt:/.test(b.id)&&b.id!=='hunt:clear'&&unlocked(b.id.slice(5)),done:()=>S.mode!=='camp'};
+const GUIDES={
+  g_hunt:[...gGo('hunt','HUNT'),{t:'PICK THE FERNWING',id:'hunt:fern',done:()=>S.mode!=='camp'},{t:'CHECK ITS WEAKNESS, THEN START THE HUNT',id:'prep:start',done:()=>S.mode!=='prep'}],
+  g_claim:[...gGo('quest','QUEST'),{t:'THE JOB IS DONE. CLAIM YOUR REWARD',id:'claim:story',done:()=>SAVE.story.i>0}],
+  g_book:[...gGo('book','BESTIARY'),{t:'TAP THE FERNWING TO SEE ITS PAGE',id:'book:fern',done:()=>S.bpick==='fern'||S.tab!=='book'}],
+  g_gather:[...gGo('hunt','HUNT'),{t:'TAP EXPEDITIONS',id:'exp:toggle',done:()=>S.mode!=='camp'||S.exp},{t:'TAP GATHER IN THE FOREST',id:'gather:fern',done:()=>S.mode!=='camp'}],
+  g_forge:[...gGo('forge','FORGE'),{t:'TAP A MATERIAL TO SEE WHERE IT DROPS',id:'mat:',done:()=>!!S.mat||S.mode!=='camp'},{t:'TAP ANYWHERE TO CLOSE',id:'mat:close',done:()=>!S.mat},
+    {t:'CRAFT OR UPGRADE SOMETHING YOU CAN AFFORD',none:'HUNT FOR MORE MATERIALS, THEN COME BACK',find:b=>(/^craft:/.test(b.id)&&canAfford(b.id.slice(6)))||(/^up:/.test(b.id)&&affords(upCost(b.id.slice(3)))),done:()=>SAVE.story.i!==2||SAVE.story.p>0}],
+  g_meal:[...gGo('hunt','HUNT'),gPickMon,{t:'PICK A MEAL WITH THE ARROWS',id:'prep:mnext',free:true,done:()=>S.mode!=='prep'||S.prep.meal>=0},{t:'START THE HUNT',id:'prep:start',free:true,done:()=>S.mode!=='prep'}],
+  g_pip:[...gGo('hunt','HUNT'),gPickMon,{t:'TAP TO CHANGE PIP\'S JOB',id:'prep:rnext',free:true,tap:true},{t:'START THE HUNT WITH PIP',id:'prep:start',free:true,done:()=>S.mode!=='prep'}],
+};
+function guide(key){if(S.guide||S.talk||MH.noTalk||SAVE.seen[key]||!GUIDES[key])return false;SAVE.seen[key]=1;save();S.guide={key,i:0,hit:false};return true;}
+const gStep=()=>S.guide&&GUIDES[S.guide.key][S.guide.i];
+function gTarget(){const st=gStep();if(!st)return null;return S.btns.find(b=>st.find?st.find(b):st.id.endsWith(':')?b.id.startsWith(st.id)&&b.id!=='mat:close':b.id===st.id)||null;}
+function guideTick(){if(!S.guide)return;const G=S.guide,L=GUIDES[G.key];
+  while(G.i<L.length){const st=L[G.i];if(st.tap?G.hit:st.done&&st.done()){G.i++;G.hit=false;}else break;}
+  if(G.i>=L.length||S.mode==='title')S.guide=null;}
+// a camp/prep tap while a guide runs: only its target goes through (unless the step is free)
+function guideGate(b,x,y){const G=S.guide;if(!G||S.talk)return true;
+  if(G.skip&&x>=G.skip.x&&x<G.skip.x+G.skip.w&&y>=G.skip.y&&y<G.skip.y+G.skip.h){S.guide=null;sfx('charge',1);return false;}
+  const st=gStep(),tg=gTarget();if(!st||!tg)return true;if(b===tg){G.hit=true;return true;}return !!st.free;}
+function arrowAt(x,y,dir,col){                                                  // (x,y) is the tip; a head and a short stem
+  const R=(dx,dy,w,h,o)=>g.fillRect(x+dx-o,y+dy-o,w+2*o,h+2*o);
+  for(const [o,c] of [[1,OUTLINE],[0,col]]){g.fillStyle=c;for(let i=0;i<5;i++){
+    if(dir==='down')R(-i,-i,2*i+1,1,o);else if(dir==='up')R(-i,i,2*i+1,1,o);else if(dir==='left')R(i,-i,1,2*i+1,o);else R(-i,-i,1,2*i+1,o);}
+    if(dir==='down')R(-1,-9,3,5,o);else if(dir==='up')R(-1,5,3,5,o);else if(dir==='left')R(5,-1,5,3,o);else R(-9,-1,5,3,o);}}
+function drawGuide(){
+  const G=S.guide,st=gStep();if(!st)return;const tg=gTarget(),pulse=Math.sin(S.t*6)*.5+.5;
+  const txt=tg?st.t:(st.none||st.t),lines=wrapText(txt,W-30),ch=lines.length*7+8;let cy;
+  if(tg){const x0=Math.max(0,tg.x-2),y0=Math.max(0,tg.y-2),x1=Math.min(W,tg.x+tg.w+2),y1=Math.min(LH,tg.y+tg.h+2);
+    g.fillStyle='rgba(6,8,16,.62)';g.fillRect(0,0,W,y0);g.fillRect(0,y1,W,LH-y1);g.fillRect(0,y0,x0,y1-y0);g.fillRect(x1,y0,W-x1,y1-y0);
+    g.fillStyle=pulse>.5?'#ffe14d':'#ffb020';g.fillRect(x0,y0,x1-x0,1);g.fillRect(x0,y1-1,x1-x0,1);g.fillRect(x0,y0,1,y1-y0);g.fillRect(x1-1,y0,1,y1-y0);
+    const ax=Math.round((x0+x1)/2),below=(y0+y1)/2<LH*.45,bob=Math.round(Math.sin(S.t*7)*2);
+    if(below){arrowAt(ax,y1+6+bob,'up','#ffe14d');cy=Math.min(LH-ch-4,y1+13);}else{arrowAt(ax,y0-7-bob,'down','#ffe14d');cy=Math.max(2,y0-12-ch);}}
+  else cy=LH-ch-26;
+  panel(6,cy,W-12,ch);lines.forEach((l,i)=>text(l,10,cy+5+i*7,'#ffe14d'));
+  const sx=W-30,sy=cy+ch-1;g.fillStyle='#000';g.fillRect(sx,sy,24,9);g.fillStyle='#3a4060';g.fillRect(sx+1,sy+1,22,7);text('SKIP',sx+12,sy+2,'#c8d0e8',{al:1});G.skip={x:sx-2,y:sy-2,w:28,h:13};
+}
+// in a fight: show the gesture right after Wren explains it
+function drawHint(){
+  const H=S.hint,h=S.h,b=Math.round(Math.sin(H.t*8)*2),blink=Math.floor(H.t*4)%2;
+  if(H.k==='h_attack'){const p=partPos('head',mPose());circ(p.x,p.y,8+Math.sin(H.t*6)*2,'#ffe14d');text('TAP!',p.x,p.y-18+b,'#ffe14d',{al:1,out:OUTLINE});if(H.t>1.5)text('HOLD FOR YOUR SKILL',W/2,L.ground+8,'#fff',{al:1,out:OUTLINE});}
+  else if(H.k==='h_dodge'){const y=L.hFeet-20;arrowAt(L.hx-6-b,y,'left','#4cc9ff');arrowAt(L.hx+42+b,y,'right','#4cc9ff');text('SWIPE TO ROLL',L.hx+18,y-14,'#4cc9ff',{al:1,out:OUTLINE});}
+  else if(H.k==='h_weak'&&S.qte){const p=partPos(S.qte.part,mPose());arrowAt(p.x,p.y-20-b,'down','#ff6a4d');text('TAP IT',p.x,p.y-34,'#ff6a4d',{al:1,out:OUTLINE});}
+  else if(H.k==='h_counter'&&h.counter>0){const c=L.counter;g.fillStyle=blink?'#ffe14d':'#ffb020';g.fillRect(c.x-2,c.y-2,c.w+4,1);g.fillRect(c.x-2,c.y+c.h+1,c.w+4,1);g.fillRect(c.x-2,c.y-2,1,c.h+4);g.fillRect(c.x+c.w+1,c.y-2,1,c.h+4);arrowAt(c.x+c.w/2,c.y-8-b,'down','#ffe14d');}
+  else if(H.k==='h_potion'){const c=L.potion;arrowAt(c.x+c.w/2,c.y-8-b,'up','#4cd964');text('SWIPE UP',c.x+c.w/2-6,c.y-22,'#4cd964',{al:1,out:OUTLINE});}
+  else if(H.k==='h_sharp'){const c=L.sharp;arrowAt(c.x+c.w/2,c.y-10+b,'down','#4cc9ff');text('SWIPE DOWN',c.x+c.w/2,c.y-22,'#4cc9ff',{al:1,out:OUTLINE});}
+}
 // what should play next, outside a fight
 function storyTick(){
-  if(S.talk||S.menu||S.opts||S.mat||S.t<.3)return;
+  if(S.talk||S.opts||S.t<.3)return;
   if(S.mode==='camp'){
-    if(SAVE.wins.fern&&talk('fern_win'))return;
-    if(SAVE.story.i<STORY.length&&talk('ch'+SAVE.story.i))return;
-    if(SAVE.seen.ch0)talk('v_'+S.tab);}
+    if(!S.guide&&!S.menu&&!S.mat){
+      if(SAVE.wins.fern&&talk('fern_win'))return;
+      if(SAVE.story.i<STORY.length&&talk('ch'+SAVE.story.i))return;
+      const i=SAVE.story.i,sq=quests()[0];
+      if(i===0&&(sq&&qClaimable(sq)?guide('g_claim'):!SAVE.wins.fern&&guide('g_hunt')))return;
+      if(i===1&&(guide('g_book')||guide('g_gather')))return;
+      if(i===2&&guide('g_forge'))return;if(i===4&&guide('g_meal'))return;if(i===6&&SAVE.pal&&guide('g_pip'))return;}
+    const arrived=!S.guide||GUIDES[S.guide.key].slice(0,S.guide.i).some(st=>st.k===S.tab);   // mid-guide, a screen introduces itself once the guide has brought you there
+    if(SAVE.seen.ch0&&!S.menu&&!S.mat&&arrived)talk('v_'+S.tab);}
   else if(S.mode==='prep'&&SAVE.seen.ch0)talk('v_prep');
 }
 // the first hunt teaches as it goes
@@ -2299,18 +2362,18 @@ function drawCamp(){
       B.push({id:'gear:skills',x:58,y:py+3,w:64,h:ph-6,fn:()=>{S.gpick='skills';S.scr.gpick=0;sfx('charge',1);}});
       // the eight slots, two to a row
       const short=id=>{const G=GEAR[id];return G.slot==='charm'?PERKS[Object.keys(G.sk)[0]].name:G.tier==='iron'?(isArmor(G.slot)?'LEATHER':G.slot[0]==='p'?'PIP':'IRON'):MONSTERS[G.tier].short;};
+      const SL=SLOTS.filter(([sl])=>sl[0]!=='p'||SAVE.pal),rows=Math.ceil(SL.length/2);         // Pip's slots appear once Pip joins
       let y=py+ph+3;const cw=(W-8)>>1,rh=Math.max(20,Math.min(26,((CB-y-2)/4)|0));
-      SLOTS.forEach(([sl,lab],i)=>{const x=3+(i%2)*(cw+2),yy=y+(i>>1)*(rh+1),id=SAVE.eq[sl],dim=sl[0]==='p'&&!SAVE.pal;
+      SL.forEach(([sl,lab],i)=>{const x=3+(i%2)*(cw+2),yy=y+(i>>1)*(rh+1),id=SAVE.eq[sl],dim=false;
         g.fillStyle='#1c2134';g.fillRect(x,yy,cw,rh);text(lab,x+3,yy+2,'#8a93b0');text('>',x+cw-5,yy+2,'#5a6080');
         if(id){g.drawImage(gearSpr(id),x+2,yy+rh-12);text(short(id)+(lvOf(id)?'+'+lvOf(id):''),x+15,yy+rh-9,dim?'#5a6080':'#e8f0fc');}else text('NONE',x+15,yy+rh-9,'#5a6080');
         B.push({id:'slot:'+sl,x,y:yy,w:cw,h:rh,fn:()=>{S.gpick=sl;S.gwt=null;S.scr.gpick=0;sfx('charge',1);}});});
-      y+=4*(rh+1);
-      if(!SAVE.pal&&y+8<CB)text('PIP JOINS LATER IN THE STORY',W/2,y+1,'#5a6080',{al:1});
+      y+=rows*(rh+1);
     }
   }else if(S.tab==='forge'){
     
     // category tabs, then the sub-filter, then the list (it scrolls)
-    const cats=Object.keys(FCATS),cw=Math.floor((W-6)/cats.length);
+    const cats=Object.keys(FCATS).filter(k=>k!=='pip'||SAVE.pal),cw=Math.floor((W-6)/cats.length);
     cats.forEach((k,i)=>{const x=3+i*cw,act=S.fcat===k;g.fillStyle='#000';g.fillRect(x,13,cw-1,12);g.fillStyle=act?'#2b3358':'#1c2134';g.fillRect(x+1,14,cw-3,10);if(act){g.fillStyle='#ffe14d';g.fillRect(x+1,14,cw-3,1);}
       text(FCATS[k].label,x+cw/2,17,act?'#fff':'#8a93b0',{al:1});B.push({id:'fcat:'+k,x,y:12,w:cw,h:14,fn:()=>{S.fcat=k;S.fsub=0;sfx('charge',1);}});});
     const subs=FCATS[S.fcat].subs,sw=Math.floor((W-6)/subs.length);
@@ -2464,10 +2527,10 @@ let last=performance.now();
 function frame(now){
   const dt=clamp((now-last)/1000,0,.05);last=now;                               // the first frame can arrive stamped before the page started
   requestAnimationFrame(frame);                                                  // schedule first, so one bad frame cannot stop the game
-  try{if(!MH.manual)update(dt);draw();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
+  try{if(!MH.manual)update(dt);draw();if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

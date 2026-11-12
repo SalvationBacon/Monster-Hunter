@@ -353,7 +353,7 @@ const shots=process.argv[2];
   await ev(()=>MH.scrollSet(1e6));await p.waitForTimeout(80);await shot('c-hunt-end');ok(await ev(()=>MH.S.btns.some(b=>b.id==='hunt:star')),'the elder is at the end of the list');
   await tapBtn('exp:toggle');ok(await ev(()=>!MH.S.exp),'expeditions are locked before the first Fernwing');
   // ── the GEAR tab and the forge ──
-  await tapBtn('tab:gear');ok(await ev(()=>MH.S.tab==='gear'&&['weapon','charm','helm','armor','arms','legs','pweapon','parmor'].every(k=>MH.S.btns.some(b=>b.id==='slot:'+k))),'the GEAR tab shows the hunter and eight gear slots');await shot('c-gear');
+  await tapBtn('tab:gear');ok(await ev(()=>MH.S.tab==='gear'&&['weapon','charm','helm','armor','arms','legs'].every(k=>MH.S.btns.some(b=>b.id==='slot:'+k))&&!MH.S.btns.some(b=>/^slot:p/.test(b.id))),'the GEAR tab shows the hunter and six gear slots: Pip\'s are hidden until Pip joins');await shot('c-gear');
   await tapBtn('slot:weapon');ok(await ev(()=>MH.S.gpick==='weapon'&&!MH.S.gwt&&['gs','db','hm','ln'].every(k=>MH.S.btns.some(b=>b.id==='wtype:'+k))&&!MH.S.btns.some(b=>b.id.startsWith('wear:'))),'the weapon slot asks for a weapon type first');await shot('c-gear-wtype');
   await tapBtn('wtype:ln');ok(await ev(()=>MH.S.gwt==='ln'&&MH.S.btns.some(b=>b.id==='wear:iron_ln')&&!MH.S.btns.some(b=>b.id==='wear:iron_gs')&&!MH.S.btns.some(b=>b.id==='wear:fern_ln')),'then lists only owned weapons of that type');await shot('c-gear-pick');
   await tapBtn('gear:back');ok(await ev(()=>MH.S.gpick==='weapon'&&!MH.S.gwt),'BACK from the list returns to the weapon types');await tapBtn('wtype:ln');
@@ -362,12 +362,13 @@ const shots=process.argv[2];
   await ev(()=>{MH.SAVE.own.fern_he=true;});await tapBtn('slot:helm');ok(await ev(()=>MH.S.btns.some(b=>b.id==='wear:fern_he')&&!MH.S.btns.some(b=>b.id==='wear:fern_ar')),'the helm slot lists only helms');
   await tapBtn('wear:fern_he');ok(await ev(()=>MH.SAVE.eq.helm==='fern_he'&&MH.armorRes().nature===.05&&MH.gearStats().hp===Math.round(80+28)),'wearing a Fernwing helm adds its health and a little nature resistance');await shot('c-gear-helm');
   await tapBtn('slot:helm');await tapBtn('wear:leather_helm');await ev(()=>{delete MH.SAVE.own.fern_he;});
-  await tapBtn('tab:forge');ok(await ev(()=>MH.S.tab==='forge'&&['fcat:weapon','fcat:armor','fcat:pip'].every(k=>MH.S.btns.some(b=>b.id===k))&&MH.S.fcat==='weapon'),'the forge has three categories: weapons, armor and Pip');
+  await tapBtn('tab:forge');ok(await ev(()=>MH.S.tab==='forge'&&['fcat:weapon','fcat:armor'].every(k=>MH.S.btns.some(b=>b.id===k))&&!MH.S.btns.some(b=>b.id==='fcat:pip')&&MH.S.fcat==='weapon'),'the forge has weapons and armor, and no Pip tab before Pip joins');
   ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids[0]==='iron_gs'&&ids.includes('fern_gs')&&ids.every(k=>MH.GEAR[k].wt==='gs')&&!ids.includes('bog_gs');}),'weapons open on greatswords: the starter, then one per monster you can hunt');await shot('c-forge-weapons');
   await tapBtn('fsub:1');ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('forge:')).every(b=>MH.GEAR[b.id.slice(6)].wt==='db')),'the sub-filter switches weapon type');
   await tapBtn('fcat:armor');const subs=[];for(let i=0;i<5;i++){await tapBtn('fsub:'+i);subs.push(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>MH.GEAR[b.id.slice(6)].slot);return ids.length&&ids.every(s=>s===ids[0])?ids[0]:'mixed';}));if(i===1)await shot('c-forge-helms');}
   ok(subs.join(',')==='armor,helm,arms,legs,charm'||subs.join(','),'armor has chest, helm, arms, legs and charm filters');await shot('c-forge-charms');
-  await tapBtn('fcat:pip');ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids[0]==='pip_fang'&&ids.every(k=>MH.GEAR[k].slot==='pweapon');}),'Pip has its own category, fangs first');await shot('c-forge-pip');
+  await ev(()=>{MH.SAVE.pal=true;});await p.waitForTimeout(100);ok(await ev(()=>MH.S.btns.some(b=>b.id==='fcat:pip')),'once Pip joins, the forge gets a Pip tab');
+  await tapBtn('fcat:pip');ok(await ev(()=>{const ids=MH.S.btns.filter(b=>b.id.startsWith('forge:')).map(b=>b.id.slice(6));return ids[0]==='pip_fang'&&ids.every(k=>MH.GEAR[k].slot==='pweapon');}),'Pip has its own category, fangs first');await shot('c-forge-pip');await ev(()=>{MH.SAVE.pal=false;});
   await tapBtn('fcat:weapon');await tapBtn('fsub:0');
   await tapBtn('craft:fern_gs');ok(await ev(()=>!MH.SAVE.own.fern_gs&&MH.SAVE.eq.weapon==='iron_gs'),'gear cannot be crafted without materials');
   await ev(()=>{Object.assign(MH.SAVE.bag,{scale:9,claw:4,horn:2,wing:1,spike:1});});await p.waitForTimeout(80);
@@ -469,7 +470,7 @@ const shots=process.argv[2];
   await ev(()=>{MH.SAVE.wins={};for(const id of MH.HUNTS)MH.SAVE.wins[id]=1;MH.toCamp('forge');MH.S.fcat='weapon';MH.S.fsub=0;});await p.waitForTimeout(150);await shot('s-forge');
   ok(await ev(()=>{const top=MH.S.btns.filter(b=>/^(forge|craft|up):/.test(b.id)).every(b=>b.y>=38&&b.y+b.h<=MH.LH-20);MH.scrollSet(1e6);return top&&MH.S.scrMax.forgeweapon0>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='forge:star_gs')))))),'the forge list scrolls on the shortest screen, down to the elder\'s gear');await shot('s-forge-end');
   await ev(()=>{MH.SAVE.pal=true;MH.toCamp('gear');});await p.waitForTimeout(150);await shot('s-gear');
-  ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===8&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
+  ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===(MH.SAVE.pal?8:6)&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
   await ev(()=>{MH.toCamp('hunt');MH.S.exp=true;MH.SAVE.wins={fern:1,quill:1,mud:1,dust:1,tusk:1,bog:1,ember:1,thorn:1};});await p.waitForTimeout(150);await shot('s-expeditions');
   ok(await ev(()=>{const g=MH.S.btns.filter(b=>/^(gather|pack):/.test(b.id));const fit=g.every(b=>b.y>=12&&b.y+b.h<=MH.LH-19);MH.scrollSet(1e6);return fit&&MH.S.scrMax.exp>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='gather:shell')&&!MH.S.btns.some(b=>b.id==='gather:storm')))))),'the expedition list scrolls on the shortest screen, and only open biomes can be started');await shot('s-expeditions-end');
   for(const tab of ['hunt','cook','quest','bugs']){await ev(t=>{MH.SAVE.story={i:0,p:0};MH.toCamp(t);},tab);await p.waitForTimeout(120);await shot('s-'+tab);}
@@ -517,7 +518,18 @@ const shots=process.argv[2];
   const tapTalk=async n=>{for(let i=0;i<n;i++){await p.touchscreen.tap(195,300);await p.waitForTimeout(40);}};
   await tapTalk(1);ok(await ev(()=>MH.S.talk&&MH.S.talk.i===0&&MH.S.talk.ch>=MH.SCENES.ch0[0][1].length),'a tap finishes the line before moving on');
   await tapTalk(1);ok(await ev(()=>MH.S.talk.i===1),'and the next tap shows the next line');
-  await tapTalk(20);ok(await ev(()=>MH.SAVE.seen.ch0&&MH.SAVE.seen.v_quest&&!MH.S.talk),'the welcome plays once, then the quest board explains itself');
+  await tapTalk(14);ok(await ev(()=>MH.SAVE.seen.ch0&&!MH.S.talk&&MH.S.guide&&MH.S.guide.key==='g_hunt'),'after the welcome, a guide takes over');
+  await p.waitForTimeout(150);ok(await ev(()=>MH.gTarget()&&MH.gTarget().id==='camp:menu'&&!MH.SAVE.seen.v_quest),'it spotlights the menu button first, and the quest board waits its turn');await shot('st-guide-menu');
+  await p.touchscreen.tap(195,500);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.menu&&MH.S.guide.i===0),'a tap anywhere else does nothing');
+  await tapBtn0('camp:menu');await p.waitForTimeout(120);ok(await ev(()=>MH.S.menu&&MH.gTarget()&&MH.gTarget().id==='tab:hunt'),'tapping it moves on to the HUNT tile');await shot('st-guide-tile');
+  await tapBtn0('tab:hunt');await p.waitForTimeout(120);ok(await ev(()=>MH.S.tab==='hunt'&&MH.gTarget()&&MH.gTarget().id==='hunt:fern'),'then the Fernwing card');
+  await tapBtn0('hunt:fern');await p.waitForTimeout(500);await tapTalk(6);await p.waitForTimeout(120);ok(await ev(()=>MH.S.mode==='prep'&&MH.SAVE.seen.v_prep&&MH.gTarget()&&MH.gTarget().id==='prep:start'),'then, after a word on the prep screen, START HUNT');await shot('st-guide-start');
+  await tapBtn0('prep:back');ok(await ev(()=>MH.S.mode==='prep'),'BACK is blocked while the guide points at START');
+  {const sk=await ev(()=>{const G=MH.S.guide.skip,r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(G.x+G.w/2)/128*r.width,y:r.top+(G.y+G.h/2)/MH.LH*r.height};});await p.touchscreen.tap(sk.x,sk.y);await p.waitForTimeout(100);}
+  ok(await ev(()=>!MH.S.guide),'SKIP ends a guide');
+  await tapBtn0('prep:back');await p.waitForTimeout(400);await tapTalk(6);ok(await ev(()=>MH.S.mode==='camp'),'and the screen is free again');
+  ok(await ev(()=>{const g=MH.GUIDES;return ['g_hunt','g_claim','g_book','g_gather','g_forge','g_meal','g_pip'].every(k=>g[k]&&g[k].length);}),'guides cover the first hunt, claiming, the bestiary, gathering, the forge, meals and Pip');
+  await ev(()=>{MH.toCamp('quest');});await p.waitForTimeout(500);await tapTalk(8);ok(await ev(()=>MH.SAVE.seen.v_quest===1),'the quest board introduces itself on the first visit');
   await ev(()=>{MH.toCamp('quest');});await p.waitForTimeout(500);ok(await ev(()=>!MH.S.talk),'seen scenes do not play again');
   await tapBtn0('story:replay');ok(await ev(()=>MH.S.talk&&MH.S.talk.lines===MH.SCENES.ch0),'REPLAY plays the chapter scene again');
   {const pos=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect(),T=MH.S.talk;return{x:r.left+(128-18)/128*r.width,y:r.top+(T.by-5)/MH.LH*r.height};});await p.touchscreen.tap(pos.x,pos.y);await p.waitForTimeout(80);}

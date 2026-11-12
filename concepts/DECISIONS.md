@@ -309,3 +309,29 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 - The prep screen has a **GEAR** button (bottom row, between BACK and START). The gear box is tappable too.
 - Either opens the GEAR screen with a green "< [MONSTER] HUNT" button in the top bar that returns to the same prep screen with the meal choice kept. Leaving for another screen drops that button.
 - When the worn weapon isn't a good match, the gear box hints the monster's weakness ("TRY WATER").
+
+## v0.27.0: guided tutorials, Pip hidden until it joins
+- **Guides spotlight the exact button.** The screen dims except for the target, which gets a pulsing outline, a bouncing arrow and a caption. Other taps are blocked until you tap the target; a few steps allow free taps, like choosing a meal. Every guide has SKIP. Each guide plays once (`SAVE.seen`) and follows its story beat:
+  - **g_hunt** (after the welcome): menu → HUNT → Fernwing card → START HUNT
+  - **g_claim** (first job done): menu → QUEST → CLAIM
+  - **g_book**: menu → BESTIARY → the Fernwing's page
+  - **g_gather** (chapter 2): menu → HUNT → EXPEDITIONS → GATHER in the forest
+  - **g_forge** (chapter 3): menu → FORGE → tap a material → close → craft or upgrade something affordable. If nothing is affordable, the caption says to hunt for more materials.
+  - **g_meal** (chapter 5): menu → HUNT → a monster → the meal arrows → START
+  - **g_pip** (chapter 7, after Pip joins): menu → HUNT → a monster → change Pip's job → START
+- While a guide runs, a screen's first-visit intro waits until the guide brings you to that screen. The prep screen's intro still plays on arrival.
+- **In fights**, each tutorial line leaves a gesture hint for a few seconds:
+  - a TAP ring on the head
+  - SWIPE arrows beside the hunter
+  - an arrow at the weak-point circle
+  - a highlighted COUNTER button
+  - SWIPE UP at the potion
+  - SWIPE DOWN at the whetstone
+- **First gather run:** Moss explains the gather run (tap herbs before they vanish; one bug per run).
+- **Pip hidden until it joins:**
+  - The GEAR screen shows six slots (Pip's fang and vest appear later).
+  - The forge has no PIP tab until then.
+  - The chapter reward shows "???" in place of Pip.
+  - The Beastfriend skill reads "FOR A FRIEND, LATER".
+  - Bram's forge intro and the material cards don't mention Pip.
+  - Bram announces the new PIP tab in Pip's chapter.
