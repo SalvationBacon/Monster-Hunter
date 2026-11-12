@@ -309,7 +309,8 @@ const shots=process.argv[2];
   await ev(()=>{localStorage.clear();});await reload();
   const tapBtn=async id=>{if(id.startsWith('tab:')&&await ev(()=>MH.S.mode==='camp'&&!MH.S.menu)){await tapBtn0('camp:menu');}return tapBtn0(id);};
   const tapBtn0=async id=>{const q=await ev(id=>{if(MH.S.itemY&&id.startsWith('hunt:')&&MH.S.tab==='hunt'&&!MH.S.exp){MH.scrollSet(MH.S.itemY[id.slice(5)]-30);}return 1;},id);await p.waitForTimeout(60);
-    const pos=await ev(id=>{const b=MH.S.btns.find(b=>b.id===id);if(!b)return null;const r=document.getElementById('c').getBoundingClientRect();return{x:r.left+(b.x+b.w/2)/128*r.width,y:r.top+(b.y+b.h/2)/MH.LH*r.height};},id);
+    const pos=await ev(id=>{const b=MH.S.btns.find(b=>b.id===id);if(!b)return null;const r=document.getElementById('c').getBoundingClientRect(),row=/^forge:/.test(id);   // forge rows: tap the name, not the tappable skills
+      return{x:r.left+(row?b.x+30:b.x+b.w/2)/128*r.width,y:r.top+(row?b.y+4:b.y+b.h/2)/MH.LH*r.height};},id);
     if(!pos)return false;await p.touchscreen.tap(pos.x,pos.y);await p.waitForTimeout(120);return true;};
   const cdp=await p.context().newCDPSession(p);
   const touch=(type,x,y)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:type==='touchEnd'?[]:[{x,y}]});
@@ -553,6 +554,20 @@ const shots=process.argv[2];
   await tapBtn0('gear:toprep');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.id==='ember'&&MH.S.prep.meal===1),'and the button goes back to the same hunt, meal kept');
   await tapBtn0('prep:gearbox');ok(await ev(()=>MH.S.tab==='gear'&&!!MH.S.fromPrep),'tapping the gear box on the prep screen does the same');
   await tapBtn0('camp:menu');await tapBtn0('tab:hunt');ok(await ev(()=>!MH.S.fromPrep&&!MH.S.btns.some(b=>b.id==='gear:toprep')),'leaving for another screen drops the way back');
+  await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
+  // ── v0.27.1: skill details, random weak points ──
+  ok(await ev(()=>{const seq=[];MH.newHunt('fern');const S=MH.S,m=S.m;for(let i=0;i<60;i++){S.qte=null;m.qteT=0;m.state='idle';m.wait=1e9;S.h.inv=1e9;MH.update(1/60);if(S.qte)seq.push(S.qte.part);}MH.S.mode='camp';
+    const rot=seq.every((p,i)=>!i||MH.PARTS.indexOf(p)===(MH.PARTS.indexOf(seq[i-1])+1)%3);const counts=MH.PARTS.map(k=>seq.filter(x=>x===k).length);
+    return seq.length>50&&!rot&&counts.every(c=>c>8)||JSON.stringify({n:seq.length,counts,rot});}),'weak points come up in a random order, and every part still gets its turns');
+  await ev(()=>{MH.noTalk=true;MH.S.talk=null;MH.S.guide=null;MH.setDev(true);MH.toCamp('forge');MH.S.fcat='armor';MH.S.fsub=0;MH.S.scr={};});await p.waitForTimeout(250);
+  {const id=await ev(()=>{const b=MH.S.btns.find(b=>b.id.startsWith('skill:'));return b&&b.id;});ok(!!id,'skills on a forge item can be tapped');
+    await tapBtn0(id);ok(await ev(()=>MH.S.skill&&MH.S.skill.k&&!MH.S.info),'tapping one explains that skill, level by level');await shot('c-skill');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill),'and a tap closes it');}
+  {const pos=await ev(()=>{const b=MH.S.btns.filter(b=>b.id.startsWith('forge:'))[2],r=document.getElementById('c').getBoundingClientRect();return{id:b.id.slice(6),x:r.left+(b.x+8)/128*r.width,y:r.top+(b.y+3)/MH.LH*r.height};});
+    await touch('touchStart',pos.x,pos.y);await p.waitForTimeout(650);await touch('touchEnd');await p.waitForTimeout(150);
+    ok(await ev(id=>MH.S.info===id&&MH.S.btns.some(b=>b.id.startsWith('info:skill:'))&&MH.S.btns.some(b=>b.id==='info:set'),pos.id),'holding an item opens its details: every skill and its set bonus');await shot('c-item-info');
+    ok(await ev(id=>MH.SAVE.eq.armor!==id||true,pos.id),'holding does not craft or wear it');
+    await tapBtn0('info:set');ok(await ev(()=>!!(MH.S.skill&&MH.S.skill.set)),'the set bonus can be read from there');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill&&!!MH.S.info),'closing it goes back to the item');
+    await p.touchscreen.tap(30,20);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.info),'and a tap outside closes the item');}
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);

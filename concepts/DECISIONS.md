@@ -335,3 +335,10 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
   - The Beastfriend skill reads "FOR A FRIEND, LATER".
   - Bram's forge intro and the material cards don't mention Pip.
   - Bram announces the new PIP tab in Pip's chapter.
+
+## v0.27.1: skill details, random weak points
+- **Weak points are random.** Circles used to go head → wings → tail in turn, so players could learn the order. Now each circle picks a random unbroken part. Landing on the same part twice in a row gets one 50% re-roll, so repeats happen but less often. Over many circles every part still gets its turns (a test checks this).
+- **Tap a skill** (forge rows): the skill's tag (e.g. MIGHT+2) opens a card showing what it does at each level, which level you have now, and levels above the normal max in orange (Ascendant). Tapping "SET: X" on armor explains the set bonus.
+- **Hold an item** (forge and GEAR lists, about half a second): a details card shows the item's type, attack and element or health and resistance, every skill and what it does at that item's level, the set bonus and how to complete it, and either "owned/wearing" or the cost. Skills and the set bonus can be tapped from the card for the full breakdown. Holding never crafts or equips.
+- In the GEAR picker, a tap still just wears the item (the tags there aren't tappable, to avoid misfires). Hold for details.
+- The forge list ends with "HOLD AN ITEM FOR ITS DETAILS". Bram's intro mentions holding and tapping skills.

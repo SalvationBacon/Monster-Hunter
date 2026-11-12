@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.27.0';
+const VER='0.27.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -456,7 +456,7 @@ const SCENES={
   // the first visit to each part of camp
   v_quest:[['wren','THE QUEST BOARD. STORY JOBS COME FROM ME. DAILY AND WEEKLY JOBS COME FROM WHOEVER YELLS LOUDEST.'],['wren','WHEN A JOB IS DONE, CLAIM ITS REWARD HERE.']],
   v_gear:[['wren','YOUR KIT. SWAP WEAPONS AND ARMOR HERE. TAP YOUR STATS TO SEE YOUR SKILLS.'],['wren','WEAR ALL FOUR ARMOR PIECES FROM ONE MONSTER FOR A SET BONUS.']],
-  v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.']],
+  v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.'],['bram','HOLD ANY ITEM TO SEE ALL ITS SKILLS. TAP A SKILL TO READ WHAT IT DOES.']],
   v_cook:[['moss','MY KITCHEN! I BREW POTIONS HERE. YOU CAN TAKE A FEW ON EACH HUNT.'],['moss','MEALS ARE CHOSEN ON THE PREP SCREEN, RIGHT BEFORE YOU HEAD OUT.']],
   v_book:[['oda','MY BESTIARY! EVERY BEAST YOU MEET GETS A PAGE.'],['oda','HUNT ONE 1, 3, 5 AND 10 TIMES AND I\'LL LEARN ITS HABITS, ITS ATTACKS, AND WHAT IT DROPS.']],
   v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON GATHER RUNS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
@@ -1408,7 +1408,7 @@ function qteUpdate(dt){
   const ok=(m.state==='idle'||m.state==='attack'||m.state==='recover'||m.state==='stagger'||m.state==='shell')&&!mAir()&&h.state!=='dead'&&h.state!=='win';
   if(!ok||(m.qteT-=dt)>0)return;
   const left=PARTS.filter(k=>!m.parts[k].broken); if(!left.length)return;
-  let part=left[0];const i0=PARTS.indexOf(m.qteLast);for(let i=1;i<=PARTS.length;i++){const k=PARTS[(i0+i)%PARTS.length];if(!m.parts[k].broken){part=k;break;}}   // take turns, so every part gets its share
+  const pick=()=>left[(Math.random()*left.length)|0];let part=pick();if(part===m.qteLast&&left.length>1&&Math.random()<.5)part=pick();   // random, so it can't be read ahead; repeats are rarer
   m.qteLast=part;S.qte={part,t:0};sfx('charge',1);
 }
 // A tap at (x,y): does it land on the open weak point?
@@ -1558,12 +1558,12 @@ function move(x,y){
 }
 function release(){if(!IN.down)return;IN.down=false;if(S.mode==='hunt')hRelease();}
 cv.addEventListener('pointerdown',e=>{e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}const p=toLogical(e);
-  if(S.mode==='camp'||S.mode==='prep'){IN.ui={x:p.x,y:p.y,s:scrollGet(),moved:false};IN.id=e.pointerId;return;}                // lists scroll, so a tap fires on release
+  if(S.mode==='camp'||S.mode==='prep'){IN.ui={x:p.x,y:p.y,s:scrollGet(),moved:false,t0:performance.now()};IN.id=e.pointerId;return;}                // lists scroll, so a tap fires on release
   if(press(p.x,p.y))IN.id=e.pointerId;});   // a weak-point tap with a second finger leaves a held charge alone
 cv.addEventListener('pointermove',e=>{if(e.pointerId!==IN.id)return;const p=toLogical(e);
   if(IN.ui){const dy=p.y-IN.ui.y;if(Math.abs(dy)>4)IN.ui.moved=true;if(IN.ui.moved)scrollSet(IN.ui.s-dy);return;}
   move(p.x,p.y);});
-cv.addEventListener('pointerup',e=>{if(e.pointerId!==IN.id)return;if(IN.ui){const u=IN.ui;IN.ui=null;if(!u.moved)press(u.x,u.y);return;}release();});
+cv.addEventListener('pointerup',e=>{if(e.pointerId!==IN.id)return;if(IN.ui){const u=IN.ui;IN.ui=null;if(!u.moved&&!u.held)press(u.x,u.y);return;}release();});
 cv.addEventListener('wheel',e=>{if(S.mode==='camp')scrollSet(scrollGet()+e.deltaY/3);},{passive:true});
 cv.addEventListener('pointercancel',e=>{if(e.pointerId===IN.id){IN.ui=null;release();}});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1578,7 +1578,7 @@ addEventListener('keydown',e=>{
     if(S.qte){const pp=partPos(S.qte.part,mPose());if(qteTap(pp.x,pp.y))return;}   // keyboard: the attack key also hits an open weak point
     IN.down=true;IN.downAt=S.clock;IN.swiped=false;IN.part=k==='k'?'tail':'head';actTap(IN.part);}
   else if(S.mode==='hunt'&&(k==='escape'||k==='p')){pauseHunt(!S.paused);}
-  else if(S.mode==='camp'&&(k==='escape'||k==='m')){if(S.mat)S.mat=null;else if(S.opts){S.opts=false;S.menu=true;}else S.menu=!S.menu;}
+  else if(S.mode==='camp'&&(k==='escape'||k==='m')){if(S.skill)S.skill=null;else if(S.info)S.info=null;else if(S.mat)S.mat=null;else if(S.opts){S.opts=false;S.menu=true;}else S.menu=!S.menu;}
   else if(S.mode==='hunt'&&!S.paused){
     if(k==='a'||k==='arrowleft')actDodge(-1);else if(k==='d'||k==='arrowright')actDodge(1);
     else if(k==='w'||k==='q'||k==='arrowup')actPotion();
@@ -1617,10 +1617,10 @@ function rollLoot(){
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
-const scrollKey=()=>S.mode!=='camp'||S.menu||S.opts||S.mat?null:S.tab==='book'?(S.bpick?'bdet':'book'):S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?'forge'+S.fcat+S.fsub:S.tab==='gear'&&S.gpick?'gpick':null;
+const scrollKey=()=>S.mode!=='camp'||S.menu||S.opts||S.mat||S.info||S.skill?null:S.tab==='book'?(S.bpick?'bdet':'book'):S.tab==='hunt'?(S.exp?'exp':'hunt'):S.tab==='forge'?'forge'+S.fcat+S.fsub:S.tab==='gear'&&S.gpick?'gpick':null;
 const scrollGet=()=>{const k=scrollKey();return k?S.scr[k]||0:0;};
 function scrollSet(v){const k=scrollKey();if(k)S.scr[k]=clamp(v,0,S.scrMax[k]||0);}
-function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fcat=S.fcat||'weapon';S.fsub=S.fsub||0;S.gpick=null;S.mode='camp';S.menu=false;S.opts=false;S.mat=null;S.fromPrep=null;S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
+function toCamp(tab){S.scr=S.scr||{};S.scrMax=S.scrMax||{};S.itemY=S.itemY||{};S.fcat=S.fcat||'weapon';S.fsub=S.fsub||0;S.gpick=null;S.mode='camp';S.menu=false;S.opts=false;S.mat=null;S.info=null;S.skill=null;S.fromPrep=null;S.t=0;S.tab=tab||S.tab||'hunt';S.fpage=S.fpage||0;S.exp=false;S.btns=[];S.toast=null;}
 function toast(txt,col){S.toast={txt,col:col||'#fff',t:0};}
 // The forge crafts; the GEAR tab is where gear is worn. A freshly crafted piece is worn straight away.
 function forgeTap(id){
@@ -1727,7 +1727,7 @@ function gatherEnd(){
 function update(dt){
   S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
   if(S.talk){talkUpdate(dt);return;}                                             // a scene pauses everything
-  guideTick();
+  guideTick();holdCheck();
   if(S.mode==='camp'||S.mode==='prep')storyTick();
   if(S.mode==='gather'){if(S.t>.4&&talk('v_gather'))return;gatherUpdate(dt);return;}
   if(S.hint&&(S.hint.t+=dt)>3.5)S.hint=null;
@@ -2006,16 +2006,16 @@ function drawFail(){
   if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,y+43,'#fff',{al:1});
 }
 // One piece of gear's line of numbers: attack and element, health and resistance, a perk, or Pip's stats
-function gearLine(id,x,y,alt){
-  const G=GEAR[id],lv=lvOf(id),tag=(t,c)=>{text(t,x,y,c);x+=textW(t)+4;};
+function gearLine(id,x,y,alt,B,top,bot){
+  const G=GEAR[id],lv=lvOf(id),tap=(bid,w,fn)=>{if(B&&y-2>=(top||0)&&y+7<=(bot||LH))B.push({id:bid,x:x-1,y:y-2,w:w+2,h:9,fn});},tag=(t,c)=>{text(t,x,y,c);x+=textW(t)+4;};
   const wk=G.elem?ELEM[G.elem]:G.status?[STATUS[G.status].name,STATUS[G.status].col]:null;
   if(G.slot==='pweapon'){tag('PIP ATK *'+G.patk.toFixed(2),'#7fe0c0');if(wk)tag(wk[0],wk[1]);}
   else if(G.slot==='parmor')tag('PIP CARE *'+G.care.toFixed(2),'#7fe0c0');
   else if(G.slot==='weapon'){tag('ATK *'+gearAtk(id).toFixed(2),'#4cd964');if(wk)tag(wk[0],wk[1]);}
   else if(isArmor(G.slot)){tag('HP '+gearHp(id),'#4cd964');const D=MONSTERS[G.tier],el=D&&D.elem,ph=Math.floor(S.t/2.5)%3;
-    if(D&&ph===1){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(D&&ph===2)tag('SET: '+SETB[D.setb].name,'#ff9a4d');else skillTags(G);}   // takes turns: skills, resistance, set bonus
+    if(D&&ph===1){tag('RESISTS','#4cd964');tag(ELEM[el][0],ELEM[el][1]);}else if(D&&ph===2){tap('setb:'+id,textW('SET: '+SETB[D.setb].name),()=>{S.skill={set:D.setb,tier:G.tier};sfx('charge',1);});tag('SET: '+SETB[D.setb].name,'#ff9a4d');}else skillTags(G);}   // takes turns: skills, resistance, set bonus
   else skillTags(G);
-  function skillTags(G){for(const [k,n] of Object.entries(G.sk||{})){text(PERKS[k].tag+'+'+n,x,y,'#ffe14d');x+=textW(PERKS[k].tag+'+'+n)+3;}}
+  function skillTags(G){for(const [k,n] of Object.entries(G.sk||{})){const t=PERKS[k].tag+'+'+n;tap('skill:'+k+':'+id,textW(t),()=>{S.skill={k};sfx('charge',1);});text(t,x,y,'#ffe14d');x+=textW(t)+3;}}
 }
 // One line of cost icons with have/need, from x. Returns where it ended.
 function costRow(cost,x,y,gap,B,top,bot){for(const [k,n] of Object.entries(cost)){const have=Math.min(99,k==='potion'?SAVE.potions:SAVE.bag[k]||0),t=have+'/'+n;g.drawImage(lootSpr(k),0,0,12,12,x,y-2,9,9);text(t,x+10,y,have>=n?'#4cd964':'#ff6a4d');
@@ -2096,6 +2096,44 @@ function drawMat(){
   text('TAP TO CLOSE',W/2,py+ph-8,'#5a6080',{al:1});
   B.push({id:'mat:close',x:0,y:0,w:W,h:LH,fn:()=>{S.mat=null;sfx('charge',1);}});}
 
+
+// ── Item details (hold an item) and skill details (tap a skill) ──
+const SLOT_LABEL={weapon:'WEAPON',armor:'CHEST',helm:'HELM',arms:'GAUNTLETS',legs:'BOOTS',charm:'CHARM',pweapon:'PIP FANG',parmor:'PIP VEST'};
+function drawInfo(){
+  const id=S.info,G=GEAR[id],B=S.btns=[],D=MONSTERS[G.tier],R=[],row=(h,fn)=>R.push({h,fn});
+  const wk=G.elem?ELEM[G.elem]:G.status?[STATUS[G.status].name,STATUS[G.status].col]:null;
+  row(16,y=>{g.drawImage(gearSpr(id),10,y);text(G.name+(lvOf(id)?'+'+lvOf(id):''),26,y+1,'#ffe14d');text(G.slot==='weapon'?WTYPES[G.wt].name:SLOT_LABEL[G.slot],26,y+8,'#8a93b0');});
+  if(G.slot==='weapon')row(9,y=>{text('ATTACK *'+gearAtk(id).toFixed(2),10,y,'#4cd964');text(wk?wk[0]:'NO ELEMENT',W-10,y,wk?wk[1]:'#5a6080',{al:2});});
+  else if(isArmor(G.slot))row(9,y=>{text('HEALTH '+gearHp(id),10,y,'#4cd964');if(D)text('RESISTS '+ELEM[D.elem][0],W-10,y,ELEM[D.elem][1],{al:2});});
+  else if(G.slot==='pweapon')row(9,y=>{text('PIP ATTACK *'+G.patk.toFixed(2),10,y,'#7fe0c0');if(wk)text(wk[0],W-10,y,wk[1],{al:2});});
+  else if(G.slot==='parmor')row(9,y=>text('PIP CARE *'+G.care.toFixed(2),10,y,'#7fe0c0'));
+  const sk=Object.entries(G.sk||{});
+  if(sk.length){row(10,y=>{text('SKILLS',10,y+1,'#8a93b0');g.fillStyle='#3a4060';g.fillRect(36,y+3,W-46,1);});
+    for(const [k,n] of sk)row(17,y=>{const K=PERKS[k];g.fillStyle='#232a4a';g.fillRect(8,y,W-16,16);text(K.name+' +'+n,11,y+2,'#ffe14d');text('MAX '+skillMax(k)+' >',W-11,y+2,'#5a6080',{al:2});text(K.d(Math.min(n,K.max)),11,y+9,'#4cd964');
+      B.push({id:'info:skill:'+k,x:8,y,w:W-16,h:16,fn:()=>{S.skill={k};sfx('charge',1);}});});}
+  else if(G.slot==='weapon')row(9,y=>text('WEAPONS CARRY NO SKILLS',10,y,'#5a6080'));
+  if(isArmor(G.slot)&&D&&G.tier!=='iron')row(26,y=>{g.fillStyle='#3a3010';g.fillRect(8,y,W-16,25);text('SET: '+SETB[D.setb].name,11,y+2,'#ff9a4d');text(SETB[D.setb].d,11,y+9,'#4cd964');text('WEAR ALL 4 '+D.short+' PIECES',11,y+16,'#8a93b0');
+      B.push({id:'info:set',x:8,y,w:W-16,h:25,fn:()=>{S.skill={set:D.setb,tier:G.tier};sfx('charge',1);}});});
+  row(10,y=>{if(SAVE.own[id])text(SAVE.eq[G.slot]===id?'YOU ARE WEARING THIS':'YOU OWN THIS',10,y+2,'#8a93b0');else if(G.cost)costRow(G.cost,10,y+2,4,B);});
+  const ph=R.reduce((a,r)=>a+r.h,0)+16,py=Math.max(4,((LH-ph)/2)|0);g.fillStyle='rgba(10,12,22,.75)';g.fillRect(0,0,W,LH);panel(5,py,W-10,ph);
+  let y=py+5;for(const r of R){r.fn(y);y+=r.h;}text('TAP TO CLOSE',W/2,py+ph-8,'#5a6080',{al:1});
+  B.push({id:'info:close',x:0,y:0,w:W,h:LH,fn:()=>{S.info=null;sfx('charge',1);}});
+}
+function drawSkill(){
+  const Q=S.skill,B=S.btns=[];g.fillStyle='rgba(10,12,22,.8)';g.fillRect(0,0,W,LH);
+  if(Q.set){const Sb=SETB[Q.set],D=MONSTERS[Q.tier],have=gearStats().setb===Q.set,ph=50,py=((LH-ph)/2)|0;panel(6,py,W-12,ph);
+    text('SET BONUS',W/2,py+5,'#8a93b0',{al:1});text(Sb.name,W/2,py+13,'#ff9a4d',{al:1});text(Sb.d,W/2,py+22,'#4cd964',{al:1});
+    text(D?'WEAR ALL 4 '+D.short+' PIECES':'WEAR A FULL SET',W/2,py+31,'#c8d0e8',{al:1});text(have?'ACTIVE NOW':'TAP TO CLOSE',W/2,py+41,have?'#ffe14d':'#5a6080',{al:1});}
+  else{const K=PERKS[Q.k],mx=skillMax(Q.k),have=gearStats().perks[Q.k]||0,ph=34+mx*9,py=((LH-ph)/2)|0;panel(6,py,W-12,ph);
+    text(K.name,W/2,py+5,'#ffe14d',{al:1});text(have?'YOU HAVE LEVEL '+have:'YOU DO NOT HAVE IT YET',W/2,py+13,have?'#4cd964':'#8a93b0',{al:1});
+    for(let L=1;L<=mx;L++){const y=py+22+(L-1)*9,on=L===have;if(on){g.fillStyle='#232a4a';g.fillRect(9,y-2,W-18,9);}text('LV'+L,11,y,on?'#ffe14d':'#8a93b0');text(K.d(Math.min(L,K.max)),26,y,on?'#fff':L>K.max?'#ff9a4d':'#c8d0e8');}
+    text('TAP TO CLOSE',W/2,py+ph-8,'#5a6080',{al:1});}
+  B.push({id:'skill:close',x:0,y:0,w:W,h:LH,fn:()=>{S.skill=null;sfx('charge',1);}});
+}
+// hold a gear row in a list for its details
+function holdCheck(){const u=IN.ui;if(!u||u.moved||u.held||S.mode!=='camp'||performance.now()-u.t0<450)return;
+  const b=S.btns.find(b=>u.x>=b.x&&u.x<b.x+b.w&&u.y>=b.y&&u.y<b.y+b.h);const m=b&&/^(forge|craft|up|wear):(.+)$/.exec(b.id);
+  if(m&&GEAR[m[2]]){u.held=true;S.info=m[2];sfx('charge',2);buzz(30);}}
 // ── The bestiary: every monster, learned a little more with each hunt ──
 const MOVE_NAME={bite:'BITE',dbl:'DOUBLE BITE',tri:'TRIPLE BITE',peck:'PECK FLURRY',sweep:'TAIL SWEEP',spin:'SPIN',slam:'SLAM',gore:'GORE',gore2:'DOUBLE GORE',rush:'CHARGE',
   stomp:'STOMP',rock:'ROCK THROW',spit:'SPIT',spit2:'DOUBLE SPIT',volley:'VOLLEY',breath:'BREATH',clap:'THUNDER CLAP',sky:'SKY CALL',hover:'HOVER STRIKES',dive:'DIVE',
@@ -2384,7 +2422,7 @@ function drawCamp(){
       if(y+23<ptop||y>pbot)return;
       g.fillStyle=on?'#232a4a':'#1c2134';g.fillRect(3,y,W-6,23);if(on){g.fillStyle='#ffe14d';g.fillRect(3,y,2,23);}
       g.drawImage(gearSpr(id),5,y+2);text(G.name+(lv?'+'+lv:''),19,y+2,own?'#e8f0fc':can?'#ffe14d':'#8a93b0');
-      gearLine(id,19,y+9,alt);
+      gearLine(id,19,y+9,alt,B,ptop,pbot);
       if(!own)costRow(G.cost,19,y+16,4,B,ptop,pbot);
       else if(uc){costRow(uc,19,y+16,2,B,ptop,pbot);const ok=affords(uc);g.fillStyle='#000';g.fillRect(W-31,y+13,27,9);g.fillStyle=ok?'#b8862a':'#3a4060';g.fillRect(W-30,y+14,25,7);text('UP',W-17.5,y+15,ok?'#fff':'#8a93b0',{al:1});
         if(y+11>=ptop&&y+23<=pbot)B.push({id:'up:'+id,x:W-34,y:y+11,w:31,h:12,fn:()=>upgradeTap(id)});}
@@ -2393,8 +2431,8 @@ function drawCamp(){
       g.fillStyle='#000';g.fillRect(W-31,y,27,9);g.fillStyle=bc;g.fillRect(W-30,y+1,25,7);text(lab,W-17.5,y+2,can||on?'#fff':'#8a93b0',{al:1});
       const by=Math.max(ptop,y),bh=Math.min(pbot,y+23)-by;if(bh>8)B.push({id:'forge:'+id,x:3,y:by,w:W-36,h:bh,fn:()=>forgeTap(id)});
       if(!own&&y>=ptop&&y+9<=pbot)B.push({id:'craft:'+id,x:W-34,y,w:31,h:11,fn:()=>forgeTap(id)});});
-    let ey=ptop+1+L2.ids.length*24-off;if(L2.hidden){text(L2.hidden+' MORE AS YOU RANK UP',W/2,ey+3,'#5a6080',{al:1});ey+=12;}
-    g.restore();const tot=L2.ids.length*24+(L2.hidden?13:2);S.scrMax[sk]=Math.max(0,tot-(pbot-ptop));
+    let ey=ptop+1+L2.ids.length*24-off;if(L2.hidden){text(L2.hidden+' MORE AS YOU RANK UP',W/2,ey+3,'#5a6080',{al:1});ey+=12;}text('HOLD AN ITEM FOR ITS DETAILS',W/2,ey+3,'#5a6080',{al:1});
+    g.restore();const tot=L2.ids.length*24+(L2.hidden?13:2)+11;S.scrMax[sk]=Math.max(0,tot-(pbot-ptop));
     if(S.scrMax[sk]>0){const hh=pbot-ptop,bh=Math.max(10,hh*hh/tot),by=ptop+(hh-bh)*off/S.scrMax[sk];g.fillStyle='#3a4060';g.fillRect(W-2,ptop,2,hh);g.fillStyle='#c8d0e8';g.fillRect(W-2,Math.round(by),2,Math.round(bh));}
   }else if(S.tab==='cook'){
     
@@ -2441,6 +2479,8 @@ function drawCamp(){
   if(S.tab==='book'){if(S.bpick)drawBookPage(B);else drawBookList(B);}
   if(S.fromPrep&&S.tab==='gear'){const D=S.fromPrep.small!=null?{short:'PACK'}:MONSTERS[S.fromPrep.id],lab='< '+(D.short||D.name)+' HUNT';smallBtn(B,'gear:toprep',W-20-textW(lab)-8,1,textW(lab)+8,lab,Math.floor(S.t*3)%2?'#2f8f4a':'#3aa85a',backToPrep);}
   drawBurger(B);
+  if(S.info&&!S.skill)drawInfo();
+  if(S.skill)drawSkill();
   if(S.mat)drawMat();
   if(S.menu)drawMenu();
   if(S.opts){drawOptions();return;}
@@ -2530,7 +2570,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{PARTS,holdCheck,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});
