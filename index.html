@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.27.1';
+const VER='0.28.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -831,6 +831,51 @@ function noise(dur,vol,freq){
   s.buffer=NOISE;f.type='lowpass';f.frequency.value=freq||2000;v.gain.setValueAtTime(vol,t);v.gain.exponentialRampToValueAtTime(.001,t+dur);
   s.connect(f);f.connect(v);v.connect(AC.destination);s.start(t);s.stop(t+dur);
 }
+
+// ── Monster voices: every monster gets its own pitch and timbre from its body, rank and element ──
+// filtered noise with a sweep (loops the noise buffer, so it can run long)
+function noiseF(dur,vol,type,f0,f1,delay,q){
+  if(!AC)return; const t=AC.currentTime+(delay||0),s=AC.createBufferSource(),v=AC.createGain(),f=AC.createBiquadFilter();
+  s.buffer=NOISE;s.loop=true;f.type=type;f.Q.value=q||1;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1||f0),t+dur);
+  v.gain.setValueAtTime(.001,t);v.gain.exponentialRampToValueAtTime(vol,t+Math.min(.04,dur/4));v.gain.exponentialRampToValueAtTime(.001,t+dur);
+  s.connect(f);f.connect(v);v.connect(AC.destination);s.start(t);s.stop(t+dur+.02);
+}
+const VOICES={};
+function voiceOf(D){const key=D.small?'small'+D.biome:D.id;if(VOICES[key])return VOICES[key];
+  let h=0;for(const ch of key)h=(Math.imul(h,31)+ch.charCodeAt(0))>>>0;const jit=.85+(h%31)/100;     // a little variety between monsters of one body
+  const R={wyvern:[105,'sawtooth'],brute:[70,'sawtooth'],serpent:[120,'triangle'],raptor:[200,'square'],crab:[95,'square'],small:[300,'square']}[D.rig]||[110,'sawtooth'];
+  const rank=D.small?1:D.rank,p=R[0]*jit*(1-.05*(rank-1))*(rank===8?.8:1);
+  return VOICES[key]={p,type:R[1],rig:D.rig,hiss:D.rig==='serpent',click:D.rig==='crab',screech:D.rig==='raptor',star:D.id==='star',big:rank>=7,last:{}};}
+// kind: roar, growl, hurt, yelp, death, snort, grumble
+function mv(kind,vol){
+  if(!AC||!PREFS.sfx||!S.def)return;const V=voiceOf(S.def),now=AC.currentTime,gap={roar:.8,growl:.25,hurt:.35,yelp:.3,death:1,snort:.3,grumble:2}[kind]||.2;
+  if(now-(V.last[kind]||-9)<gap)return;V.last[kind]=now;const p=V.p,ty=V.type,k=vol||1,big=V.big?1.25:1;
+  if(kind==='roar'||kind==='death'){const d=kind==='death'?1.5:1.0,dn=kind==='death'?.45:.85;
+    tone(p*1.7,p*dn,d,.2*k*big,ty);tone(p*2.55,p*dn*1.5,d*.9,.09*k,ty,.02);noiseF(d,.22*k*big,'lowpass',p*10,p*4);
+    if(V.screech)tone(p*5,p*2.6,d*.7,.1*k,'square',.05);
+    if(V.hiss)noiseF(d*.9,.16*k,'highpass',3500,2500,.05);
+    if(V.click)for(let i=0;i<6;i++)noiseF(.03,.25*k,'bandpass',2200,1800,i*.07,4);
+    if(V.star){for(const f of [523,784,1047])tone(f,f*.98,d*1.2,.04*k,'sine',.1);}
+    if(V.big)tone(p*.6,p*.4,d,.16*k,'sine');}
+  else if(kind==='growl'){tone(p*1.4,p*1.1,.32,.09*k,ty);noiseF(.3,.1*k,'lowpass',p*7,p*5);if(V.hiss)noiseF(.25,.08*k,'highpass',4000,3000);if(V.click)for(let i=0;i<3;i++)noiseF(.025,.18*k,'bandpass',2400,2000,i*.06,4);}
+  else if(kind==='hurt'){tone(p*2.4,p*1.3,.22,.15*k,ty);noiseF(.18,.14*k,'lowpass',p*12,p*6);}
+  else if(kind==='yelp'){tone(p*3.6,p*2.1,.28,.15*k,ty);tone(p*4.6,p*2.6,.22,.06*k,ty,.03);}
+  else if(kind==='snort'){noiseF(.14,.14*k,'bandpass',1400,700,0,2);tone(p*1.6,p*1.2,.1,.06*k,ty);}
+  else if(kind==='grumble'){tone(p*1.1,p*.95,.55,.045*k,ty);noiseF(.5,.05*k,'lowpass',p*6,p*4);}
+}
+// the sound of an attack landing (or whiffing past): its element if it carries one, or a body blow
+function mStrike(A){
+  if(!AC||!PREFS.sfx)return;const el=A.st?S.def.elem:null;
+  if(el==='fire'){noiseF(.35,.2,'bandpass',600,2600,0,1.5);noiseF(.3,.12,'lowpass',400,200);}
+  else if(el==='water'){noiseF(.3,.18,'bandpass',1600,350,0,2);noiseF(.15,.08,'highpass',3000,2000,.08);}
+  else if(el==='thunder'){noiseF(.12,.3,'highpass',3500,2500);tone(110,40,.35,.18,'sawtooth',.03);}
+  else if(el==='ice'){tone(1900,2500,.14,.07,'sine');tone(2600,3100,.12,.06,'sine',.06);noiseF(.18,.1,'highpass',5000,4000);}
+  else if(el==='earth'){noiseF(.3,.3,'lowpass',380,120);tone(80,45,.25,.15,'sine');}
+  else if(el==='nature'){noiseF(.22,.15,'bandpass',2800,1600,0,1.2);}
+  else if(el==='dragon'){tone(300,150,.3,.1,'sawtooth');for(const f of [880,1320])tone(f,f*.7,.3,.04,'sine');noiseF(.25,.12,'bandpass',900,400);}
+  else if(A.heavy){noiseF(.28,.3,'lowpass',420,140);}
+  else noiseF(.12,.14,'bandpass',1700,600,0,1.5);
+}
 const SFX={
   swing(){noise(.07,.12,3500);}, hit(){noise(.08,.25,1800);tone(220,90,.08,.12);}, heavy(){noise(.25,.4,1200);tone(160,40,.3,.25,'sawtooth');},
   charge(l){tone(300+l*180,340+l*180,.09,.12);}, dodge(){noise(.12,.1,5000);}, perfect(){tone(880,1320,.1,.15);tone(1320,1760,.14,.15,'square',.08);},
@@ -1111,7 +1156,7 @@ function newHunt(id,o){
 }
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
-  const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;
+  const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;mv('death');
   if(S.pack>1){S.pack--;S.respawn=1;return;}
   S.slow=1.2;S.endT=0;h.state='win';h.t=0;
 }
@@ -1244,9 +1289,9 @@ function mStartAttack(){
   do{id=pool[(Math.random()*pool.length)|0];}while(id===m.last&&Math.random()<.7);
   const A=ATTACKS[id], sp=Math.max(.3,S.def.speed[m.phase]*(m.over?CHARGE.speed:1)*(S.def.trait==='frenzy'?1-FRENZY*(1-m.hp/m.max):1)), w=A.wind*sp, gap=.4+.6*sp;   // combos tighten up too
   m.state='attack';m.t=0;m.atk=id;m.last=id;m.hi=0;m.hits=A.hits.map(o=>w+o*gap);m.dur=m.hits[m.hits.length-1]+A.after;m.rec=A.rec*(.6+.4*sp);
-  sfx('warn');
+  sfx('warn');mv(A.heavy?'roar':'growl',A.heavy?.55:1);
 }
-function mStagger(d,stun){const m=S.m;if(m.state==='stagger'&&m.staggerDur-m.t>d)return;m.state='stagger';m.t=0;m.staggerDur=d;m.stunned=!!stun;}
+function mStagger(d,stun){const m=S.m;if(m.state==='stagger'&&m.staggerDur-m.t>d)return;mv('hurt');m.state='stagger';m.t=0;m.staggerDur=d;m.stunned=!!stun;}
 // Stormwing: knock its charge out. all=false only drains some.
 function mDischarge(amount){
   const m=S.m; if(S.def.trait!=='charge'||m.state==='dead')return;
@@ -1257,6 +1302,8 @@ function mDischarge(amount){
 function mUpdate(dt){
   const m=S.m,D=S.def; m.t+=dt; if(m.flash>0)m.flash-=dt; if(m.enter>0)m.enter-=dt; if(m.evadeCd>0&&m.state!=='stagger')m.evadeCd-=dt;
   if(m.state==='dead')return;
+  if(!m.intro&&S.clock>.35){m.intro=true;mv('roar',.9);}                       // it announces itself
+  if(m.state==='idle'&&Math.random()<dt*.18)mv('grumble');                       // and mutters while it circles
   if(D.trait==='regen'&&m.hp<m.max&&m.mpoison<=0&&S.clock-m.lastHit>REGEN.after&&S.h.state!=='dead'){m.hp=Math.min(m.max,m.hp+m.max*REGEN.rate*dt);      // heals when left alone
     if(Math.random()<.2){const b=partPos('body',mPose());S.pt.push({x:b.x+rnd(-20,20),y:b.y+rnd(-10,10),vx:0,vy:-30,life:.5,col:'#4cd964',g:0});}}
   if(D.trait==='charge'&&!m.over&&m.state!=='stagger'&&m.state!=='sleep'&&S.h.state!=='dead'&&(m.charge+=CHARGE.rate*dt*S.h.chargeSlow)>=100){m.charge=100;m.over=true;S.shake=.5;sfx('roar');
@@ -1264,7 +1311,7 @@ function mUpdate(dt){
   if(m.mpoison>0){m.mpoison-=dt;if((m.mpT+=dt)>=STATUS.poison.tick){m.mpT=0;const d=Math.min(m.hp-1,Math.round(STATUS.poison.dmg*S.h.atk));     // poison never lands the kill
       if(d>0){m.hp-=d;S.stats.dealt+=d;S.stats.statusDmg=(S.stats.statusDmg||0)+d;const b=partPos('body',mPose());addNum(b.x+rnd(-14,14),b.y-14,''+d,STATUS.poison.col,.6);}}}
   if(m.state==='idle'){
-    if(m.roarDue){m.roarDue=false;m.state='roar';m.t=0;S.shake=.9;sfx('roar');buzz(200);
+    if(m.roarDue){m.roarDue=false;m.state='roar';m.t=0;S.shake=.9;mv('roar');buzz(200);
       addNum(W/2,L.ground-14,m.phase===2?'ENRAGED!':'ANGRY!','#ff6a4d',1.4);}
     else if((m.wait-=dt)<=0&&S.h.state!=='dead'){
       if(D.trait==='shell'&&m.last!=='shell'&&Math.random()<SHELL.chance){m.state='shell';m.t=0;m.last='shell';const b=partPos('body',mPose());addNum(b.x,b.y-24,'SHELL UP','#c8d0e8',1);}
@@ -1297,7 +1344,7 @@ function applyStatus(st){
 }
 // One of the monster's hits lands (or is dodged)
 function mHit(i){
-  const m=S.m,h=S.h,A=ATTACKS[m.atk],a=A.pose,D=S.def; let dmg=A.dmg; if((a==='sweep'||a==='slam'||a==='spin')&&m.parts.tail.broken)dmg*=.6;
+  const m=S.m,h=S.h,A=ATTACKS[m.atk],a=A.pose,D=S.def;mStrike(A); let dmg=A.dmg; if((a==='sweep'||a==='slam'||a==='spin')&&m.parts.tail.broken)dmg*=.6;
   dmg=Math.round(dmg*S.def.dmg*(m.over?CHARGE.dmg:1));
   const hc={x:L.hx+18+hunterX(),y:L.hFeet-18}, dust=(n,col)=>{for(let k=0;k<n;k++)S.pt.push({x:rnd(10,70),y:L.hFeet-rnd(0,8),vx:rnd(-90,-20),vy:rnd(-50,0),life:rnd(.2,.5),col,g:150});};
   if(a==='dive'){S.shake=.5;for(let k=0;k<18;k++)S.pt.push({x:rnd(20,90),y:L.mFeet+2,vx:rnd(-60,60),vy:rnd(-90,-20),life:rnd(.3,.7),col:BIOMES[S.def.biome].speck,g:260});sfx('heavy');buzz(60);}
@@ -1363,7 +1410,7 @@ function dealDamage(base,part,heavy,stun,pierce){
   const pose=mPose();
   if(mAir()){addNum(60,L.mFeet-40,'MISS','#8a93b0',.5);sfx('miss');return;}
   if(mWary()){                                                                   // it hops back and the hit misses
-    m.state='evade';m.t=0;m.evadeCd=S.def.evadeCd[m.phase];S.stats.evaded++;const hp=mHeadPos(pose);
+    m.state='evade';m.t=0;m.evadeCd=S.def.evadeCd[m.phase];S.stats.evaded++;mv('snort');const hp=mHeadPos(pose);
     addNum(hp.x+6,hp.y-14,'DODGED!','#c8d0e8',1.1);sfx('dodge');
     for(let k=0;k<8;k++)S.pt.push({x:L.mx+MS_OX+rnd(26,46),y:L.mFeet,vx:rnd(-50,10),vy:rnd(-40,-5),life:rnd(.2,.4),col:'#d9c88e',g:150});
     return;
@@ -1393,7 +1440,7 @@ function dealDamage(base,part,heavy,stun,pierce){
   if(m.hp<=0){mKill();return;}
   if(stun&&!m.stunned&&(m.stun+=stun)>=m.stunMax){                               // stun meter full: the monster goes down
     m.stun=0;m.stunMax+=STUN_GROW;S.stats.stuns++;mStagger(STUN_TIME,true);
-    addNum(pp.x,pp.y-30,'STUNNED!','#ffe14d',1.4);sfx('brk');buzz(150);S.shake=.7;S.stop=.14;mDischarge();
+    addNum(pp.x,pp.y-30,'STUNNED!','#ffe14d',1.4);sfx('brk');mv('hurt',1.3);buzz(150);S.shake=.7;S.stop=.14;mDischarge();
   }
   const ph=m.hp<=m.max/3?2:m.hp<=m.max*2/3?1:0;
   if(ph>m.phase&&!S.def.small){m.phase=ph;m.roarDue=true;if(m.state==='attack'||m.state==='recover'){m.state='idle';m.wait=0;}}
@@ -1423,7 +1470,7 @@ function qteTap(x,y){
   for(let k=0;k<10;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-80,80),vy:rnd(-100,-10),life:rnd(.2,.5),col:k%2?'#fff':'#ff6a4d',g:240});
   addNum(pp.x,pp.y-12,P.hits+'/'+S.qteHits,'#ffffff',.9);sfx('heavy');buzz(30);
   if(P.hits>=S.qteHits){
-    P.broken=true;addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');buzz(120);S.shake=.6;S.stop=.14;
+    P.broken=true;addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');mv('yelp');buzz(120);S.shake=.6;S.stop=.14;
     for(let k=0;k<14;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-130,-30),life:rnd(.4,.8),col:'#e8e2cc',g:300});
     if(m.hp>0){mStagger(2);mDischarge();}
   }
@@ -2570,7 +2617,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{PARTS,holdCheck,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{audioInit,mv,mStrike,voiceOf,noiseF,PARTS,holdCheck,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

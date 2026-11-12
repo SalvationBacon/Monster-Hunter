@@ -342,3 +342,19 @@ New ingredients: bog bean and marsh lily (swamp), kelp and clam (coast), ruin fi
 - **Hold an item** (forge and GEAR lists, about half a second): a details card shows the item's type, attack and element or health and resistance, every skill and what it does at that item's level, the set bonus and how to complete it, and either "owned/wearing" or the cost. Skills and the set bonus can be tapped from the card for the full breakdown. Holding never crafts or equips.
 - In the GEAR picker, a tap still just wears the item (the tags there aren't tappable, to avoid misfires). Hold for details.
 - The forge list ends with "HOLD AN ITEM FOR ITS DETAILS". Bram's intro mentions holding and tapping skills.
+
+## v0.28.0: monster sounds
+- **Every monster has its own voice** (`voiceOf`), all synthesized in code like the music:
+  - **Pitch by body:** brutes ~70 Hz, crabs ~95, wyverns ~105, serpents ~120, raptors ~200, Snapjaws ~300. Pitch drops 5% per rank and a further 20% for the elder, with a small per-monster variation.
+  - **Timbre by body:** a sawtooth growl for wyverns and brutes, a triangle wave plus a breathy hiss for serpents, a square screech for raptors, and clicking pincers for crabs.
+  - **The elder** adds a shimmering high chord.
+- **Monster sounds:**
+  - a **roar** when the hunt opens and when it gets angry or enraged
+  - a **growl** on every wind-up (a short roar before heavy attacks), on top of the warning tick
+  - a **hurt** cry on staggers and stuns
+  - a **yelp** when a part breaks
+  - a **snort** when it dodges
+  - a long falling **death** cry
+  - low **grumbles** while it circles
+- **Strike sounds:** an elemental attack sounds like its element (fire whoosh, water splash, thunder crack, icy chime, earth thud, rustling nature, dragon shimmer). Physical attacks get a heavy thud or a fast swish.
+- Every sound follows the SOUND setting, and each sound type has a minimum gap so they don't stack.

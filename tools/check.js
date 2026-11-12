@@ -569,6 +569,10 @@ const shots=process.argv[2];
     await tapBtn0('info:set');ok(await ev(()=>!!(MH.S.skill&&MH.S.skill.set)),'the set bonus can be read from there');await tapBtn0('skill:close');ok(await ev(()=>!MH.S.skill&&!!MH.S.info),'closing it goes back to the item');
     await p.touchscreen.tap(30,20);await p.waitForTimeout(120);ok(await ev(()=>!MH.S.info),'and a tap outside closes the item');}
   await ev(()=>{MH.setDev(false);MH.toCamp('hunt');});
+  // ── v0.28: monster sounds ──
+  ok(await ev(()=>{const v=id=>MH.voiceOf(MH.MONSTERS[id]);const ps=new Set(MH.HUNTS.map(id=>Math.round(v(id).p)));return ps.size>=25&&v('tusk').p<v('fern').p&&v('quill').p>v('fern').p&&v('star').p<v('fern').p;}),'every monster has its own voice: brutes low, raptors high, the elder deepest');
+  ok(await ev(()=>{MH.audioInit();MH.PREFS.sfx=true;MH.newHunt('fern');const S=MH.S,m=S.m;S.h.inv=1e9;m.evadeCd=1e9;m.qteT=1e9;const V=MH.voiceOf(S.def);V.last={};
+    for(let i=0;i<60*6;i++)MH.update(1/60);MH.S.mode='camp';return (V.last.roar>0&&V.last.growl>0)||JSON.stringify(V.last);}),'a hunt is full of the monster\'s noises: a roar to open, growls as it winds up');
   ok(errs.length===0||errs.slice(0,3).join(' | '),'no page errors');
   await b.close();process.exit(fail?1:0);
 })();
