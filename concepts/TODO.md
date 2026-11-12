@@ -14,8 +14,9 @@ Ideas agreed on but not built yet. Newest first.
 - Touches: `unlocked()`, `rankOpen()` and `lockText()`; the hunt list (the next locked monster says "BEAT X FIRST"); the camp home's NEXT UP; story chapters gated on rank ("REACH RANK 3"); the guides; the test-bot ladder; and quests that count rank wins.
 
 ## Monster and hunter art redesign (in progress)
-- Drafts are being reviewed: https://claude.ai/artifact/FyXieP1MFkZGUCRFWaHvcY (round 3: flowing forms, skeletons, whole-body attacks, Mudclaw as a crab).
-- Still to draft: Quillbeak and the other 29 monsters.
+- Drafts are being reviewed: https://claude.ai/artifact/FyXieP1MFkZGUCRFWaHvcY (round 4: all 35 monsters drafted).
+- Five body types, each a builder with per-monster design specs: wyvern, brute, crab, serpent, and a new raptor rig (feathered wing-arms, crest, sickle claws). Every monster has its own horns/crest, back, tail, markings and element effects, plus a breath or spit of its element.
+- Waiting on feedback for which monsters need more work.
 - Once approved: swap the new renderer, animations and breaks into the game.
   - Pre-bake animation frames, because rendering live costs about 20–50 ms a frame.
   - Grow the hunter's sprite canvas.
