@@ -511,3 +511,7 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Snapjaws** have a quarter less health (10% of their biome monster's, was 13%) and an alpha 1.8x (was 2.2x), so expeditions stay quick with stamina.
 - **Tests:** the bots keep a roll's worth of stamina in hand. The balance checks now look at the ladder's overall win rate (50–88%) rather than two wins in three per monster, which is luck at this difficulty; all four iron weapons together must beat the Fernwing 15 times in 24. The mechanics tests run without feints or combos so their timing is exact.
 
+## v0.39.1: keep what broke off
+- **A lost hunt keeps the parts you broke.** Each part's material goes in the bag the moment it breaks, and the fail screen lists them under "YOU KEEP WHAT BROKE OFF". Nothing else drops on a loss.
+- In a Rank Trial this covers parts broken on any of the three monsters, and a cleared trial now pays those part materials too (before, trial loot had no part drops).
+

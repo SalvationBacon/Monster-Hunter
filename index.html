@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.39.0';
+const VER='0.39.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -3249,7 +3249,7 @@ function freshMonster(D,status){
 // o.meal: a meal eaten for this hunt. o.role: what the companion does. o.small: a biome, for a pack hunt.
 function newHunt(id,o){
   o=o||{}; if(o.trial)id=o.trial.list[0]; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
-  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0,ev:D.small?exRoll():null,evAt:(Math.random()*2)|0};
+  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.broke=[]; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0,ev:D.small?exRoll():null,evAt:(Math.random()*2)|0};
   S.trial=o.trial?{rank:o.trial.rank,list:o.trial.list,i:0}:null;
   S.mode='hunt'; S.t=0; S.timeLeft=S.trial?trialTime(S.trial.list):D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,fury:0,furyT:0,dn:0,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
@@ -3264,6 +3264,8 @@ function newHunt(id,o){
   S.loot=null; S.fail=''; S.paused=false;
   S.abCur=null;abPrebake(D);huPrebake();if(S.trial)abPrebake(MONSTERS[S.trial.list[1]]);
 }
+// A lost hunt still keeps the parts that broke off: they're lying on the ground
+function keepBroken(){const out=[];for(const id of S.broke||[]){const o=out.find(d=>d.id===id);if(o)o.n++;else out.push({id,n:1});SAVE.bag[id]=(SAVE.bag[id]||0)+1;}return out;}
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
   const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;mv('death');
@@ -3664,7 +3666,7 @@ function qteTap(x,y){
   for(let k=0;k<10;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-80,80),vy:rnd(-100,-10),life:rnd(.2,.5),col:k%2?'#fff':'#ff6a4d',g:240});
   addNum(pp.x,pp.y-12,P.hits+'/'+S.qteHits,'#ffffff',.9);sfx('heavy');buzz(30);
   if(P.hits>=S.qteHits){
-    P.broken=true;addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');mv('yelp');buzz(120);S.shake=.6;S.stop=.14;
+    P.broken=true;if(S.def.loot.parts[q.part])S.broke.push(S.def.loot.parts[q.part]);addNum(pp.x,pp.y-24,'BREAK!','#ffe14d',1.3);sfx('brk');mv('yelp');buzz(120);S.shake=.6;S.stop=.14;
     for(let k=0;k<14;k++)S.pt.push({x:pp.x,y:pp.y,vx:rnd(-90,90),vy:rnd(-130,-30),life:rnd(.4,.8),col:'#e8e2cc',g:300});
     if(m.hp>0){mStagger(2);mDischarge();}
   }
@@ -3873,6 +3875,7 @@ function rollLoot(){
 function trialLoot(){
   const T=S.trial,r=T.rank,out=[],add=(id,n,rare)=>{if(n<=0)return;const o=out.find(d=>d.id===id);if(o)o.n+=n;else out.push(rare?{id,n,rare:true}:{id,n});},time=trialTime(T.list)-S.timeLeft,first=!SAVE.trials[r]||SAVE.trials[r].old;
   for(const id of T.list){const D=MONSTERS[id];for(const [k,lo,hi] of D.loot.common)add(k,lo+((Math.random()*(hi-lo+1))|0));SAVE.wins[id]=(SAVE.wins[id]||0)+1;qEvent('hunt',id);}
+  for(const id of S.broke||[])add(id,1);   // parts broken off any of the three
   if(first&&!SAVE.own['crest'+r]){SAVE.own['crest'+r]=true;out.push({id:'crest'+r,n:1,gear:true});}add('gem',first?2+r:1);
   if(first||Math.random()<.35){const D=MONSTERS[T.list[(Math.random()*3)|0]];add(D.mat.rare,1,true);SAVE.dry[D.id]=0;}
   const prev=SAVE.trials[r];SAVE.trials[r]={best:prev&&prev.best&&!prev.old?Math.min(prev.best,time):time,n:((prev&&prev.n)||0)+1};
@@ -3983,7 +3986,7 @@ function update(dt){
   if(h.state==='dead'||(m.state==='dead'&&!S.respawn&&!S.forage&&S.m===m)){
     S.endT+=dt;
     if(m.state==='dead'&&S.endT>1.9){S.loot=rollLoot();S.mode='loot';S.t=0;sfx('win');}
-    else if(h.state==='dead'&&S.endT>1.5){S.mode='fail';S.t=0;save();}
+    else if(h.state==='dead'&&S.endT>1.5){S.mode='fail';S.t=0;S.kept=keepBroken();save();}
   }
 }
 
@@ -4346,9 +4349,11 @@ function drawLoot(){
 }
 function drawFail(){
   g.fillStyle='rgba(30,6,10,.82)';g.fillRect(0,0,W,LH);
-  const y=((LH-50)/2)|0;big('HUNT FAILED',W/2,y,UI.bad,1);text(S.fail,W/2,y+16,UI.tx,{al:1});
+  const K=S.kept||[],y=((LH-50-(K.length?14+K.length*14:0))/2)|0;big('HUNT FAILED',W/2,y,UI.bad,1);text(S.fail,W/2,y+16,UI.tx,{al:1});
   text(S.trial?'MONSTER '+(S.trial.i+1)+' OF 3: '+S.def.name:S.def.name+' LEFT AT '+Math.round(S.m.hp/S.m.max*100)+'%',W/2,y+26,UI.dim,{al:1});
-  if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,y+42,UI.dim,{al:1});
+  let yy=y+40;if(K.length){text('YOU KEEP WHAT BROKE OFF',W/2,yy,UI.gold,{al:1});yy+=10;
+    for(const d of K){rbox(8,yy-3,W-16,13,UI.s1);g.drawImage(lootSpr(d.id),11,yy-3);text(LOOT[d.id].name,26,yy+1,UI.tx);text('+'+d.n,W-11,yy+1,UI.gold,{al:2});yy+=14;}yy+=2;}
+  if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,yy+2,UI.dim,{al:1});
 }
 // One piece of gear's line of numbers: attack and element, health and resistance, a perk, or Pip's stats
 function gearLine(id,x,y,alt,B,top,bot){

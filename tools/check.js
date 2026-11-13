@@ -235,6 +235,10 @@ const shots=process.argv[2];
     {const f0=F.feint,k0=F.fake;F.feint=[1,1,1];F.fake=1;const S=QUIET('fern'),m=S.m;S.h.inv=0;S.h.hp=S.h.max=1e6;m.wait=0;let t=0,att=false;while(t<3&&!(att&&m.state==='recover')){MH.update(1/60);t+=1/60;if(m.state==='attack')att=true;}R.push(m.state==='recover'&&S.stats.taken===0);F.feint=f0;F.fake=k0;}
     {const c0=F.combo;F.combo=[1,1,1];const S=QUIET('fern'),m=S.m;S.h.inv=0;S.h.hp=S.h.max=1e6;S.def.pools=S.def.pools.map(()=>['bite']);m.wait=0;let t=0,starts=0,last=null;while(t<6&&m.state!=='recover'){if(m.state==='attack'&&m.hits!==last){starts++;last=m.hits;}MH.update(1/60);t+=1/60;}R.push(starts===2);F.combo=c0;}
     return R.every(x=>x)||R.join();}),'a big move leaves the monster wide open for extra damage; enraged it hits 20% harder; feints pull back without a hit; combos chain straight into another attack');
+  ok(await ev(()=>{EQ();const S=QUIET('ember'),m=S.m,D=MH.MONSTERS.ember,horn=D.loot.parts.head,b0=MH.SAVE.bag[horn]||0;S.h.noStam=true;
+    for(let i=0;i<20&&!m.parts.head.broken;i++){S.qte={part:'head',t:0};const pp=MH.partPos('head',MH.mPose());MH.qteTap(pp.x,pp.y);RUN(30);S.h.state='idle';}
+    const broke=m.parts.head.broken;S.h.hp=0;S.h.state='dead';S.endT=0;let t=0;while(S.mode==='hunt'&&t<5){MH.update(1/60);t+=1/60;}
+    return broke&&S.mode==='fail'&&MH.SAVE.bag[horn]===b0+1&&S.kept.length===1&&S.kept[0].id===horn||JSON.stringify([broke,S.mode,MH.SAVE.bag[horn]-b0,S.kept]);}),'a lost hunt still keeps the parts that broke off');
   ok(await ev(()=>{const S=QUIET('mud'),h=S.h;MH.applyStatus('mud');MH.actDodge(-1);const cost=100-h.st;RUN(40);return Math.abs(cost-54)<.01&&h.mud===0;}),'mud makes the next roll cost 80% more, and that roll shakes it off');
   ok(await ev(()=>{const S=QUIET('ember',{meal:'tonic'});MH.applyStatus('burn');const a=S.h.burn===0;MH.applyStatus('poison');const c=S.h.poison>0;EQ();const T=QUIET('fern',{meal:'fish'});let t=0;while(T.h.sharp>=MH.SHARP.lo&&t<120){MH.actTap('body');MH.update(1/60);t+=1/60;}
     return a&&c&&t>35&&t<70;}),'Cool Tonic stops burning only, and Grilled Icefish makes the edge last twice as long');
