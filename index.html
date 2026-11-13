@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.37.0';
+const VER='0.38.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1554,7 +1554,7 @@ R('temp','TEMPESTBEAK','#3a3f7a','#c8c8f0','#ffe14d','#23265a',{plan:'roc',beakC
 // over long legs, a stiff balancing tail, a long low head full of teeth, small grasping hands and a raised sickle claw
 // on each foot. Each biome gives it its own skin (feathered or scaled), crest, back, markings and tail tip.
 (()=>{
-const {V,add,lerp2,chain,ik,kit,spike,bolt,ambient,glowDots,eyeAt}=KIT,PI=Math.PI;
+const {V,add,lerp2,chain,ik,kit,spike,bolt,ambient,glowDots,eyeAt,scale}=KIT,PI=Math.PI;
 const GROUND=66;
 const one=c=>ENG.materials({b:c,u:c,h:c,d:c}).horn;
 const groups={armF:{z:1,R:1.4,k:.8,dk:-1},legF:{z:2,R:2.4,k:1.4,dk:-.9},tailF:{z:3,R:1.2,k:.7},back:{z:3.4,R:1.2,k:.7},body:{z:4,R:4,k:2},
@@ -1632,10 +1632,13 @@ function build(p,brk,t,D){const K=kit(),{S,E,C,P}=K,glows=[],br=Math.sin(t*3)*.3
     for(const d of[-.55,-.1,.35])C([[wr[0],wr[1],.5],add(wr,V(a2+d+.4,1.7)).concat([.25])],'claw',g,{pri:2.6});};
   const sh=add(add(Cv,fv,.5),up,-1.2);arm(add(sh,[2.4,-.6]),'armF',.9);arm(sh,'armN',1);
   for(const q of S)if(q.pri>=2.5)q.top=1;   // small details colour only themselves
-  const eye=add(add(Hc,f,-.2),uH,.9),blink=(t%2.7)<.09,mouth=lerp2(s1,J1,.5);
-  return{S,mouth,extra:g=>{glowDots(g,glows,D.glowCol,t);if(D.fx)ambient(g,D.fx,t,[Pv[0]-20,20,Pv[0]+20,60],3);eyeAt(g,eye[0]-1,eye[1]-1,D.eye,blink,1,0);}};}
+  let eye=add(add(Hc,f,-.2),uH,.9),mouth=lerp2(s1,J1,.5),G2=glows;const blink=(t%2.7)<.09;
+  if(D.s&&D.s!==1){scale(S,Pv[0],GROUND,D.s);const sc=q=>[Pv[0]+(q[0]-Pv[0])*D.s,GROUND+(q[1]-GROUND)*D.s];eye=sc(eye);mouth=sc(mouth);G2=glows.map(sc);}   // an alpha is drawn bigger
+  return{S,mouth,extra:g=>{glowDots(g,G2,D.glowCol,t);if(D.fx)ambient(g,D.fx,t,[Pv[0]-20,20,Pv[0]+20,60],3);eyeAt(g,eye[0]-1,eye[1]-1,D.eye,blink,1,0);}};}
 
-const R=(id,b,u,h,d,D)=>make(id,'SNAPJAW',{b,u,h,d,glow:D.glowCol},D);
+// each kind also has a rare ALPHA: a size bigger, darker, with a gold crest, back spines and red eyes
+const R=(id,b,u,h,d,D)=>{make(id,'SNAPJAW',{b,u,h,d,glow:D.glowCol},D);make(id.replace('snap','snapA'),'ALPHA SNAPJAW',{b:ENG.mix(b,'#141018',.35),u,h:'#ffd34d',d:ENG.mix(d,'#000000',.3),glow:'#ffd34d'},
+  Object.assign({},D,{s:1.22,back:'spines',crest:D.crest==='swept'||D.crest==='fan'?'horns':D.crest,eye:'#ff4030',glowCol:'#ffd34d'}));};
 R('snap0','#7aa84a','#e0e8b0','#e0a03a','#3f6a34',{skin:'feather',crest:'swept',marks:'stripes',tail:'fan',el:'nature',eye:'#ffe14d'});          // forest
 R('snap1','#a8503a','#e8b080','#ffb03a','#4a2420',{skin:'scale',crest:'bony',back:'spines',tail:'club',el:'fire',fx:'embers',eye:'#ffb03a',glowCol:'#ff9a3a'});   // volcano
 R('snap2','#c9a05a','#f2dca0','#e05a3a','#7a5a2c',{skin:'scale',crest:'frill',marks:'stripes',tail:'spike',el:'earth',eye:'#ffd34d'});          // desert
@@ -2600,7 +2603,7 @@ const mSpriteOld=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.
 // ═══════════════════════════════════════════════════
 const AB={cache:new Map(),q:[],qk:new Set(),mats:{},anch:{},white:new WeakMap(),port:{},max:900};
 const AFPS=12, AB_W=96, AB_H=72, AB_DX=-6, AB_FEET=66;                    // frames are 96x72, feet at y 66
-const artId=D=>D.small?'snap'+D.biome:D.id;   // the pack's Snapjaws have one design per biome
+const artId=D=>D.small?(D.alpha?'snapA':'snap')+D.biome:D.id;   // the pack's Snapjaws have one design per biome
 const hasArt=D=>!!(D&&ART.MON[artId(D)]);
 const abMats=id=>AB.mats[id]||(AB.mats[id]=ART.ENG.materials(Object.assign({},ART.MON[id].look),ART.MON[id].mats));
 const abBrk=m=>m?{head:m.parts.head.broken,wings:m.parts.wings.broken,tail:m.parts.tail.broken}:{};
@@ -2626,7 +2629,7 @@ function abEnq(id,clip,q,brk,nb,front){const k=abKey(id,clip,q,abBk(brk||{}),nb)
 const ABW={w:[],busy:0,pend:new Map(),max:2,off:false};
 function abWorkers(){if(ABW.w.length||ABW.off)return ABW.w.length>0;
   try{if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||!new OffscreenCanvas(1,1).getContext('2d'))throw 0;
-    const src=[...document.scripts].map(x=>x.textContent).find(t=>t.includes('// ART:BEGIN')),a=src.indexOf('// ART:BEGIN'),b=src.indexOf('// ART:END');if(a<0||b<0)throw 0;
+    const src=[...document.scripts].map(x=>x.textContent).find(t=>t.includes('// ART'+':BEGIN')),a=src.indexOf('// ART'+':BEGIN'),b=src.indexOf('// ART'+':END');if(a<0||b<0)throw 0;
     const code=`self.document={createElement:()=>new OffscreenCanvas(1,1)};self.window=self;\n${src.slice(a,b)}\n${abPoseOf.toString()}
 const MATS={},HG={},mats=id=>MATS[id]||(MATS[id]=ART.ENG.materials(Object.assign({},ART.MON[id].look),ART.MON[id].mats));
 onmessage=e=>{const j=e.data;let o;try{let c,ex={};
@@ -2783,7 +2786,40 @@ const ING_SHAPE={leaf:a=>{a.poly([[1,9],[2,3],[6,0],[9,1],[8,6],[4,9]],1);a.px(3
   cap:a=>{a.ell(5,4,5,3,1);a.rect(4,5,2,5,2);a.px(3,3,2);a.px(7,4,2);},meat:a=>{a.ell(4,6,4,3,1);a.rect(7,2,3,2,2);a.rect(8,4,1,2,2);}};
 for(const [id,[name,c1,c2,shape]] of Object.entries(ING))LOOT[id]={name,pal:{1:c1,2:c2},draw:ING_SHAPE[shape]};
 LOOT.potion={name:'POTION',pal:{1:'#e2483d',2:'#c8d0e8',3:'#6b4a2e'},draw:a=>{a.rect(4,0,3,2,3);a.rect(3,2,5,2,2);a.rect(2,4,7,7,2);a.rect(3,6,5,4,1);}};
-const bugSpr=(i,f)=>{const c=CREATURES[i];return shapeSpr('bug:'+i+':'+(f|0),12,10,{1:c.col,2:shade(c.col,-.4),3:'!#141826'},a=>{a.off(1,1);
+// ── Creatures and ingredients, drawn by the art engine: lit, outlined little forms in the same style as everything else
+const SMALLART={};
+function smallArt(key,w,h,look,more,fn,extra){if(key in SMALLART)return SMALLART[key];SMALLART[key]=null;
+  try{const one=c=>ART.ENG.materials({b:c,u:c,h:c,d:c}).horn,K=ART.KIT.kit(),M=ART.ENG.materials(look,more&&more(one));fn(K,ART.KIT);for(const q of K.S)if(q.pri>=2.5)q.top=1;
+    SMALLART[key]=ART.ENG.render(K.S,{back:{z:1,R:.8,k:.5},body:{z:2,R:1.4,k:.8},front:{z:3,R:.8,k:.5}},M,w,h,extra);}catch(e){SMALLART[key]=null;}
+  return SMALLART[key];}
+const tint=(c,k)=>ART.ENG.mix(c,k>0?'#ffffff':'#101018',Math.abs(k));
+function bugArt(i,f){const c=CREATURES[i],col=c.col,tail=/NEWT|SKINK/.test(c.name),stag=/STAG/.test(c.name);
+  return smallArt('bug:'+i+':'+f,12,10,{b:col,u:tint(col,.45),h:tint(col,.25),d:tint(col,-.45)},one=>({wing:Object.assign(one(tint(col,.2)),{dk:.2}),spot:one(tint(col,-.6)),lg:one(tint(col,-.55))}),({E,C,P})=>{
+    if(c.type==='beetle'){for(const s of[-1,1])for(let k=0;k<3;k++){const y=3.6+k*1.9,lift=(k+f)%2?.6:0;C([[6+s*2.4,y,.3],[6+s*4,y+(k-1)*.7-lift,.25]],'lg','back');}
+      E(6,5.6,3.4,3,'body','body');E(6,2.3,1.8,1.3,'dark','body');C([[6,3.4,.3],[6,8.4,.3]],'spot','body',{pri:2.6});
+      if(stag){for(const s of[-1,1])C([[6+s*.9,1.6,.5],[6+s*2,.2,.4],[6+s*1.1,-.6,.3]],'horn','front');}if(c.rare)E(5,4.6,.7,.5,'wing','body',{pri:2.7});}
+    else if(c.type==='moth'){const sp=f?3.6:5;for(const s of[-1,1]){P([[6+s*.6,3.6],[6+s*sp,.6+f],[6+s*(sp+.4),4.4],[6+s*.8,5.4]],'wing','back',{k:.3});P([[6+s*.6,5.2],[6+s*(sp-.8),6.2],[6+s*(sp-1.6),8.6],[6+s*.7,7]],'body','back',{k:.3});
+        E(6+s*(sp*.55),3.6,.7,.7,'spot','back',{pri:2.6});C([[6+s*.3,2.6,.25],[6+s*1.6,.4,.2]],'dark','front');}C([[6,3,.9],[6,7.6,.7]],'dark','front');}
+    else if(c.type==='frog'){if(tail)C([[8.2,6.8,1.1],[10.4,6+(f?.6:0),.6],[11.6,7.4,.3]],'body','back');
+      C([[3.6+(f?.4:0),8.2,.5],[1.4,9,.4]],'lg','back');C([[8,8,.6],[10,9-(f?.6:0),.4]],'lg','back');E(6.2,6.6,3.4,2.2,'body','body');E(6.6,7.6,2.4,1.1,'belly','body',{pri:1});
+      E(3,5.4,2,1.7,'body','body');E(2.6,4,1,.8,'body','body');C([[1.4,6.4,.2],[3.4,6.6,.2]],'dark','body',{pri:2.6});if(!tail)for(let k=0;k<3;k++)E(5.4+k*1.5,5.2+(k%2)*.4,.5,.4,'spot','body',{pri:2.6});}
+    else{C([[1.6,5.6,1.1],[5,4.8,1.3],[9.4,4.2,.8]],'body','body');E(1.8,5,1.2,1.1,'body','body');P([[4,4.2],[10.6,2.6+(f?1:0)],[9.8,4.4]],'wing','back',{k:.3});
+      C([[6.6,5.2,.7],[9.4,2.8+(f?1.2:0),.5],[10.6,8.6,.3]],'lg','front');C([[3.6,6,.3],[3,8.6,.25]],'lg','front');C([[1.6,4.2,.2],[.4,1.6+(f?.6:0),.15]],'dark','front');}},
+    g=>{g.fillStyle='#10141a';g.fillRect(c.type==='frog'?2:c.type==='hopper'?1:5,c.type==='frog'?4:c.type==='hopper'?4:2,1,1);if(c.type==='beetle')g.fillRect(6,2,1,1);});}
+const ING_ART={leaf:(K,c1,c2)=>{K.P([[2,10],[2.6,5],[6,1.4],[10,1],[9.6,5],[6,9.4]],'body','body',{k:.4});K.C([[2.6,9.6,.35],[8.6,2.2,.3]],'dark','body',{pri:2.6});for(const k of[.35,.6])K.C([[2.6+6*k,9.6-7.4*k,.25],[2.6+6*k+(k>.5?2:1.6),9.6-7.4*k+.6,.2]],'dark','body',{pri:2.6});},
+  drop:(K)=>{K.C([[6,1.4,.6],[6,5,2.6],[6,7.6,3.2]],'body','body');K.E(4.6,6.6,.8,1.1,'belly','body',{pri:2.6});},
+  fruit:(K)=>{K.E(6,7,4,3.8,'body','body');K.C([[6,3.6,.45],[6.6,1.2,.35]],'dark','front');K.P([[6.6,2.2],[9.6,.8],[9.2,2.6]],'horn','front',{k:.2});K.E(4.4,5.6,1,1.1,'belly','body',{pri:2.6});},
+  root:(K)=>{K.C([[3,1.6,1.4],[5,5,2],[7.4,8.6,1.4],[9.6,10.6,.6]],'body','body');K.C([[4.4,5,.3],[1.6,6.6,.2]],'dark','back');K.C([[6.6,7.4,.3],[9.4,6.4,.2]],'dark','back');K.C([[3,.4,.6],[2.4,-1,.4]],'horn','front');},
+  fish:(K)=>{K.P([[9.4,6],[11.6,3],[11.8,9]],'dark','back',{k:.3});K.E(5.6,6,4.4,2.6,'body','body');K.E(5,7.2,3.2,1.2,'belly','body',{pri:1});K.C([[4.2,3.8,.3],[7.6,3.6,.3]],'dark','body',{pri:2.6});},
+  cap:(K)=>{K.C([[6,6,1.3],[6,10.4,1.5]],'belly','back');K.P([[1,6.4],[2.2,3],[6,1.2],[9.8,3],[11,6.4]],'body','body',{k:.8});for(const[x,y]of[[4,3.6],[7.6,3.2],[6,5]])K.E(x,y,.7,.6,'horn','body',{pri:2.6});},
+  meat:(K)=>{K.C([[7.6,4.4,.8],[10,2,.8]],'horn','back');K.E(10.6,1.4,1,1,'horn','back');K.E(10.2,2.6,1,1,'horn','back');K.E(5,7,4,3.4,'body','body',{a:-.5});K.E(4,8,2,1.4,'belly','body',{pri:2.6,a:-.5});},
+  clam:(K)=>{K.E(6,6.6,4.8,3.8,'body','body');for(let k=-2;k<=2;k++)K.C([[6,9.6,.25],[6+k*1.9,3.4+Math.abs(k)*.5,.2]],'dark','body',{pri:2.6});K.E(6,9.8,2.2,.8,'horn','front');},
+  gem:(K)=>{K.P([[6,.8],[10.6,4.4],[6,11.2],[1.4,4.4]],'body','body',{k:.2});K.P([[6,.8],[8,4.4],[6,6],[4,4.4]],'belly','body',{pri:2.6,k:.1});},
+  potion:(K)=>{K.C([[6,1,1],[6,2.6,1]],'horn','front');K.C([[6,3.4,1.6],[6,4.6,1.4]],'belly','body');K.E(6,8,3.8,3.2,'belly','body');K.E(6,8.6,3,2.4,'body','body',{pri:2.6});K.E(4.6,7.2,.7,.9,'tooth','front',{pri:2.7});}};
+function ingArt(id){const I=id==='gem'?['GEM','#4cd9c0','#e8fffb','gem']:id==='potion'?['POTION','#e2483d','#c8d0e8','potion']:ING[id];if(!I)return null;const shape=id==='clam'?'clam':I[3],c1=I[1],c2=I[2];
+  return smallArt('ing:'+id,12,12,{b:c1,u:id==='potion'?'#dfe8f0':tint(c1,.5),h:c2,d:tint(c1,-.5)},null,K=>ING_ART[shape](K,c1,c2));}
+const bugSpr=(i,f)=>(typeof ART!=='undefined'&&bugArt(i,f|0))||bugSprOld(i,f);
+const bugSprOld=(i,f)=>{const c=CREATURES[i];return shapeSpr('bug:'+i+':'+(f|0),12,10,{1:c.col,2:shade(c.col,-.4),3:'!#141826'},a=>{a.off(1,1);
   if(c.type==='beetle'){a.ell(5,5,3,3,1);a.rect(5,2,1,6,2);a.px(3,1,2);a.px(7,1,2);a.px(1,4+f,2);a.px(9,4+f,2);a.px(1,7-f,2);a.px(9,7-f,2);if(c.rare){a.px(4,0,1);a.px(6,0,1);}}
   else if(c.type==='moth'){if(f){a.poly([[0,2],[4,3],[4,6],[1,6]],1);a.poly([[10,2],[6,3],[6,6],[9,6]],1);}else{a.poly([[1,0],[4,3],[4,6],[0,8]],1);a.poly([[9,0],[6,3],[6,6],[10,8]],1);}a.rect(4,2,2,6,2);}
   else if(c.type==='frog'){a.ell(5,6,4,2,1);a.px(3,3,1);a.px(7,3,1);a.px(3,4,3);a.px(7,4,3);a.rect(0,7+f,2,1,2);a.rect(9,7+f,2,1,2);}
@@ -2831,7 +2867,7 @@ const gearSprOld=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slo
 const LOOT_ART={};{const ik={scale:'scale',claw:'claw',head:'horn',wings:'wing',tail:'tail',rare:'core'};for(const id of HUNTS){const D=MONSTERS[id];for(const k in ik)LOOT_ART[D.mat[k]]=[id,ik[k]];}}
 const LOOT_CV={};
 // a monster's materials are drawn from its own body by the art kit; everything else is a small shape
-const lootSpr=id=>{const a=LOOT_ART[id];if(a&&typeof ART!=='undefined'&&ART.MON[a[0]]){if(!LOOT_CV[id])try{LOOT_CV[id]=ART.ICON.frame(a[0],a[1],12);}catch(e){LOOT_CV[id]=null;}if(LOOT_CV[id])return LOOT_CV[id];}
+const lootSpr=id=>{if((ING[id]||id==='gem'||id==='potion')&&typeof ART!=='undefined'){const c=ingArt(id);if(c)return c;}const a=LOOT_ART[id];if(a&&typeof ART!=='undefined'&&ART.MON[a[0]]){if(!LOOT_CV[id])try{LOOT_CV[id]=ART.ICON.frame(a[0],a[1],12);}catch(e){LOOT_CV[id]=null;}if(LOOT_CV[id])return LOOT_CV[id];}
   return shapeSpr('loot:'+id,12,12,LOOT[id].pal,a=>{a.off(1,1);LOOT[id].draw(a);});};
 
 // ═══════════════════════════════════════════════════
@@ -3053,7 +3089,7 @@ function mPlay(e,t){
 // Which track the screen wants
 function musicCtx(){
   if(S.mode==='title')return S.show?'mon:'+S.show:'title';
-  if(S.mode==='hunt'&&S.def)return S.def.small?'pack':'mon:'+S.def.id;
+  if(S.mode==='hunt'&&S.def)return S.def.small?(S.forage&&!S.forage.last?'gather':'pack'):'mon:'+S.def.id;
   return 'camp';
 }
 const trackFor=key=>key.startsWith('mon:')?monsterTrack(MONSTERS[key.slice(4)]):SCORE[key];
@@ -3189,7 +3225,7 @@ function freshMonster(D,status){
 // o.meal: a meal eaten for this hunt. o.role: what the companion does. o.small: a biome, for a pack hunt.
 function newHunt(id,o){
   o=o||{}; if(o.trial)id=o.trial.list[0]; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
-  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0};
+  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0,ev:D.small?exRoll():null,evAt:(Math.random()*2)|0};
   S.trial=o.trial?{rank:o.trial.rank,list:o.trial.list,i:0}:null;
   S.mode='hunt'; S.t=0; S.timeLeft=S.trial?trialTime(S.trial.list):D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,fury:0,furyT:0,dn:0,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
@@ -3207,7 +3243,8 @@ function newHunt(id,o){
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
   const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;mv('death');
-  if(S.def.small){forageStart(S.pack===1);if(S.pack>1){S.pack--;S.respawn=FORAGE.time+.4;}return;}   // an expedition: forage, then the next Snapjaw
+  if(S.def.small){if(S.def.alpha&&S.pack===1){const X=S.ex,B=S.def.base;X.got.gem=(X.got.gem||0)+1;X.got[B.mat.head]=(X.got[B.mat.head]||0)+1;}   // the alpha's own reward
+    forageStart(S.pack===1);if(S.pack>1){S.pack--;S.respawn=FORAGE.time+.4;}return;}   // an expedition: forage, then the next Snapjaw
   if(S.trial&&S.trial.i<S.trial.list.length-1){S.trial.i++;S.respawn=TRIAL.gap;return;}   // a trial: the next monster steps in, no break
   huntWon();
 }
@@ -3221,8 +3258,17 @@ function trialNext(){const D=S.def=MONSTERS[S.trial.list[S.trial.i]],gs=S.h.g;BG
 function huntWon(){const h=S.h;S.slow=1.2;S.endT=0;h.state='win';h.t=0;}
 // ── Expeditions: a biome's Snapjaw pack, and after each kill a short lull where the ground turns up that biome's
 // ingredients and, once a run, a creature darts past. Tap them before they're gone.
+// Once in a while an expedition has something extra: a treasure cache in a lull, the biome's big monster passing by
+// in the background (tap it for shed scales), or an alpha leading the pack as its third Snapjaw.
+const EXEV={cache:.25,passer:.25,alpha:.2};
+function exRoll(){const r=Math.random();return r<EXEV.cache?'cache':r<EXEV.cache+EXEV.passer?'passer':r<EXEV.cache+EXEV.passer+EXEV.alpha?'alpha':null;}
+function exBanner(t,c){S.exBan={t,c,life:2.2};}
 const FORAGE={time:5,spawn:[.9,1.3],life:1.6,rareLife:1.1,rare:.15,r:11,bugTime:2.4,bugRare:.15};
-function forageStart(last){const X=S.ex;X.n++;S.forage={t:0,last,spawn:.25,nodes:[],bug:null,bugT:X.n-1===X.bugAt?rnd(.6,1.6):-1};}
+function forageStart(last){const X=S.ex;X.n++;const F=S.forage={t:0,last,spawn:.25,nodes:[],bug:null,bugT:X.n-1===X.bugAt?rnd(.6,1.6):-1};
+  if(X.ev&&!X.evDone&&!last&&X.n-1===X.evAt){const B=S.def.base;
+    if(X.ev==='cache'){X.evDone=true;F.cache={x:rnd(50,W-24),y:L.ground+14,hp:3,t:0};exBanner('A TREASURE CACHE!','#ffe14d');}
+    else if(X.ev==='passer'){X.evDone=true;F.passer={x:W+40,y:L.ground-6,t:0,got:false};exBanner('THE '+B.name+' PASSES BY','#ff9a4d');}}
+  if(X.ev==='alpha'&&!X.evDone&&S.pack===2){X.evDone=true;S.def.alpha=true;abPrebake(S.def);}}   // the next one is the alpha
 function forageUpdate(dt){const F=S.forage,X=S.ex;F.t+=dt;
   if(F.t<FORAGE.time-.8&&(F.spawn-=dt)<=0){F.spawn=rnd(FORAGE.spawn[0],FORAGE.spawn[1]);const rare=Math.random()<FORAGE.rare;
     F.nodes.push({x:rnd(34,W-12),y:rnd(L.ground+8,L.hFeet+4),id:BIOME_ING[S.def.biome][rare?1:0],rare,t:0,life:rare?FORAGE.rareLife:FORAGE.life});}
@@ -3230,14 +3276,26 @@ function forageUpdate(dt){const F=S.forage,X=S.ex;F.t+=dt;
   if(F.bugT>0&&(F.bugT-=dt)<=0){F.bugT=-1;const pool=CREATURES.map((c,i)=>i).filter(i=>CREATURES[i].biome===S.def.biome),rare=Math.random()<FORAGE.bugRare,i=rare?pool[3]:pool[(Math.random()*3)|0],dir=Math.random()<.5?1:-1;
     F.bug={i,dir,x:dir>0?-8:W+8,y:rnd(L.ground-30,L.ground+20),t:0};}
   if(F.bug){const b=F.bug;b.t+=dt;b.x+=b.dir*(W+16)/FORAGE.bugTime*dt;b.y+=Math.sin(b.t*9)*18*dt;if(b.t>=FORAGE.bugTime)F.bug=null;}
-  if(F.t>=FORAGE.time&&!F.bug){S.forage=null;if(F.last)huntWon();}}
-function forageTap(x,y){const F=S.forage;if(!F)return false;const b=F.bug;
+  if(F.passer){const P=F.passer;P.t+=dt;P.x-=dt*(W+80)/(FORAGE.time+1);if(P.x<-60)F.passer=null;}
+  if(F.cache)F.cache.t+=dt;
+  if(F.t>=FORAGE.time&&!F.bug&&!F.passer){S.forage=null;if(F.last)huntWon();}}
+function forageTap(x,y){const F=S.forage;if(!F)return false;const b=F.bug,X=S.ex,B=S.def.base;
+  if(F.cache&&Math.abs(x-F.cache.x)<10&&Math.abs(y-F.cache.y)<10){const C=F.cache;C.hp--;S.shake=Math.max(S.shake,.15);sfx('hit');buzz(15);
+    if(C.hp<=0){const gem=Math.random()<.45,k=gem?'gem':Math.random()<.5?B.mat.scale:B.mat.claw,n=gem?1:2;X.got[k]=(X.got[k]||0)+n;addNum(C.x,C.y-14,'+'+n+' '+LOOT[k].name,'#ffe14d',1.2);sfx('loot');buzz(60);
+      for(let k2=0;k2<14;k2++)S.pt.push({x:C.x,y:C.y,vx:rnd(-70,70),vy:rnd(-110,-20),life:.5,col:k2%2?'#ffe14d':'#fff3a0',g:240});F.cache=null;}return true;}
+  if(F.passer&&!F.passer.got&&Math.abs(x-F.passer.x)<26&&y>F.passer.y-30&&y<F.passer.y+10){const P=F.passer;P.got=true;X.got[B.mat.scale]=(X.got[B.mat.scale]||0)+2;addNum(P.x,P.y-30,'SHED SCALES +2','#ff9a4d',1.2);sfx('perfect');buzz(40);return true;}
   if(b&&(x-b.x)**2+(y-b.y)**2<=14*14){S.ex.caught.push(b.i);F.bug=null;sfx('perfect');buzz(30);addNum(b.x,b.y-8,'CAUGHT!',CREATURES[b.i].col,.9);
     for(let k=0;k<10;k++)S.pt.push({x:b.x,y:b.y,vx:rnd(-60,60),vy:rnd(-90,-10),life:.4,col:CREATURES[b.i].col,g:200});return true;}
   let best=null,bd=FORAGE.r*FORAGE.r;for(const n of F.nodes){const d=(x-n.x)**2+(y-n.y)**2;if(d<=bd){bd=d;best=n;}}
   if(!best)return false;F.nodes.splice(F.nodes.indexOf(best),1);S.ex.got[best.id]=(S.ex.got[best.id]||0)+1;sfx(best.rare?'loot':'hit');buzz(10);
   addNum(best.x,best.y-10,'+1',best.rare?'#ffe14d':'#ffffff',.6);for(let k=0;k<6;k++)S.pt.push({x:best.x,y:best.y,vx:rnd(-50,50),vy:rnd(-80,-10),life:.3,col:ING[best.id][1],g:200});return true;}
-function drawForage(){const F=S.forage;if(!F)return;
+function drawForage(){const F=S.forage;
+  if(S.exBan&&(S.exBan.life-=1/60)>0){const k=S.exBan;text(k.t,W/2,HUD_T+28,k.c,{al:1,out:OUTLINE});}else S.exBan=null;
+  if(!F)return;
+  if(F.passer){const P=F.passer,B=S.def.base,c=mSprite(B,POSE0),sw=Math.round(MS_W*.5),sh=Math.round(MS_H*.5),bob=Math.round(Math.abs(Math.sin(P.t*5))*1.5);g.save();g.globalAlpha=P.got?.55:.9;g.drawImage(c,0,0,MS_W,MS_H,Math.round(P.x-sw/2),Math.round(P.y-sh+6-bob),sw,sh);g.restore();
+    if(!P.got&&Math.floor(P.t*4)%2)circ(P.x,P.y-12,18,'#ff9a4d');}
+  if(F.cache){const C=F.cache,j=C.hp<3?Math.round(Math.sin(C.t*40)):0,ch=smallArt('chest',14,12,{b:'#8a5a2e',u:'#c89a5a',h:'#ffd34d',d:'#4a2e14'},null,K=>{K.P([[1,5],[13,5],[13,11],[1,11]],'body','body',{k:.3});K.P([[1,5],[2,1.6],[12,1.6],[13,5]],'belly','body',{k:.4});K.C([[1.4,5.4,.5],[12.6,5.4,.5]],'horn','front');K.E(7,6.4,1.3,1.3,'horn','front');});
+    if(Math.floor(C.t*3)%2)circ(C.x,C.y,11,'#ffe14d');if(ch)g.drawImage(ch,Math.round(C.x-7+j),Math.round(C.y-6));for(let i=0;i<C.hp;i++){g.fillStyle='#ffe14d';g.fillRect(Math.round(C.x-4+i*3),Math.round(C.y+8),2,2);}}
   for(const n of F.nodes){const u=n.t/n.life,pop=Math.min(1,n.t/.12),yy=Math.round(n.y-6-(1-pop)*4+Math.sin(n.t*8));if(u>.7&&Math.floor(n.t*16)%2)continue;   // blinks before it goes
     if(n.rare)circ(n.x,n.y,8+Math.sin(n.t*14)*1.5,'#ffe14d');g.fillStyle='rgba(0,0,0,.3)';g.fillRect(Math.round(n.x)-4,Math.round(n.y)+5,8,2);g.drawImage(lootSpr(n.id),Math.round(n.x)-6,yy);}
   if(F.bug){const b=F.bug,u=b.t/FORAGE.bugTime;g.drawImage(bugSpr(b.i,Math.floor(b.t*10)%2),Math.round(b.x)-6,Math.round(b.y)-5);circ(b.x,b.y,lerp(18,7,u)+1,OUTLINE);circ(b.x,b.y,lerp(18,7,u),CREATURES[b.i].rare?'#ffe14d':'#4cc9ff');}
@@ -3881,7 +3939,7 @@ function update(dt){
   if(S.forage){if(S.forage.t>.3&&talk('v_gather'))return;forageUpdate(dt);}
   if(!over&&!S.forage){S.timeLeft-=dt;if(S.timeLeft<=0){S.timeLeft=0;h.state='dead';S.fail='TIME UP';S.endT=0;sfx('lose');}}
   hUpdate(dt); mUpdate(dt); qteUpdate(dt); palUpdate(dt);
-  if(S.respawn>0&&(S.respawn-=dt)<=0){S.respawn=0;if(S.trial)trialNext();else{S.m=freshMonster(S.def,S.h.g.status);S.m.enter=.5;S.m.wait=1.2;}}
+  if(S.respawn>0&&(S.respawn-=dt)<=0){S.respawn=0;if(S.trial)trialNext();else{S.m=freshMonster(S.def,S.h.g.status);S.m.enter=.5;S.m.wait=1.2;if(S.def.alpha&&S.pack===1){S.m.hp=S.m.max=Math.round(S.m.max*2.2);S.def.dmg*=1.3;exBanner('AN ALPHA LEADS THE PACK!','#ffd34d');mv('roar');}}}
   for(const f of S.fx)f.t+=dt; S.fx=S.fx.filter(f=>f.t<(f.life||.22));
   for(const p of S.pt){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.g*dt;} S.pt=S.pt.filter(p=>p.life>0);
   for(const n of S.nums){n.t+=dt;} S.nums=S.nums.filter(n=>n.t<n.life);
@@ -4088,7 +4146,7 @@ function drawHud(){
   const h=S.h,m=S.m,blink=Math.floor(S.clock*8)%2;
   // top: the monster. Name and parts, a big health bar, stun (and status, and charge) as thin bars with icons
   g.fillStyle=UI.bg;g.fillRect(0,0,W,HUD_T);g.fillStyle='rgba(17,20,31,.55)';g.fillRect(0,HUD_T,W,2);
-  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.trial?MONSTERS[S.trial.list[S.trial.i]].short+' '+(S.trial.i+1)+'/3':S.def.name.replace('THE ','');text(hn,4,3,UI.tx);
+  const hn=S.def.small?(S.def.alpha&&S.pack===1?'ALPHA':S.def.name)+' '+(4-S.pack)+'/3':S.trial?MONSTERS[S.trial.list[S.trial.i]].short+' '+(S.trial.i+1)+'/3':S.def.name.replace('THE ','');text(hn,4,3,UI.tx);
   const px0=Math.max(44,textW(hn)+9);
   if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*15,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
     g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,1,8,8);g.globalAlpha=1;if(P.broken){g.fillStyle=UI.bad;g.fillRect(x,5,8,1);}
@@ -4873,7 +4931,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(!MH.manual)abTick(S.mode==='hunt'?5:3);if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{draw,abFrame,abTick,abState,AB,trialOpen,trialPick,TRIAL,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,forageTap,FORAGE,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{draw,abFrame,abTick,abState,AB,bugSpr,trialOpen,trialPick,TRIAL,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,forageTap,FORAGE,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS:SCORE,SCORE,MOTIF,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

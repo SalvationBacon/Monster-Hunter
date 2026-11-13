@@ -475,3 +475,12 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Bakers now run in Web Workers** (one to three, by core count). The art engine runs there on `OffscreenCanvas` and frames come back as bitmaps, so the game thread never draws art mid-hunt. A frame that isn't baked yet shows the nearest baked one, or the monster's (or hunter's) resting frame. Hunts now hold about 59 fps at 6x slowdown, and a monster's frames are ready in about 3 seconds. Browsers without workers or `OffscreenCanvas` keep the old baker.
 - **The renderer is about 30% faster** with identical output: each layer only scans its own box, colours are parsed once, per-pixel allocations are gone, and cast shadows skip layers that aren't nearby.
 
+## v0.38.0: the last pixel art, and expedition events
+- **Creatures and ingredients** are drawn by the art engine now, so no hand-made pixel sprites are left. Creatures: beetles (with stag horns on the stag kinds), moths with eye-spotted wings that flap, frogs, newts and skinks (with tails), and hoppers. Ingredient icons: leaves, honey and spice drops, fruits, roots, fish, mushrooms, a clam, meat on the bone, the Wyvern Gem and the potion.
+- **Expedition events.** About two expeditions in three have one:
+  - **Treasure cache** (25%): a chest turns up in a lull and stays until you open it. Three taps break it open: a Wyvern Gem, or two of the biome monster's scales or claws.
+  - **Passing giant** (25%): the biome's big monster walks across the background during a lull. Tap it for two shed scales.
+  - **Alpha** (20%): the third Snapjaw is an alpha, a size bigger with a gold crest, back spines and red eyes, 2.2x health and harder hits. It drops a Wyvern Gem and the biome monster's horn.
+- **The Foraging theme** plays during each forage lull and the pack's theme returns after.
+- `tools/build-art.py` now refuses to run unless there is exactly one art block, after a worker's marker strings were mistaken for one.
+

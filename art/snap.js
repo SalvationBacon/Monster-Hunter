@@ -2,7 +2,7 @@
 // over long legs, a stiff balancing tail, a long low head full of teeth, small grasping hands and a raised sickle claw
 // on each foot. Each biome gives it its own skin (feathered or scaled), crest, back, markings and tail tip.
 (()=>{
-const {V,add,lerp2,chain,ik,kit,spike,bolt,ambient,glowDots,eyeAt}=KIT,PI=Math.PI;
+const {V,add,lerp2,chain,ik,kit,spike,bolt,ambient,glowDots,eyeAt,scale}=KIT,PI=Math.PI;
 const GROUND=66;
 const one=c=>ENG.materials({b:c,u:c,h:c,d:c}).horn;
 const groups={armF:{z:1,R:1.4,k:.8,dk:-1},legF:{z:2,R:2.4,k:1.4,dk:-.9},tailF:{z:3,R:1.2,k:.7},back:{z:3.4,R:1.2,k:.7},body:{z:4,R:4,k:2},
@@ -80,10 +80,13 @@ function build(p,brk,t,D){const K=kit(),{S,E,C,P}=K,glows=[],br=Math.sin(t*3)*.3
     for(const d of[-.55,-.1,.35])C([[wr[0],wr[1],.5],add(wr,V(a2+d+.4,1.7)).concat([.25])],'claw',g,{pri:2.6});};
   const sh=add(add(Cv,fv,.5),up,-1.2);arm(add(sh,[2.4,-.6]),'armF',.9);arm(sh,'armN',1);
   for(const q of S)if(q.pri>=2.5)q.top=1;   // small details colour only themselves
-  const eye=add(add(Hc,f,-.2),uH,.9),blink=(t%2.7)<.09,mouth=lerp2(s1,J1,.5);
-  return{S,mouth,extra:g=>{glowDots(g,glows,D.glowCol,t);if(D.fx)ambient(g,D.fx,t,[Pv[0]-20,20,Pv[0]+20,60],3);eyeAt(g,eye[0]-1,eye[1]-1,D.eye,blink,1,0);}};}
+  let eye=add(add(Hc,f,-.2),uH,.9),mouth=lerp2(s1,J1,.5),G2=glows;const blink=(t%2.7)<.09;
+  if(D.s&&D.s!==1){scale(S,Pv[0],GROUND,D.s);const sc=q=>[Pv[0]+(q[0]-Pv[0])*D.s,GROUND+(q[1]-GROUND)*D.s];eye=sc(eye);mouth=sc(mouth);G2=glows.map(sc);}   // an alpha is drawn bigger
+  return{S,mouth,extra:g=>{glowDots(g,G2,D.glowCol,t);if(D.fx)ambient(g,D.fx,t,[Pv[0]-20,20,Pv[0]+20,60],3);eyeAt(g,eye[0]-1,eye[1]-1,D.eye,blink,1,0);}};}
 
-const R=(id,b,u,h,d,D)=>make(id,'SNAPJAW',{b,u,h,d,glow:D.glowCol},D);
+// each kind also has a rare ALPHA: a size bigger, darker, with a gold crest, back spines and red eyes
+const R=(id,b,u,h,d,D)=>{make(id,'SNAPJAW',{b,u,h,d,glow:D.glowCol},D);make(id.replace('snap','snapA'),'ALPHA SNAPJAW',{b:ENG.mix(b,'#141018',.35),u,h:'#ffd34d',d:ENG.mix(d,'#000000',.3),glow:'#ffd34d'},
+  Object.assign({},D,{s:1.22,back:'spines',crest:D.crest==='swept'||D.crest==='fan'?'horns':D.crest,eye:'#ff4030',glowCol:'#ffd34d'}));};
 R('snap0','#7aa84a','#e0e8b0','#e0a03a','#3f6a34',{skin:'feather',crest:'swept',marks:'stripes',tail:'fan',el:'nature',eye:'#ffe14d'});          // forest
 R('snap1','#a8503a','#e8b080','#ffb03a','#4a2420',{skin:'scale',crest:'bony',back:'spines',tail:'club',el:'fire',fx:'embers',eye:'#ffb03a',glowCol:'#ff9a3a'});   // volcano
 R('snap2','#c9a05a','#f2dca0','#e05a3a','#7a5a2c',{skin:'scale',crest:'frill',marks:'stripes',tail:'spike',el:'earth',eye:'#ffd34d'});          // desert

@@ -255,6 +255,13 @@ const shots=process.argv[2];
   ok(await ev(()=>{EQ();const pr=(mon,st,meal)=>{const S=QUIET(mon,{meal});MH.applyStatus(st);return !(S.h[st]>0||S.h.state==='numb');};
     return pr('mud','mud','beanbroth')&&pr('mire','stench','beanbroth')&&pr('quill','bleed','lilytea')&&pr('shell','wet','kelpwrap')&&pr('dust','numb','chowder')&&pr('dread','blight','figpie')&&!pr('dread','blight','kelpwrap');}),
     'the new meals guard against mud, stench, bleeding, soaking, numbing and blight');
+  ok(await ev(()=>{const run=ev=>{MH.manual=true;MH.newHunt(null,{small:'ember'});const S=MH.S;S.ex.ev=ev;S.ex.evAt=0;S.h.inv=1e9;S.h.atk*=3;let t=0,saw=0,music=new Set();
+      while(S.mode==='hunt'&&t<120){const F=S.forage;music.add(MH.musicCtx());if(F&&F.cache){saw=1;for(let i=0;i<3;i++)MH.forageTap(F.cache.x,F.cache.y);}if(F&&F.passer&&!F.passer.got&&F.passer.x<90){saw=1;MH.forageTap(F.passer.x,F.passer.y-10);}
+        if(ev==='alpha'&&S.pack===1&&!S.respawn&&S.m.state!=='dead'&&S.def.alpha)saw=S.m.max;if(!F&&S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
+      const n=id=>(S.loot.drops.find(d=>d.id===id)||{n:0}).n,B=MH.MONSTERS.ember.mat;return{saw,mode:S.mode,gem:n('gem'),horn:n(B.head),scale:n(B.scale),claw:n(B.claw),music:[...music].join()};};
+    const c=run('cache'),p=run('passer'),a=run('alpha');MH.toCamp('hunt');
+    return c.saw&&c.mode==='loot'&&(c.gem>=1||c.scale>=3||c.claw>=3)&&p.saw&&p.scale>=3&&a.saw>1000&&a.gem===1&&a.horn===1&&c.music.includes('gather')&&c.music.includes('pack')||JSON.stringify([c,p,a]);}),
+    'expedition events: a treasure cache to break open, the big monster passing by for shed scales, and an alpha leading the pack; the lulls play the foraging theme');
   ok(await ev(()=>{MH.SAVE.potions=9;MH.newHunt(null,{small:'dread'});const S=MH.S;return S.def.small&&S.def.biome===7&&S.pack===3&&S.def.loot.common[0][0]===MH.MONSTERS.dread.mat.scale;}),'an expedition in the ruins is three Snapjaws that drop Dreadbeak materials');
 
   // ── ranks ──
