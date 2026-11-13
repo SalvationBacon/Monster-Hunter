@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.35.0';
+const VER='0.36.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -296,6 +296,9 @@ Object.assign(GEAR,{
   relic_status: {slot:'charm',tier:'relic',name:'AFFLICTOR CHARM', sk:{statusup:2,hardy:1},  cost:{gem:1,bog_horn:1,quill_horn:1}},
   relic_beast:  {slot:'charm',tier:'relic',name:'BEAST CHARM',     sk:{beast:2,vigor:1},     cost:{gem:1,shell_horn:1}},
 });
+// ── Crests: a charm for clearing each Rank Trial the first time. Not forged; stronger than the relics.
+[{vigor:2,might:1},{tireless:2,herbal:1},{keenedge:2,razor:1},{guardian:2,hardy:1},{might:2,keeneye:1},{breaker:2,riposte:1},{might:2,keenedge:2,vigor:1}]
+  .forEach((sk,i)=>{GEAR['crest'+(i+1)]={slot:'charm',tier:'crest',trial:i+1,name:(i===6?'APEX':'RANK '+(i+1))+' CREST',sk};});
 // ── Pip's gear: a weapon (attack, and the monster's element or status) and a vest (care: how much its support roles do)
 GEAR.pip_fang={slot:'pweapon',tier:'iron',name:'PIP TWIG',patk:1,free:true};
 GEAR.pip_vest={slot:'parmor',tier:'iron',name:'PIP SCARF',care:1,free:true};
@@ -352,7 +355,7 @@ const STORY=[
   {t:'THE SHY THIEF',     d:['WELCOME TO HOLLOWROOT CAMP.','A FERNWING IS IN THE HERB','GARDEN. ODD: THEY ARE SHY.'],goal:['hunt','fern',1],rw:{potion:2}},
   {t:'STOCK THE PANTRY',  d:['MOSS WANTS HER HERBS BACK.','GO ON AN EXPEDITION: OPEN','THE HUNTS, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
   {t:'A PROPER EDGE',     d:['BRAM SAYS THAT IRON WILL','NOT LAST. FORGE OR UPGRADE','SOMETHING AT THE FORGE.'],goal:['craft',null,1],rw:{scale:3}},
-  {t:'WORD GETS AROUND',  d:['FOUR MORE BEASTS ARE ACTING','UP NEARBY. BEAT ANY THREE','IN RANK 1 TO EARN RANK 2.'],goal:['rank',2,1],rw:{meat:3}},
+  {t:'WORD GETS AROUND',  d:['FOUR MORE BEASTS ARE ACTING','UP NEARBY. BEAT THEM, THEN','PASS THE RANK 1 TRIAL.'],goal:['rank',2,1],rw:{meat:3}},
   {t:'EAT FIRST',         d:['NEVER HUNT HUNGRY. PICK A','DISH ON THE PREP SCREEN','BEFORE YOUR NEXT HUNT.'],goal:['meal',null,1],rw:{honey:2}},
   {t:'SMOKE ON THE RIDGE',d:['AN EMBERWING LEFT ITS NEST,','AND ITS SCALES SHED A FAINT','GLOW. NOBODY HAS SEEN THAT.'],goal:['hunt','ember',1],rw:{pal:1}},
   {t:'A SINGED LITTLE FRIEND',d:['A SCORCHED CRITTER TRAILED','YOU HOME. MOSS CALLS IT','PIP. TAKE PIP ON A HUNT.'],goal:['pal',null,1],rw:{potion:2}},
@@ -362,7 +365,7 @@ const STORY=[
   {t:'THE HIGH TRAIL',    d:['THE GLOW IS THICKEST AT THE','PEAKS. ONLY THE BEST HUNT','THERE. REACH RANK 6.'],goal:['rank',6,1],rw:{gem:2}},
   {t:'EYE OF THE STORM',  d:['EVERY TRAIL OF GLOW ENDS AT','THE PEAKS. A STORMPEARL','CIRCLES THERE, ON GUARD.'],goal:['hunt','storm',1],rw:{gem:2}},
   {t:'FOUR HERALDS',      d:['FOUR GREAT BEASTS HAVE RISEN,','SOAKED IN GLOW. THEY GUARD','THE WAY UP. BEAT ALL FOUR.'],goal:['apex',null,4],rw:{gem:3}},
-  {t:'THE HOLLOW STAR',   d:['THE GLOW FALLS FROM THE SKY.','ITS SOURCE HAS COME DOWN TO','THE PEAK. END THIS, HUNTER.'],goal:['hunt','star',1],rw:{gem:5}},
+  {t:'THE HOLLOW STAR',   d:['THE GLOW FALLS FROM THE SKY.','CLEAR THE APEX TRIAL, THEN','END THIS AT THE PEAK.'],goal:['hunt','star',1],rw:{gem:5}},
   {t:'QUIET SKIES',       d:['THE GLOW IS FADING AND THE','BEASTS ARE CALM AGAIN. MOSS','HAS MADE YOU A FEAST.'],goal:['done',null,1],rw:{}},
 ];
 // ── The story: a cast, scenes, and a dialogue box. Scenes play once (SAVE.seen) and can be replayed from the quest board.
@@ -405,7 +408,7 @@ const SCENES={
        ['bram','NAME\'S BRAM. I TURN MONSTER BITS INTO GEAR. BRING ME SCALES, I\'LL BRING YOU A BLADE.'],
        ['bram','OPEN MY FORGE. TAP ANY MATERIAL TO SEE WHO DROPS IT. THEN MAKE SOMETHING! OR UPGRADE SOMETHING! CLANG!']],
   ch3:[['wren','WORD\'S SPREADING. FOUR MORE BEASTS ARE ACTING ODD AROUND HERE.'],
-       ['wren','BEAT ANY THREE IN RANK 1 AND I\'LL SIGN YOU UP FOR RANK 2. BIGGER BEASTS. BIGGER LOOT.'],
+       ['wren','BEAT THEM ONE BY ONE. THEN TAKE THE RANK 1 TRIAL: THREE OF THEM IN A ROW, NO BREAKS. PASS IT AND YOU\'RE RANK 2. BIGGER BEASTS. BIGGER LOOT.'],
        ['oda','AND BRING ME THEIR SCALES! I NEED TO KNOW IF THEY ALL GLOW.']],
   ch4:[['moss','YOU\'VE BEEN HUNTING ON AN EMPTY STOMACH, HAVEN\'T YOU? I CAN TELL. YOU LOOK GREY.'],
        ['moss','PICK A MEAL ON THE PREP SCREEN BEFORE YOUR NEXT HUNT. EVERY DISH DOES SOMETHING DIFFERENT.'],
@@ -435,7 +438,7 @@ const SCENES={
        ['wren','ONLY ONE WAY TO FIND OUT. BRING THUNDER-PROOF ARMOR.']],
   ch12:[['wren','FOUR GREAT BEASTS HAVE RISEN, DRIPPING WITH GLOW. ODA CALLS THEM HERALDS.'],
        ['oda','THEY AREN\'T CAUSING THE GLOW. THEY\'RE WAITING FOR SOMETHING. LIKE A WELCOME PARTY.'],
-       ['bram','BEAT ALL FOUR. I\'LL MAKE YOU SOMETHING SPECIAL FROM WHAT\'S LEFT.']],
+       ['bram','BEAT ALL FOUR, THEN THREE OF THEM AT ONCE IN THE APEX TRIAL. I\'LL MAKE YOU SOMETHING SPECIAL FROM WHAT\'S LEFT.']],
   ch13:[['oda','I WAS WRONG. IT WASN\'T A BEDTIME STORY.'],
        ['oda','THE HOLLOW STAR. IT FELL AGES AGO AND SLEPT UNDER THE PEAK. NOW IT\'S WAKING, AND IT WANTS THE SKY BACK.'],
        ['wren','THE GLOW IS IT, STIRRING. THE BEASTS FELT IT FIRST. THAT\'S WHY THE FERNWING CAME TO US.'],
@@ -2779,7 +2782,7 @@ function armorIcon(id){if(id in AICON)return AICON[id];AICON[id]=null;
 const gearSpr=id=>{const G=GEAR[id];if(G.slot==='weapon'&&MONSTERS[G.tier]&&typeof ART!=='undefined'){const c=wpnIcon(id);if(c)return c;}
   if((isArmor(G.slot)||G.slot==='weapon')&&typeof ART!=='undefined'&&ART.HUN){const c=armorIcon(id);if(c)return c;}
   return gearSprOld(id);};
-const gearSprOld=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?'#4cc9ff':weaponCol(id);
+const gearSprOld=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?(G.trial?'#ffd34d':'#4cc9ff'):weaponCol(id);
   return shapeSpr('gear:'+id,12,12,{1:col,2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);
     if(G.slot==='armor'){a.poly([[1,1],[4,1],[5,2],[6,1],[9,1],[10,4],[8,5],[8,10],[2,10],[2,5],[0,4]],1);a.rect(2,7,7,1,2);}
     else if(G.slot==='helm'){a.ell(5,5,5,4,1);a.rect(0,5,11,4,1);a.rect(3,6,5,1,2);}
@@ -3071,6 +3074,9 @@ function loadSave(){
   v.own.leather=v.own.leather_helm=v.own.leather_arms=v.own.leather_legs=v.own.pip_fang=v.own.pip_vest=true;for(const wt of WT)v.own['iron_'+wt]=true;v.pal=!!v.pal;
   const DEF={weapon:'iron_gs',armor:'leather',helm:'leather_helm',arms:'leather_arms',legs:'leather_legs',charm:null,pweapon:'pip_fang',parmor:'pip_vest'};for(const sl in DEF)if(!v.eq[sl]||!(GEAR[v.eq[sl]]&&v.own[v.eq[sl]]))v.eq[sl]=DEF[sl];
   if(v.potions==null)v.potions=POT_START;v.bugs=v.bugs||{};v.story=v.story||{i:0,p:0};v.side=v.side||{};v.daily=v.daily||{key:'',q:[]};v.weekly=v.weekly||{key:'',q:[]};v.packs=v.packs||0;v.role=v.role||'fighter';
+  if(!v.trials){v.trials={};v.open={};const rw=r=>HUNTS.filter(id=>MONSTERS[id].rank===r&&v.wins[id]).length,oldOpen=r=>r<=1?!!v.wins.fern:r===8?rw(7)>=4:rw(r-1)>=3;
+    for(let r=1;r<8;r++)if(r<7?rw(r)>=3:rw(7)>=4)v.trials[r]={best:0,old:1};for(const id of HUNTS)if(oldOpen(MONSTERS[id].rank))v.open[id]=1;}   // older saves keep every rank and monster they had opened
+  v.open=v.open||{};
   if(!v.seen){v.seen={};if(v.wins.fern){for(const k of TUT_KEYS)v.seen[k]=1;for(let i=0;i<v.story.i;i++)v.seen['ch'+i]=1;}}   // older saves skip the tutorial, but see their current chapter
   return v;
 }
@@ -3123,12 +3129,16 @@ function gearStats(meal){
 // Pip's numbers, from its gear
 function palStats(){const e=SAVE.eq,w=GEAR[e.pweapon]||GEAR.pip_fang,a=GEAR[e.parmor]||GEAR.pip_vest,b=1+.08*(skillLevels().beast||0);return{atk:+(w.patk*b).toFixed(3),elem:w.elem||null,status:w.status||null,care:+(a.care*b).toFixed(3)};}
 const canAfford=id=>Object.entries(GEAR[id].cost||{}).every(([k,n])=>(SAVE.bag[k]||0)>=n);
-// Ranks: three wins in a rank open the next. The apex rank needs three of rank 6, and the elder needs all four apex monsters.
-const RANK_NEED=3, RANKS=8;
-const rankWins=r=>HUNTS.filter(id=>MONSTERS[id].rank===r&&SAVE.wins[id]).length;
-const rankOpen=r=>r<=1?true:r===8?rankWins(7)>=4:rankWins(r-1)>=RANK_NEED;
-const unlocked=id=>id==='fern'||(SAVE.wins[id]||0)>0||(MONSTERS[id].rank===1?!!SAVE.wins.fern:rankOpen(MONSTERS[id].rank));
-const lockText=id=>{const r=MONSTERS[id].rank;return r===1?'BEAT THE FERNWING FIRST':r===8?'BEAT ALL FOUR APEX':'WIN '+RANK_NEED+' HUNTS IN RANK '+(r-1);};
+// Ranks: monsters open one at a time, in order; beating a rank's last monster opens its Rank Trial (three of the rank's
+// monsters back to back), and clearing the trial opens the next rank. The Fernwing comes first, before rank 1's others.
+const RANKS=8;
+const rankIds=r=>HUNTS.filter(id=>MONSTERS[id].rank===r);
+const rankWins=r=>rankIds(r).filter(id=>SAVE.wins[id]).length;
+const rankOpen=r=>r<=1||!!SAVE.trials[r-1];
+const prevInRank=id=>{const L=rankIds(MONSTERS[id].rank),i=L.indexOf(id);return i>0?L[i-1]:null;};
+const unlocked=id=>id==='fern'||(SAVE.wins[id]||0)>0||!!SAVE.open[id]||(rankOpen(MONSTERS[id].rank)&&(()=>{const p=prevInRank(id);return !p||(SAVE.wins[p]||0)>0;})());
+const lockText=id=>{const r=MONSTERS[id].rank;if(!rankOpen(r))return 'CLEAR '+rankName(r-1)+' TRIAL';const p=prevInRank(id);return 'BEAT THE '+MONSTERS[p].name+' FIRST';};
+const trialOpen=r=>r<RANKS&&rankOpen(r)&&rankWins(r)===rankIds(r).length;
 const rankName=r=>r===7?'APEX':r===8?'ELDER':'RANK '+r;
 
 // A pack of three small monsters for a biome: the short hunts
@@ -3145,11 +3155,12 @@ function freshMonster(D,status){
 }
 // o.meal: a meal eaten for this hunt. o.role: what the companion does. o.small: a biome, for a pack hunt.
 function newHunt(id,o){
-  o=o||{}; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
+  o=o||{}; if(o.trial)id=o.trial.list[0]; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
   S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0};
-  S.mode='hunt'; S.t=0; S.timeLeft=D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
+  S.trial=o.trial?{rank:o.trial.rank,list:o.trial.list,i:0}:null;
+  S.mode='hunt'; S.t=0; S.timeLeft=S.trial?trialTime(S.trial.list):D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,fury:0,furyT:0,dn:0,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
-       potions:Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
+       potions:o.trial?TRIAL.potions:Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
        immune:M.immune||{},wear:M.wear||1,regen:M.regen||1,healMul:M.heal||1,luck:(M.luck||1)*(gs.setb==='bounty'?1.5:1),chargeSlow:M.chargeSlow||1,sw:gs.setb==='secondwind',bl:0,qGap:gs.setb==='insight'?.8:1};
   S.m=freshMonster(D,gs.status);
   S.pal=o.role&&o.role!=='rest'&&SAVE.pal?Object.assign({role:o.role,t:PAL.every,trapT:PAL.trapFirst,used:false,hop:0,sb:0},palStats()):null;
@@ -3158,14 +3169,22 @@ function newHunt(id,o){
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
   S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0,qteHit:0,qteMiss:0};
   S.loot=null; S.fail=''; S.paused=false;
-  S.abCur=null;abPrebake(D);huPrebake();
+  S.abCur=null;abPrebake(D);huPrebake();if(S.trial)abPrebake(MONSTERS[S.trial.list[1]]);
 }
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
   const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;mv('death');
   if(S.def.small){forageStart(S.pack===1);if(S.pack>1){S.pack--;S.respawn=FORAGE.time+.4;}return;}   // an expedition: forage, then the next Snapjaw
+  if(S.trial&&S.trial.i<S.trial.list.length-1){S.trial.i++;S.respawn=TRIAL.gap;return;}   // a trial: the next monster steps in, no break
   huntWon();
 }
+// ── Rank Trials: three of a rank's monsters back to back in one hunt. Health carries over, one timer for all three,
+// and the trial brings its own potions (yours stay at home).
+const TRIAL={potions:5,gap:1.6,time:.7};
+const trialTime=list=>Math.round(list.reduce((a,id)=>a+MONSTERS[id].time,0)*TRIAL.time/10)*10;
+function trialPick(r){const L=rankIds(r).slice();while(L.length>3)L.splice((Math.random()*L.length)|0,1);return L;}   // three of the rank, weakest first
+function trialNext(){const D=S.def=MONSTERS[S.trial.list[S.trial.i]],gs=S.h.g;BG=bgFor(D.biome);S.qteTime=D.qteTime*gs.qteSlow;HUD_T=D.trait==='charge'?27:21;
+  S.m=freshMonster(D,gs.status);S.m.enter=.5;S.m.wait=1.2;S.qte=null;S.abCur=null;S.sigSt=null;const nx=S.trial.list[S.trial.i+1];if(nx)abPrebake(MONSTERS[nx]);mv('roar');}
 function huntWon(){const h=S.h;S.slow=1.2;S.endT=0;h.state='win';h.t=0;}
 // ── Expeditions: a biome's Snapjaw pack, and after each kill a short lull where the ground turns up that biome's
 // ingredients and, once a run, a creature darts past. Tap them before they're gone.
@@ -3581,7 +3600,7 @@ function hUpdate(dt){
   }
   else if(h.state==='hurt'){if(h.t>=.45){h.state='idle';h.inv=.7;}}
   else if(h.state==='drink'){
-    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;SAVE.potions=Math.max(0,SAVE.potions-1);const heal=Math.round(h.max*POTION_HEAL*(1+.17*(P.herbal||0))*h.healMul);h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');
+    if(!h.drank&&h.t>=.6){h.drank=true;h.potions--;if(!S.trial)SAVE.potions=Math.max(0,SAVE.potions-1);const heal=Math.round(h.max*POTION_HEAL*(1+.17*(P.herbal||0))*h.healMul);h.hp=Math.min(h.max,h.hp+heal);addNum(L.hx+18,L.hFeet-34,'+'+heal,'#4cd964',.9);sfx('heal');
       if(h.poison>0){h.poison=0;addNum(L.hx+18,L.hFeet-44,'CURED','#7ad84a',.9);}}
     if(h.t>=.9)h.state='idle';
   }
@@ -3694,6 +3713,7 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k===' '||k==='j'||k=
 //  UPDATE
 // ═══════════════════════════════════════════════════
 function rollLoot(){
+  if(S.trial)return trialLoot();
   const m=S.m,D=S.def,h=S.h,out=[],add=(id,n)=>{if(n<=0)return;const o=out.find(d=>d.id===id&&!d.rare);if(o)o.n+=n;else out.push({id,n});};let bugs=[],fresh=[];
   for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
   const fl=lv(h.g,'fortune'),luck=1+.33*fl, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
@@ -3710,7 +3730,7 @@ function rollLoot(){
     if(Math.random()<chance){out.push({id:D.mat.rare,n:1,rare:true});SAVE.dry[D.id]=0;}else SAVE.dry[D.id]=dry+1;
     if(D.rank===7)qEvent('apex');
     const first=!SAVE.wins[D.id]; SAVE.wins[D.id]=(SAVE.wins[D.id]||0)+1;
-    if(first){const r=D.rank;unlock=D.id==='fern'?'RANK 1 IS OPEN':r<RANKS&&rankOpen(r+1)&&(r===7?rankWins(7)===4:rankWins(r)===RANK_NEED)?rankName(r+1)+' IS OPEN':'';}
+    if(first){const r=D.rank,nx=HUNTS.find(x=>MONSTERS[x].rank===r&&!SAVE.wins[x]&&unlocked(x)&&x!==D.id);unlock=D.id==='fern'?'RANK 1 IS OPEN':trialOpen(r)?'THE '+rankName(r)+' TRIAL IS OPEN':nx?MONSTERS[nx].name+' IS OPEN':'';}
     qEvent('hunt',D.id);qEvent('weapon',h.g.wt);if(time<45)qEvent('fast');
     if(broke.length){qEvent('break',null,broke.length);if(m.parts.tail.broken)qEvent('tail');if(broke.length===3)qEvent('allbreak');}
   }
@@ -3719,6 +3739,18 @@ function rollLoot(){
   for(const d of out)SAVE.bag[d.id]=(SAVE.bag[d.id]||0)+d.n;
   save();
   return{drops:out,bag:SAVE.bag,time,unlock,bugs,fresh};
+}
+// A cleared trial: the next rank on the first clear, carves from all three monsters, Wyvern Gems, a rare core (always the
+// first time), a seal for the rank, and the best time kept
+function trialLoot(){
+  const T=S.trial,r=T.rank,out=[],add=(id,n,rare)=>{if(n<=0)return;const o=out.find(d=>d.id===id);if(o)o.n+=n;else out.push(rare?{id,n,rare:true}:{id,n});},time=trialTime(T.list)-S.timeLeft,first=!SAVE.trials[r]||SAVE.trials[r].old;
+  for(const id of T.list){const D=MONSTERS[id];for(const [k,lo,hi] of D.loot.common)add(k,lo+((Math.random()*(hi-lo+1))|0));SAVE.wins[id]=(SAVE.wins[id]||0)+1;qEvent('hunt',id);}
+  if(first&&!SAVE.own['crest'+r]){SAVE.own['crest'+r]=true;out.push({id:'crest'+r,n:1,gear:true});}add('gem',first?2+r:1);
+  if(first||Math.random()<.35){const D=MONSTERS[T.list[(Math.random()*3)|0]];add(D.mat.rare,1,true);SAVE.dry[D.id]=0;}
+  const prev=SAVE.trials[r];SAVE.trials[r]={best:prev&&prev.best&&!prev.old?Math.min(prev.best,time):time,n:((prev&&prev.n)||0)+1};
+  qEvent('weapon',S.h.g.wt);qEvent('trial',r);if(S.stats.perfect)qEvent('perfect',null,S.stats.perfect);if(S.pal)qEvent('pal');
+  for(const d of out)if(!d.gear)SAVE.bag[d.id]=(SAVE.bag[d.id]||0)+d.n;save();
+  return{drops:out,bag:SAVE.bag,time,unlock:first?rankName(r+1)+' IS OPEN':'',best:SAVE.trials[r].best,newBest:!first&&prev&&time<=SAVE.trials[r].best&&prev.best>time,bugs:[],fresh:[]};
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
@@ -3748,7 +3780,7 @@ FCATS.weapon.subs=[['GREAT','gs'],['DUAL','db'],['HAMMER','hm'],['LANCE','ln']];
 function forgeList(cat,sub){
   const key=FCATS[cat].subs[sub][1],out=[];
   const pick=id=>{const G=GEAR[id];return cat==='weapon'?G.slot==='weapon'&&G.wt===key:G.slot===key;};
-  const ids=Object.keys(GEAR).filter(pick),seen=id=>{const T=GEAR[id].tier;return !MONSTERS[T]||unlocked(T)||SAVE.own[id];};
+  const ids=Object.keys(GEAR).filter(pick),seen=id=>{const G=GEAR[id],T=G.tier;if(G.trial)return !!SAVE.own[id];return !MONSTERS[T]||unlocked(T)||SAVE.own[id];};
   for(const id of ids)if(seen(id))out.push(id);
   return{ids:out,hidden:ids.length-out.length};
 }
@@ -3792,11 +3824,11 @@ function brew(){if(!affords(POT_COST)){toast('NEEDS 3 HERBS','#ff6a4d');sfx('mis
 const ROLE_IDS=['fighter','healer','trapper','scout','gatherer','rest'];
 function prepGear(){const P=S.prep;toCamp('gear');S.fromPrep=P;sfx('charge',1);}
 function backToPrep(){const P=S.fromPrep;S.fromPrep=null;S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.gpick=null;S.prep=P;sfx('charge',1);}
-function toPrep(id,small){S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.prep={id,small:small==null?null:small,meal:-1};}
+function toPrep(id,small,trial){S.mode='prep';S.t=0;S.btns=[];S.toast=null;S.prep={id,small:small==null?null:small,meal:-1,trial:trial?{rank:trial,list:trialPick(trial)}:null};}
 function prepStart(){
   const P=S.prep,meal=P.meal>=0?MEAL_IDS[P.meal]:null;
   if(meal){if(!affords(MEALS[meal].cost)){toast('MISSING INGREDIENTS','#ff6a4d');sfx('miss');return;}for(const [k,n] of Object.entries(MEALS[meal].cost))SAVE.bag[k]-=n;qEvent('meal');}
-  save();newHunt(P.id,{meal,role:SAVE.pal?SAVE.role:null,small:P.small});
+  save();newHunt(P.id,{meal,role:SAVE.pal?SAVE.role:null,small:P.small,trial:P.trial});
 }
 // ── Gather run: tap what pops up before it goes, and catch creatures in their closing circle ──
 // A run: something pops up every 1.4 to 2.2s, so a perfect run gathers about ten things; one creature crosses once
@@ -3816,7 +3848,7 @@ function update(dt){
   if(S.forage){if(S.forage.t>.3&&talk('v_gather'))return;forageUpdate(dt);}
   if(!over&&!S.forage){S.timeLeft-=dt;if(S.timeLeft<=0){S.timeLeft=0;h.state='dead';S.fail='TIME UP';S.endT=0;sfx('lose');}}
   hUpdate(dt); mUpdate(dt); qteUpdate(dt); palUpdate(dt);
-  if(S.respawn>0&&(S.respawn-=dt)<=0){S.respawn=0;S.m=freshMonster(S.def,S.h.g.status);S.m.enter=.5;S.m.wait=1.2;}
+  if(S.respawn>0&&(S.respawn-=dt)<=0){S.respawn=0;if(S.trial)trialNext();else{S.m=freshMonster(S.def,S.h.g.status);S.m.enter=.5;S.m.wait=1.2;}}
   for(const f of S.fx)f.t+=dt; S.fx=S.fx.filter(f=>f.t<(f.life||.22));
   for(const p of S.pt){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.g*dt;} S.pt=S.pt.filter(p=>p.life>0);
   for(const n of S.nums){n.t+=dt;} S.nums=S.nums.filter(n=>n.t<n.life);
@@ -3941,7 +3973,7 @@ function drawWorld(){
   const air=clamp(-p.oy/60,0,1);
   if(S.def.small)shadow(L.mx+MS_OX+(hasArt(S.def)?20:29)+p.ox,L.mFeet+2,12,3);else shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
   const dead=m.state==='dead';
-  if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)&&!(dead&&S.def.small&&m.t>2)){
+  if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)&&!(dead&&(S.def.small&&m.t>2||S.trial&&S.respawn>0&&m.t>1))){
     if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(artId(S.def),st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+abDx()+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:p.oy);S.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;S.abCur={mouth:st.sig?f.st&&f.st.mouth:f.mouth,sig:!!st.sig,dx:st.sig?-st.dx:p.ox,oy:st.sig?0:p.oy};
       if(S.sigSt&&S.sigSt.wash){for(const[c,a]of S.sigSt.wash){g.globalAlpha=a;g.fillStyle=c;g.fillRect(0,0,W,LH);}g.globalAlpha=1;}   // full-screen flash or darkness from a signature move
       if((p.oy>4&&m.state==='attack')||st.sink){g.save();g.beginPath();g.rect(-8,0,W+16,L.mFeet+3);g.clip();g.drawImage(img,x,y);g.restore();}else g.drawImage(img,x,y);}
@@ -4012,6 +4044,7 @@ function drawWorld(){
     if(f.kind==='bolt'){let x=f.x;for(let y=f.y;y>HUD_T;y-=4){const nx=x+((hash2(y,f.x|0,3)*7)|0)-3;g.fillStyle=u<.5?'#ffffff':f.col||'#ffe14d';g.fillRect(Math.min(x,nx)-1,y-4,Math.abs(nx-x)+3,4);x=nx;}continue;}
     for(let i=0;i<n;i++){const k=i/n-.5+u*.3;g.fillStyle=u<.5?'#fff':'#fff3a0';g.fillRect(Math.round(f.x+k*n*1.4),Math.round(f.y+d*k*n*1.6),f.big?3:2,1);}}
   drawForage();
+  if(S.trial&&S.respawn>0&&S.h.state!=='dead'){const N=MONSTERS[S.trial.list[S.trial.i]],k=1-S.respawn/TRIAL.gap;if(Math.floor(S.clock*8)%2||k>.3){text('NEXT',W/2,HUD_T+8,UI.dim,{al:1,out:OUTLINE});big(N.name,W/2,HUD_T+16,'#ff9a4d',1);}}
   for(const q of S.pt){g.fillStyle=q.col;g.fillRect(Math.round(q.x),Math.round(q.y),q.life>.25?2:1,q.life>.25?2:1);}
   for(const n of S.nums){const u=n.t/n.life;text(n.txt,clamp(n.x,n.txt.length*2+2,W-n.txt.length*2-2),n.y-u*12-(u<.15?(1-u/.15)*-3:0),n.col,{al:1,out:OUTLINE});}
   g.restore();
@@ -4021,7 +4054,7 @@ function drawHud(){
   const h=S.h,m=S.m,blink=Math.floor(S.clock*8)%2;
   // top: the monster. Name and parts, a big health bar, stun (and status, and charge) as thin bars with icons
   g.fillStyle=UI.bg;g.fillRect(0,0,W,HUD_T);g.fillStyle='rgba(17,20,31,.55)';g.fillRect(0,HUD_T,W,2);
-  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.def.name.replace('THE ','');text(hn,4,3,UI.tx);
+  const hn=S.def.small?S.def.name+' '+(4-S.pack)+'/3':S.trial?MONSTERS[S.trial.list[S.trial.i]].short+' '+(S.trial.i+1)+'/3':S.def.name.replace('THE ','');text(hn,4,3,UI.tx);
   const px0=Math.max(44,textW(hn)+9);
   if(!S.def.small)PARTS.forEach((k,i)=>{const spr=S.def.loot.parts[k],P=m.parts[k],x=px0+i*15,act=S.qte&&S.qte.part===k&&Math.floor(S.clock*10)%2;
     g.globalAlpha=P.broken?.3:1;g.drawImage(lootSpr(spr),0,0,12,12,x,1,8,8);g.globalAlpha=1;if(P.broken){g.fillStyle=UI.bad;g.fillRect(x,5,8,1);}
@@ -4164,11 +4197,11 @@ function drawOptions(){
 function drawLoot(){
   const R=S.loot,nb=(R.bugs||[]).length,rows=R.drops.length+nb; g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);
   const ph=48+rows*14+(R.unlock?10:0), y=Math.max(14,((LH-ph)/2)|0);
-  big(S.def.small?'EXPEDITION DONE':'HUNT COMPLETE',W/2,y,UI.gold,1);text(fmtTime(R.time)+'   '+S.stats.perfect+' PERFECT DODGES',W/2,y+14,UI.dim,{al:1});
+  big(S.trial?'TRIAL CLEARED':S.def.small?'EXPEDITION DONE':'HUNT COMPLETE',W/2,y,UI.gold,1);text(S.trial?fmtTime(R.time)+(R.newBest?'   NEW BEST!':'   BEST '+fmtTime(R.best)):fmtTime(R.time)+'   '+S.stats.perfect+' PERFECT DODGES',W/2,y+14,S.trial&&R.newBest?UI.gold:UI.dim,{al:1});
   R.drops.forEach((d,i)=>{const at=.5+i*.35;if(S.t<at)return;if(!d.snd){d.snd=1;sfx('loot');}
     if(d.rare&&!d.fan){d.fan=1;sfx('win');buzz(200);}
     const yy=y+26+i*14;rbox(8,yy-3,W-16,13,d.rare?(Math.floor(S.t*6)%2?'#5a4a14':'#3a3010'):UI.s1);
-    g.drawImage(lootSpr(d.id),11,yy-3);text(LOOT[d.id].name,26,yy+1,d.rare?UI.gold:d.id==='gem'?'#4cd9c0':UI.tx);if(d.rare)text('RARE',W-30,yy+1,UI.gold,{al:2});
+    g.drawImage(d.gear?gearSpr(d.id):lootSpr(d.id),11,yy-3);text(d.gear?GEAR[d.id].name:LOOT[d.id].name,26,yy+1,d.gear?UI.gold:d.rare?UI.gold:d.id==='gem'?'#4cd9c0':UI.tx);if(d.rare)text('RARE',W-30,yy+1,UI.gold,{al:2});
     text('+'+d.n,W-11,yy+1,UI.gold,{al:2});});
   (R.bugs||[]).forEach((i,j)=>{const at=.5+(R.drops.length+j)*.35;if(S.t<at)return;const yy=y+26+(R.drops.length+j)*14;rbox(8,yy-3,W-16,13,UI.s1);   // creatures caught
     g.drawImage(bugSpr(i,Math.floor(S.t*5)%2),11,yy-2);text(CREATURES[i].name,26,yy+1,CREATURES[i].col);if(R.fresh.includes(i))text('NEW!',W-11,yy+1,Math.floor(S.t*5)%2?'#fff':UI.gold,{al:2});});
@@ -4179,7 +4212,7 @@ function drawLoot(){
 function drawFail(){
   g.fillStyle='rgba(30,6,10,.82)';g.fillRect(0,0,W,LH);
   const y=((LH-50)/2)|0;big('HUNT FAILED',W/2,y,UI.bad,1);text(S.fail,W/2,y+16,UI.tx,{al:1});
-  text(S.def.name+' LEFT AT '+Math.round(S.m.hp/S.m.max*100)+'%',W/2,y+26,UI.dim,{al:1});
+  text(S.trial?'MONSTER '+(S.trial.i+1)+' OF 3: '+S.def.name:S.def.name+' LEFT AT '+Math.round(S.m.hp/S.m.max*100)+'%',W/2,y+26,UI.dim,{al:1});
   if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO RETURN',W/2,y+42,UI.dim,{al:1});
 }
 // One piece of gear's line of numbers: attack and element, health and resistance, a perk, or Pip's stats
@@ -4567,6 +4600,12 @@ function drawHunts(B,gs){
         else{if(ropen&&!lockNote){lockNote=true;if(vis(9))text(lockText(id),6,y+1,UI.faint);y+=9;total+=9;}
           if(vis(16)){rbox(6,y,W-12,16,UI.s1);portraitBox(D,7,y+1,14,14,false,top,bot);text(ropen||r===1?D.name:'???',26,y+6,UI.faint);icLock(W-14,y+5,UI.faint);push('hunt:'+id,16,()=>huntTap(id));}
           y+=18;total+=18;}}
+      if(!q&&r<RANKS&&ropen){const op=trialOpen(r),rec=SAVE.trials[r],done=rec&&!rec.old;   // the rank's trial
+        if(vis(30)){rbox(6,y,W-12,30,op?'#2a2414':UI.s1);g.drawImage(gearSpr('crest'+r),9,y+9);text(rankName(r)+' TRIAL',26,y+5,op?UI.gold:UI.faint);
+          text(!op?'BEAT ALL '+all.length+' TO OPEN':done?'CLEARED . BEST '+fmtTime(rec.best):rec?'CLEARED. TRY IT FOR THE CREST':'THREE IN A ROW, NO BREAKS',26,y+14,!op?UI.faint:done?UI.ok:UI.dim);
+          if(op)text(rankOpen(r+1)?'AGAIN >':'TAKE IT >',W-10,y+22,UI.gold,{al:2});else icLock(W-14,y+11,UI.faint);
+          push('trial:'+r,30,()=>{if(!trialOpen(r)){toast('BEAT ALL OF '+rankName(r)+' FIRST','#ff6a4d');sfx('miss');return;}toPrep(null,null,r);});}
+        y+=33;total+=33;}
       y+=4;total+=4;}
     if(!shown)text('NOTHING MATCHES '+q,W/2,top+12,UI.dim,{al:1});
     g.restore();uScroll(top,bot,'hunt',total+2);
@@ -4719,8 +4758,9 @@ function drawCamp(){
 }
 // ── Prep: the moment before a hunt ──
 function drawPrep(){
-  const B=S.btns=[],P=S.prep,D=P.small!=null?smallDef(P.small):MONSTERS[P.id],gs=gearStats(P.meal>=0?MEAL_IDS[P.meal]:null),eq=SAVE.eq;
+  const B=S.btns=[],P=S.prep,TR=P.trial,D=P.small!=null?smallDef(P.small):MONSTERS[TR?TR.list[0]:P.id],gs=gearStats(P.meal>=0?MEAL_IDS[P.meal]:null),eq=SAVE.eq;
   g.fillStyle=UI.bg;g.fillRect(0,0,W,LH);
+  if(TR){drawTrialPrep(B,P,TR,gs,eq);return;}
   const tip=D.tip&&LH>=226,need=12+12+(tip?11:0)+46+31+24+(SAVE.pal?31:0),bh=Math.max(40,Math.min(90,LH-need));
   g.save();g.beginPath();g.rect(0,0,W,bh);g.clip();g.drawImage(bgFor(D.biome),0,L.ground-bh+6,W,bh,0,0,W,bh);
   g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*1.1)>.9?1:0})),(W-MS_W)/2+12,Math.min(8,bh-62));g.restore();
@@ -4750,7 +4790,27 @@ function drawPrep(){
   uToast(by-16);
 }
 
-// ── Gather run ──
+// The trial's prep: its three monsters in order, the rules, and what the first clear gives
+function drawTrialPrep(B,P,TR,gs,eq){
+  const r=TR.rank,bh=Math.max(46,Math.min(70,LH-150));g.save();g.beginPath();g.rect(0,0,W,bh);g.clip();g.drawImage(bgFor(MONSTERS[TR.list[2]].biome),0,L.ground-bh+6,W,bh,0,0,W,bh);
+  TR.list.forEach((id,i)=>{const D=MONSTERS[id],c=mSprite(D,POSE0);g.drawImage(c,0,0,MS_W,MS_H,2+i*41,bh-50,Math.round(MS_W*.5),Math.round(MS_H*.5));});g.restore();
+  for(let i=0;i<22;i++){g.fillStyle='rgba(17,20,31,'+(i/22).toFixed(2)+')';g.fillRect(0,bh-22+i,W,1);}
+  rbox(4,4,13,12,'rgba(0,0,0,.55)');icChev(8,7,UI.tx,true);B.push({id:'prep:back',x:0,y:0,w:22,h:20,fn:()=>toCamp('hunt')});
+  text('RANK TRIAL . THREE IN A ROW',7,bh-17,UI.dim);big(rankName(r)+' TRIAL',7,bh-10,UI.gold);
+  let y=bh+4;TR.list.forEach((id,i)=>{const D=MONSTERS[id];text((i+1)+'. '+D.name,7,y+2,UI.tx);let x=W-8-textW(ELEM[D.weak][0])-6;echip(x,y,D.weak);y+=10;});
+  y+=2;text('HEALTH CARRIES OVER, NO BREAKS',7,y,UI.dim);y+=8;text(fmtTime(trialTime(TR.list))+' FOR ALL THREE. '+TRIAL.potions+' POTIONS',7,y,UI.dim);y+=10;
+  const done=SAVE.trials[r]&&!SAVE.trials[r].old;if(done){text('BEST '+fmtTime(SAVE.trials[r].best),7,y,UI.ok);y+=11;}else{text('FIRST CLEAR: OPENS '+(r<7?rankName(r+1):'THE ELDER'),7,y,UI.gold);y+=8;text('+ '+GEAR['crest'+r].name+' AND A RARE CORE',7,y,UI.gold);y+=11;}
+  uLabel('LOADOUT',6,y);y+=8;const w=GEAR[eq.weapon];
+  rbox(6,y,W-12,24,UI.s1);g.drawImage(gearSpr(eq.weapon),10,y+6);text(w.name+(lvOf(eq.weapon)?' +'+lvOf(eq.weapon):''),26,y+5,UI.tx);icChev(W-12,y+8,UI.faint);
+  icHeart(26,y+15,UI.dim);text(''+gs.hp,33,y+15,UI.dim);icSword(50,y+15,UI.dim);text(gs.atk.toFixed(2),57,y+15,UI.dim);g.drawImage(lootSpr('potion'),0,0,12,12,76,y+13,8,8);text(''+TRIAL.potions,85,y+15,UI.dim);
+  B.push({id:'prep:gear',x:6,y,w:W-12,h:24,fn:prepGear});y+=27;
+  const n=MEAL_IDS.length+1,mk=P.meal>=0?MEAL_IDS[P.meal]:null,M=MEALS[mk];
+  if(y+26<LH-24){rbox(6,y,W-12,22,UI.s1);icChev(11,y+8,UI.dim,true);icChev(W-14,y+8,UI.dim);
+    B.push({id:'prep:mprev',x:6,y,w:22,h:22,fn:()=>{P.meal=(P.meal+1+n-1)%n-1;sfx('charge',1);}});B.push({id:'prep:mnext',x:W-28,y,w:22,h:22,fn:()=>{P.meal=(P.meal+2)%n-1;sfx('charge',1);}});
+    if(M){const ok=affords(M.cost);text(M.name,W/2,y+4,ok?UI.gold:UI.dim,{al:1});text(M.desc,W/2,y+12,UI.ok,{al:1});}else text('NO MEAL',W/2,y+8,UI.tx,{al:1});}
+  const by=LH-21;uBtn(B,'prep:backbtn',6,by,30,16,'BACK','plain',()=>toCamp('hunt'));uBtn(B,'prep:start',40,by,W-46,16,'BEGIN','gold',prepStart,true);
+  uToast(by-16);
+}
 function draw(){
   syncSearch();
   g.imageSmoothingEnabled=false;
@@ -4779,7 +4839,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(!MH.manual)abTick(S.mode==='hunt'?5:3);if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{draw,abFrame,abTick,abState,AB,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,forageTap,FORAGE,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{draw,abFrame,abTick,abState,AB,trialOpen,trialPick,TRIAL,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,forageTap,FORAGE,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS:SCORE,SCORE,MOTIF,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

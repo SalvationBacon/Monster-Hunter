@@ -458,3 +458,15 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - An expedition counts for both the old quest goals: "go on an expedition" (was gather run) and "beat a Snapjaw pack". Moss's first-lull tip, the story, the guides, the material sources and the terrarium now point to expeditions.
 - The separate gather screen and its results screen are gone. The Foraging music theme is no longer used.
 
+## v0.36.0: Rank Trials
+- **Monsters open one at a time**, in roster order within each rank: beating one opens the next. The hunt list says "BEAT THE X FIRST" for the next locked one.
+- **Moving up a rank takes a Rank Trial.** Beating a rank's last monster opens its trial: three of that rank's monsters picked at random (weakest first), back to back in one hunt.
+  - **Health carries over** and there are **no breaks**: the next monster steps in 1.6 seconds after a kill, announced by a "NEXT" banner.
+  - **One timer** for all three: 70% of their three hunt times (5:20 in rank 1).
+  - The trial brings **its own 5 potions**; your stock stays at home.
+  - Clearing the rank 1–6 trials opens the next rank; the Apex trial (three of the four apex monsters) opens the Hollow Star.
+- **Rewards.** The first clear: the next rank, a **Crest** (a charm only trials give, stronger than the forge's relic charms: Rank 1 vigor 2 + might 1, Rank 2 tireless 2 + herbal 1, Rank 3 keen edge 2 + razor 1, Rank 4 guardian 2 + hardy 1, Rank 5 might 2 + keen eye 1, Rank 6 breaker 2 + riposte 1, Apex might 2 + keen edge 2 + vigor 1), a guaranteed rare core from one of the three, and 2 + rank Wyvern Gems. Every clear: the common carves from all three monsters, a win for each, and your best time. Repeat clears: 1 gem and a 35% chance at a rare core.
+- The hunt list shows each rank's trial as a gold card after its monsters (locked, open, or cleared with the best time). The prep screen lists the three monsters with their weaknesses, the rules and the first-clear rewards.
+- Older saves keep everything the old rules had opened (ranks and monsters); those ranks can still be trialled for the crest.
+- The story's rank chapters and the dialogue now talk about the trials.
+

@@ -238,7 +238,7 @@ const shots=process.argv[2];
   // ── expeditions in every biome but the elder's ──
   ok(await ev(()=>{const E=MH.EXPED,bi=E.map(id=>MH.MONSTERS[id].biome).sort().join(',');return E.length===8&&bi==='0,1,2,3,4,5,6,7'&&E.every(id=>MH.BIOME_ING[MH.MONSTERS[id].biome].length===2)&&MH.CREATURES.length===32&&
     [0,1,2,3,4,5,6,7].every(b=>MH.CREATURES.filter(c=>c.biome===b).length===4&&MH.CREATURES.filter(c=>c.biome===b&&c.rare).length===1)&&new Set(MH.CREATURES.map(c=>c.name)).size===32;}),'eight biomes have expeditions, each with two ingredients and four creatures, one rare');
-  ok(await ev(()=>{const S=MH.SAVE;S.wins={};const a=!MH.unlocked('mud')&&!MH.unlocked('shell')&&!MH.unlocked('dread');S.wins.fern=1;const c=MH.unlocked('mud')&&!MH.unlocked('shell');S.wins={};return a&&c;}),'the swamp opens with rank 1, before the coast and the ruins');
+  ok(await ev(()=>{const S=MH.SAVE;S.wins={};const a=!MH.unlocked('mud')&&!MH.unlocked('shell')&&!MH.unlocked('dread');S.wins.fern=S.wins.quill=1;const c=MH.unlocked('mud')&&!MH.unlocked('shell');S.wins={};return a&&c;}),'the swamp opens in rank 1, before the coast and the ruins');
   // an expedition played perfectly by a bot: it fights the pack and taps everything the lulls turn up
   const EXPED_RUN=`(mon)=>{MH.newHunt(null,{small:mon});const S=MH.S;S.h.inv=1e9;let t=0,lulls=0,lastF=null,seen=0,lastBug=null;const got=new Set(),bugs=new Set();
     while(S.mode==='hunt'&&t<120){const F=S.forage;if(F&&F!==lastF){lulls++;lastF=F;}
@@ -258,9 +258,22 @@ const shots=process.argv[2];
   ok(await ev(()=>{MH.SAVE.potions=9;MH.newHunt(null,{small:'dread'});const S=MH.S;return S.def.small&&S.def.biome===7&&S.pack===3&&S.def.loot.common[0][0]===MH.MONSTERS.dread.mat.scale;}),'an expedition in the ruins is three Snapjaws that drop Dreadbeak materials');
 
   // ── ranks ──
-  ok(await ev(()=>{const S=MH.SAVE;S.wins={};const a=MH.unlocked('fern')&&!MH.unlocked('quill')&&!MH.unlocked('bog');S.wins.fern=1;const c=MH.unlocked('quill')&&MH.unlocked('tusk')&&!MH.unlocked('bog');S.wins.quill=1;const d=!MH.rankOpen(2);S.wins.mud=1;const e=MH.rankOpen(2)&&MH.unlocked('ember')&&!MH.unlocked('eel');
-    for(const id of MH.HUNTS)if(MH.MONSTERS[id].rank<=6)S.wins[id]=1;const f=MH.rankOpen(7)&&MH.unlocked('gloom')&&!MH.unlocked('star');S.wins.gloom=S.wins.reaver=S.wins.pyre=1;const gg=!MH.unlocked('star');S.wins.render=1;const h=MH.unlocked('star');S.wins={};return a&&c&&d&&e&&f&&gg&&h;}),
-    'the Fernwing opens rank 1, three wins in a rank open the next, and the elder needs all four apex monsters');
+  ok(await ev(()=>{const S=MH.SAVE,T=S.trials,O=S.open;S.wins={};S.trials={};S.open={};const R=[];
+    R.push(MH.unlocked('fern')&&!MH.unlocked('quill'));S.wins.fern=1;R.push(MH.unlocked('quill')&&!MH.unlocked('mud')&&!MH.unlocked('tusk'));
+    for(const id of ['quill','mud','dust'])S.wins[id]=1;R.push(MH.unlocked('tusk')&&!MH.trialOpen(1));S.wins.tusk=1;R.push(MH.trialOpen(1)&&!MH.rankOpen(2)&&!MH.unlocked('bog'));
+    S.trials[1]={best:100};R.push(MH.rankOpen(2)&&MH.unlocked('bog')&&!MH.unlocked('ember'));
+    for(const id of MH.HUNTS)if(MH.MONSTERS[id].rank<=6)S.wins[id]=1;for(let r=1;r<=6;r++)S.trials[r]={best:100};R.push(MH.rankOpen(7)&&MH.unlocked('gloom')&&!MH.unlocked('reaver')&&!MH.unlocked('star'));
+    for(const id of ['gloom','reaver','pyre','render'])S.wins[id]=1;R.push(MH.trialOpen(7)&&!MH.unlocked('star'));S.trials[7]={best:100};R.push(MH.unlocked('star')&&!MH.trialOpen(8));
+    S.wins={};S.trials=T;S.open=O;return R.every(x=>x)||R.join();}),
+    'monsters open one at a time; beating a rank\'s last opens its trial; the trial opens the next rank, and the apex trial the elder');
+  ok(await ev(()=>{localStorage.setItem('mh_save_v1',JSON.stringify({wins:{fern:1,quill:1,mud:1,bog:1,ember:1},bag:{}}));const v=MH.loadSave();localStorage.removeItem('mh_save_v1');
+    return v.trials[1]&&v.trials[1].old&&!v.trials[2]&&v.open.tusk&&v.open.thorn&&!v.open.eel;}),'older saves keep the ranks and monsters the old rules had opened');
+  ok(await ev(()=>{const S=MH.SAVE,keep=JSON.stringify({w:S.wins,t:S.trials,p:S.potions,own:S.own.crest1});S.wins={fern:1,quill:1,mud:1,dust:1,tusk:1};S.trials={};delete S.own.crest1;MH.manual=true;
+    const list=MH.trialPick(1);MH.newHunt(null,{trial:{rank:1,list}});const s=MH.S,p0=S.potions;const R=[s.trial&&s.def.id===list[0]&&s.h.potions===5&&s.timeLeft===Math.round(list.reduce((a,id)=>a+MH.MONSTERS[id].time,0)*.07)*10];
+    s.h.inv=1e9;s.h.atk*=4;let t=0,seen=[],hp1=null;while(s.mode==='hunt'&&t<400){if(!seen.includes(s.def.id)){seen.push(s.def.id);if(seen.length===2)hp1=s.h.hp;}if(s.h.state==='idle')MH.actTap('head');if(t>1&&t<1.02){s.h.hp-=20;}MH.update(1/60);t+=1/60;}
+    R.push(s.mode==='loot'&&seen.join()===list.join()&&hp1<s.h.max&&S.potions===p0,!!s.loot&&s.loot.unlock==='RANK 2 IS OPEN'&&s.loot.drops.some(d=>d.id==='crest1')&&s.loot.drops.some(d=>d.rare)&&S.own.crest1&&MH.rankOpen(2)&&S.trials[1].best>0);
+    if(!R.every(x=>x))R.push(JSON.stringify({u:s.loot&&s.loot.unlock,d:s.loot&&s.loot.drops.map(d=>d.id),own:S.own.crest1,ro:MH.rankOpen(2),t:S.trials[1]}));const k=JSON.parse(keep);S.wins=k.w;S.trials=k.t;S.potions=k.p;if(!k.own)delete S.own.crest1;MH.toCamp('hunt');return R.every(x=>x)||R.join();}),
+    'a Rank Trial is three of the rank in a row: health carries over, one timer, its own five potions; the first clear opens the next rank and gives the crest and a rare core');
 
   // ── companion and quests ──
   ok(await ev(()=>{const S=MH.SAVE;S.story={i:5,p:0};S.pal=false;S.wins={fern:1,quill:1,mud:1};EQ();MH.newHunt('ember',{role:'fighter'});const noPal=!MH.S.pal;MH.S.m.hp=1;MH.S.m.evadeCd=1e9;MH.actTap('head');for(let i=0;i<400&&MH.S.mode==='hunt';i++)MH.update(1/60);
@@ -287,7 +300,7 @@ const shots=process.argv[2];
     MH.fakeNow=Date.UTC(2027,0,5,12);MH.ensureQuests();const reset=S.daily.q.every(q=>q.p===0)&&S.weekly.key===w1;MH.fakeNow=Date.UTC(2027,0,12,12);MH.ensureQuests();const wk=S.weekly.key!==w1;MH.fakeNow=0;return n===3&&uniq===3&&moved&&same&&reset&&wk&&S.weekly.q.length===1;}),
     'three different dailies are set each day and one weekly each week, and progress resets with them');
   ok(await ev(()=>{const S=MH.SAVE;S.side={};const q=()=>MH.quests().find(x=>x.kind==='side'&&x.def.id==='hammer');MH.qEvent('weapon','gs');const no=q().st.p===0;for(let i=0;i<3;i++)MH.qEvent('weapon','hm');const full=q().st.p===2,h0=S.bag.herb||0;MH.claim(q());MH.claim(q());return no&&full&&S.bag.herb===h0+5&&q().st.c;}),'a side quest counts only what it asks for, stops at its goal and pays out once');
-  ok(await ev(()=>{const S=MH.SAVE;S.wins={fern:1};S.story={i:3,p:0};const q=()=>MH.quests()[0];const a=q().st.p===0;S.wins.quill=S.wins.mud=1;const c=q().st.p===1;S.story={i:12,p:0};const d=q().st.p===0;S.wins.gloom=S.wins.pyre=1;const e=q().st.p===2;S.story={i:14,p:0};const f=!MH.quests()[0].st.c&&q().st.p===0;S.wins={};S.story={i:0,p:0};return a&&c&&d&&e&&f;}),
+  ok(await ev(()=>{const S=MH.SAVE;S.wins={fern:1};S.story={i:3,p:0};const q=()=>MH.quests()[0];const a=q().st.p===0;const T0=S.trials;S.trials={1:{best:90}};const c=q().st.p===1;S.trials=T0;S.story={i:12,p:0};const d=q().st.p===0;S.wins.gloom=S.wins.pyre=1;const e=q().st.p===2;S.story={i:14,p:0};const f=!MH.quests()[0].st.c&&q().st.p===0;S.wins={};S.story={i:0,p:0};return a&&c&&d&&e&&f;}),
     'the story\'s rank chapters follow the ranks, the apex chapter counts apex wins, and the last chapter is the end');
 
   // ── screenshots of fights ──
@@ -447,8 +460,8 @@ const shots=process.argv[2];
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='home'&&MH.S.btns.some(b=>b.id==='claim:story')),'a tap on the loot screen returns to the camp home, with the reward ready to claim');await shot('c-home-claim');
   const pot0=await ev(()=>MH.SAVE.potions);await tapBtn('claim:story');ok(await ev(p0=>MH.SAVE.story.i===1&&MH.SAVE.potions===p0+2,pot0),'claiming the first chapter pays its reward and opens the next');
-  await tapBtn('tab:hunt');await tapBtn('exp:toggle');ok(await ev(()=>MH.S.exp&&MH.S.btns.some(b=>b.id==='exped:fern')&&MH.S.btns.some(b=>b.id==='exped:tusk')&&!MH.S.btns.some(b=>b.id==='exped:ember')),'expeditions open with the monsters that guard their biomes');await shot('c-expeditions');
-  ok(await ev(()=>MH.S.scrMax.exp>0&&MH.S.btns.some(b=>b.id==='exped:mud')),'the swamp opens with the rest of rank 1');
+  await tapBtn('tab:hunt');await tapBtn('exp:toggle');ok(await ev(()=>MH.S.exp&&MH.S.btns.some(b=>b.id==='exped:fern')&&!MH.S.btns.some(b=>b.id==='exped:tusk')&&!MH.S.btns.some(b=>b.id==='exped:ember')),'expeditions open with the monsters that guard their biomes');await shot('c-expeditions');
+  ok(await ev(()=>MH.S.btns.some(b=>b.id==='exp:mud')),'the swamp is listed, locked until its guard can be hunted');
   await tapBtn('exped:fern');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.small==='fern'),'EXPEDITION opens the prep screen for the forest');await tapBtn('prep:start');
   ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.small&&MH.S.pack===3),'and sets out against three Snapjaws');
   await ev(()=>{MH.manual=true;const S=MH.S;S.h.inv=1e9;let t=0;while(!S.forage&&t<40){if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
@@ -472,7 +485,7 @@ const shots=process.argv[2];
   ok(await ev(()=>{const S=MH.S;S.h.inv=1e9;let t=0,seen=new Set();while(S.mode==='hunt'&&t<120){seen.add(S.pack);if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
     return S.mode==='loot'&&seen.size===3&&!S.qte&&S.loot.drops.some(d=>d.id==='meat')&&S.loot.drops.every(d=>d.id)&&MH.SAVE.packs===2&&(MH.SAVE.wins.fern||0)===1&&t<60;}),'the pack falls one after another and pays in meat and common materials');
   await ev(()=>{MH.S.t=5;MH.manual=false;});await p.touchscreen.tap(195,400);await p.waitForTimeout(150);await tapBtn('tab:hunt');await shot('c-hunt');
-  await tapBtn('hunt:tusk');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='tusk'&&MH.S.m.max===MH.MONSTERS.tusk.hp),'the Tuskhide, in rank 1, can now be hunted');
+  await tapBtn('hunt:quill');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='quill'&&MH.S.m.max===MH.MONSTERS.quill.hp),'the Quillbeak, next in rank 1, can now be hunted');
   await tapBtn('nothing');await ev(()=>{MH.toCamp('hunt');});await p.waitForTimeout(80);await tapBtn('hunt:bog');ok(await ev(()=>MH.S.mode==='camp'),'rank 2 stays locked until three rank 1 monsters are beaten');
   // ── saves and screen sizes ──
   ok(await ev(()=>{const v={bag:{scale:2},own:{iron:true,fblade:true,keen:true,coat_poison:true},eq:{weapon:'fblade',armor:'leather',charm:'keen',coat:'coat_poison'},wins:{fern:2,ember:1}};localStorage.setItem('mh_save_v1',JSON.stringify(v));const s=MH.loadSave();
@@ -483,7 +496,7 @@ const shots=process.argv[2];
   ok(await ev(()=>{const top=MH.S.btns.filter(b=>/^(forge|craft|up):/.test(b.id)).every(b=>b.y>=38&&b.y+b.h<=MH.LH-20);MH.scrollSet(1e6);return top&&MH.S.scrMax.forgeweapon0>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='forge:star_gs')))))),'the forge list scrolls on the shortest screen, down to the elder\'s gear');await shot('s-forge-end');
   await ev(()=>{MH.SAVE.pal=true;MH.toCamp('gear');});await p.waitForTimeout(150);await shot('s-gear');
   ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===(MH.SAVE.pal?8:6)&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
-  await ev(()=>{MH.toCamp('hunt');MH.S.exp=true;MH.SAVE.wins={fern:1,quill:1,mud:1,dust:1,tusk:1,bog:1,ember:1,thorn:1};});await p.waitForTimeout(150);await shot('s-expeditions');
+  await ev(()=>{MH.toCamp('hunt');MH.S.exp=true;MH.SAVE.wins={fern:1,quill:1,mud:1,dust:1,tusk:1,bog:1,ember:1,thorn:1};MH.SAVE.trials[1]={best:90};});await p.waitForTimeout(150);await shot('s-expeditions');
   ok(await ev(()=>{const g=MH.S.btns.filter(b=>/^exped:/.test(b.id));const fit=g.every(b=>b.y>=12&&b.y+b.h<=MH.LH-19);MH.scrollSet(1e6);return fit&&MH.S.scrMax.exp>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='exped:shell')&&!MH.S.btns.some(b=>b.id==='exped:storm')))))),'the expedition list scrolls on the shortest screen, and only open biomes can be started');await shot('s-expeditions-end');
   for(const tab of ['hunt','cook','quest','bugs']){await ev(t=>{MH.SAVE.story={i:0,p:0};MH.toCamp(t);},tab);await p.waitForTimeout(120);await shot('s-'+tab);}
   ok(await ev(()=>{MH.SAVE.bugs={};for(const c of MH.CREATURES)MH.SAVE.bugs[c.id]=1;MH.toCamp('bugs');return 1;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.filter(b=>b.id.startsWith('bug:')).length===32&&MH.S.btns.filter(b=>b.id.startsWith('bug:')).every(b=>b.y+b.h<=MH.LH-20)))))),'all 32 terrarium slots fit the shortest screen');await shot('s-bugs-full');
