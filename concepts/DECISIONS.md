@@ -470,3 +470,8 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - Older saves keep everything the old rules had opened (ranks and monsters); those ranks can still be trialled for the crest.
 - The story's rank chapters and the dialogue now talk about the trials.
 
+## v0.37.0: smooth on phones
+- Measured with the CPU slowed 4x and 6x (mid-range and low-end phones): hunts ran at 12 and 7 fps, because the background baker drew one art frame per game frame on the game's own thread, and an art frame costs 9 to 24 ms on a desktop (40 to 100 ms on a phone).
+- **Bakers now run in Web Workers** (one to three, by core count). The art engine runs there on `OffscreenCanvas` and frames come back as bitmaps, so the game thread never draws art mid-hunt. A frame that isn't baked yet shows the nearest baked one, or the monster's (or hunter's) resting frame. Hunts now hold about 59 fps at 6x slowdown, and a monster's frames are ready in about 3 seconds. Browsers without workers or `OffscreenCanvas` keep the old baker.
+- **The renderer is about 30% faster** with identical output: each layer only scans its own box, colours are parsed once, per-pixel allocations are gone, and cast shadows skip layers that aren't nearby.
+

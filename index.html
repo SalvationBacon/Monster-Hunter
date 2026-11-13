@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.36.0';
+const VER='0.37.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -502,7 +502,7 @@ const ART=(()=>{
 const ENG=(()=>{
 const Lv=(()=>{const v=[-.5,-.75,.6],m=Math.hypot(...v);return v.map(x=>x/m);})();
 const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(x=>x/16-.47);
-const hex=h=>{h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
+const HEXC=new Map(),hex=h=>{let v=HEXC.get(h);if(v)return v;const q=h.replace('#','');v=[parseInt(q.slice(0,2),16),parseInt(q.slice(2,4),16),parseInt(q.slice(4,6),16)];HEXC.set(h,v);return v;};   // parsed once per colour
 function rgb2hsl([r,g,b]){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}return[h,s,l];}
 function hsl2hex(h,s,l){h=((h%360)+360)%360;s=Math.max(0,Math.min(1,s));l=Math.max(0,Math.min(1,l));const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;
   let r,g,b;[r,g,b]=h<60?[c,x,0]:h<120?[x,c,0]:h<180?[0,c,x]:h<240?[0,x,c]:h<300?[x,0,c]:[c,0,x];return'#'+[r,g,b].map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('');}
@@ -513,13 +513,14 @@ function ramp(base){const [h,s,l]=rgb2hsl(hex(base));const T=[[-.29,.24,.07],[-.
 function mix(a,b,t){const A=hex(a),B=hex(b);return'#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');}
 const rot=(x,y,a)=>[x*Math.cos(a)-y*Math.sin(a),x*Math.sin(a)+y*Math.cos(a)];
 // ── distance functions (negative inside)
-function dE(s,x,y){const[dx,dy]=rot(x-s.x,y-s.y,-(s.a||0)),u=dx/s.rx,v=dy/s.ry,k=Math.hypot(u,v);return (k-1)*Math.min(s.rx,s.ry)*(k>1?1:1);}
+function dE(s,x,y){if(s._c==null){s._c=Math.cos(-(s.a||0));s._s=Math.sin(-(s.a||0));}const X=x-s.x,Y=y-s.y,dx=X*s._c-Y*s._s,dy=X*s._s+Y*s._c,u=dx/s.rx,v=dy/s.ry,k=Math.hypot(u,v);return (k-1)*Math.min(s.rx,s.ry)*(k>1?1:1);}
 function dC(s,x,y){let best=1e9;const P=s.p;for(let i=0;i<P.length-1;i++){const[ax,ay,ar]=P[i],[bx,by,br]=P[i+1],vx=bx-ax,vy=by-ay,L2=vx*vx+vy*vy||1;
     let t=((x-ax)*vx+(y-ay)*vy)/L2;t=Math.max(0,Math.min(1,t));const d=Math.hypot(x-ax-vx*t,y-ay-vy*t)-(ar+(br-ar)*t);if(d<best)best=d;}return best;}
 function dP(s,x,y){const P=s.p;let md=1e9,inside=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const[ax,ay]=P[j],[bx,by]=P[i];
     if(((by>y)!==(ay>y))&&(x<(ax-bx)*(y-by)/(ay-by)+bx))inside=!inside;const vx=bx-ax,vy=by-ay,L2=vx*vx+vy*vy||1;let t=((x-ax)*vx+(y-ay)*vy)/L2;t=Math.max(0,Math.min(1,t));md=Math.min(md,Math.hypot(x-ax-vx*t,y-ay-vy*t));}
   return inside?-md:md;}
 const DF={E:dE,C:dC,P:dP};
+const SHOFF=[[-1,-1,.9],[-2,-2,.5],[-3,-2,.3]],NB4=[[1,0],[-1,0],[0,1],[0,-1]];   // cast-shadow offsets, the four neighbours
 const smin=(a,b,k)=>{const h=Math.max(k-Math.abs(a-b),0)/k;return Math.min(a,b)-h*h*k*.25;};
 // ── render. shapes: {t,…,m(material),g(group)}; groups: {name:{z,R(bevel radius),k(blend),dk}}
 function render(shapes,groups,matsObj,W,H,extra){
@@ -528,7 +529,9 @@ function render(shapes,groups,matsObj,W,H,extra){
   const layers=G.map(([name,gp])=>{const S=shapes.filter(s=>s.g===name);
     const bb=S.map(s=>{if(s.t==='E'){const r=Math.max(s.rx,s.ry)+3;return[s.x-r,s.y-r,s.x+r,s.y+r];}let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const p of s.p){const r=(p[2]||0)+3;x0=Math.min(x0,p[0]-r);y0=Math.min(y0,p[1]-r);x1=Math.max(x1,p[0]+r);y1=Math.max(y1,p[1]+r);}return[x0,y0,x1,y1];});
     const D=new Float32Array(N).fill(99),M=new Int16Array(N).fill(-1),CR=new Float32Array(N),BU=new Float32Array(N);
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const px=x+.5,py=y+.5;let d=99,best=99,m=-1,second=99,m2=-1,bulge=0,raw=99;
+    let X0=W,Y0=H,X1=-1,Y1=-1;for(const b of bb){X0=Math.min(X0,Math.floor(b[0]));Y0=Math.min(Y0,Math.floor(b[1]));X1=Math.max(X1,Math.ceil(b[2]));Y1=Math.max(Y1,Math.ceil(b[3]));}   // only the layer's own box
+    X0=Math.max(0,X0);Y0=Math.max(0,Y0);X1=Math.min(W-1,X1);Y1=Math.min(H-1,Y1);
+    for(let y=Y0;y<=Y1;y++)for(let x=X0;x<=X1;x++){const px=x+.5,py=y+.5;let d=99,best=99,m=-1,second=99,m2=-1,bulge=0,raw=99;
       for(let i=0;i<S.length;i++){const b=bb[i];if(px<b[0]||px>b[2]||py<b[1]||py>b[3])continue;const s=S[i];let di=DF[s.t](s,px,py);
         if(s.holes)for(const[hx,hy,hr]of s.holes)di=Math.max(di,hr-Math.hypot(px-hx,py-hy));
         if(s.cut){d=Math.max(d,-di);continue;}
@@ -537,16 +540,16 @@ function render(shapes,groups,matsObj,W,H,extra){
         if(pr<best){second=best;m2=m;best=pr;m=s.m;}else if(pr<second){second=pr;m2=s.m;}
         if(s.bulge&&di<0)bulge+=s.bulge*Math.min(1,-di/(s.bw||3));}
       const k=y*W+x;D[k]=d;if(d<0){M[k]=(m2>=0&&second-best<.7&&BAYER[(y&3)*4+(x&3)]>(second-best)/.7-.5)?m2:m;CR[k]=Math.max(0,raw-d);BU[k]=bulge;}}
-    return{name,gp,D,M,CR,BU};});
+    return{name,gp,D,M,CR,BU,box:[X0,Y0,X1,Y1]};});
   const T=new Int16Array(N).fill(-1),MAT=new Int16Array(N).fill(-1),OWN=new Int16Array(N).fill(-1);
   const height=(L,k)=>{const d=L.D[k];if(d>=0)return 0;const R=L.gp.R,u=Math.min(1,-d/R);return R*Math.sqrt(1-(1-u)*(1-u))+L.BU[k];};
-  layers.forEach((L,li)=>{for(let y=0;y<H;y++)for(let x=0;x<W;x++){const k=y*W+x;if(L.D[k]>=0)continue;
+  layers.forEach((L,li)=>{const[X0,Y0,X1,Y1]=L.box;for(let y=Y0;y<=Y1;y++)for(let x=X0;x<=X1;x++){const k=y*W+x;if(L.D[k]>=0)continue;
       const hL=x>0?height(L,k-1):0,hR=x<W-1?height(L,k+1):0,hU=y>0?height(L,k-W):0,hD=y<H-1?height(L,k+W):0;
-      let n=[(hL-hR)*.5,(hU-hD)*.5,1];const m=Math.hypot(...n);n=n.map(v=>v/m);
-      let lum=n[0]*Lv[0]+n[1]*Lv[1]+n[2]*Lv[2];const M=mats[L.M[k]]||mats.body;if(M.flat!=null)lum=M.flat;
+      const nx=(hL-hR)*.5,ny=(hU-hD)*.5,m=Math.sqrt(nx*nx+ny*ny+1);
+      let lum=(nx*Lv[0]+ny*Lv[1]+Lv[2])/m;const M=mats[L.M[k]]||mats.body;if(M.flat!=null)lum=M.flat;
       let tv=1.35+lum*3.4+(L.gp.dk||0)+(M.dk||0)-Math.min(1.2,L.CR[k]*.55);              // creases darken where forms meet
       // cast shadow from groups in front, toward the bottom right
-      for(let j=li+1;j<layers.length;j++){const F=layers[j];for(const[dx,dy,a]of[[-1,-1,.9],[-2,-2,.5],[-3,-2,.3]]){const xx=x+dx,yy=y+dy;if(xx<0||yy<0)continue;if(F.D[yy*W+xx]<0){tv-=a;break;}}}
+      for(let j=li+1;j<layers.length;j++){const F=layers[j],fb=F.box;if(x-1<fb[0]||x-3>fb[2]||y-1<fb[1]||y-2>fb[3])continue;for(const o of SHOFF){const xx=x+o[0],yy=y+o[1];if(xx<0||yy<0)continue;if(F.D[yy*W+xx]<0){tv-=o[2];break;}}}
       if(M.tex==='dscale'){const r=(y>>1)&1,cx=(x+r*2)%4,cy=y%2;if(cy===0&&cx===0&&tv>1.6)tv-=.75;else if(cy===1&&cx===2&&tv<4.2)tv+=.35;}
       if(M.tex==='scale'&&((x+((y>>1)&1)*3)%6===0)&&(y%3)===0&&tv>2.3&&tv<4.3)tv+=.7;
       if(M.tex==='plate'&&(y%3===0))tv-=.6;if(M.tex==='fur'&&((x*7+y*3)%7===0)&&tv<3.6)tv-=.6;if(M.tex==='spot'&&((x*13+y*7)%23<2))tv-=.9;
@@ -558,7 +561,7 @@ function render(shapes,groups,matsObj,W,H,extra){
   for(let k=0;k<N;k++)if(T[k]>=0)put(k,(mats[MAT[k]]||mats.body).r[T[k]]);
   // outlines only around a group's silhouette: dark outside, a thin line where a front group sits over one behind
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const k=y*W+x;let nb=-1,lit=false;
-    for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const j=yy*W+xx;
+    for(const o of NB4){const dx=o[0],dy=o[1],xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const j=yy*W+xx;
       if(T[j]>=0&&(T[k]<0||OWN[j]>OWN[k]&&!layers[OWN[j]].gp.soft)){nb=j;lit=dx>0||dy>0;break;}}
     if(nb<0)continue;const M=mats[MAT[nb]]||mats.body;if(T[k]<0)put(k,lit?M.line1:M.line0);else put(k,(mats[MAT[k]]||mats.body).r[Math.max(0,T[k]-2)]);}
   g.putImageData(img,0,0);if(extra)extra(g);return c;}
@@ -2613,9 +2616,36 @@ function abFrame(id,clip,u,brk,nb){const M=ART.MON[id],C=M.clips[clip]||M.clips.
   const q=abQ(id,clip,C,u),bk=abBk(brk||{}),k=abKey(id,clip,q,bk,nb);let f=AB.cache.get(k);if(f)return f;
   if(!MH.manual){for(let d=1;d<=4;d++)for(const s of[-1,1]){const kk=abKey(id,clip,abQ(id,clip,C,q+s*d/AFPS),bk,nb);if(AB.cache.has(kk)){abEnq(id,clip,q,brk,nb,1);return AB.cache.get(kk);}}
     for(const ob of['000','100','010','001','110','101','011','111'])if(ob!==bk){const kk=abKey(id,clip,q,ob,nb);if(AB.cache.has(kk)){abEnq(id,clip,q,brk,nb,1);return AB.cache.get(kk);}}}
+  if(!MH.manual&&ABW.w.length){abEnq(id,clip,q,brk,nb,1);return abRest(id);}   // still baking: the resting frame, never a draw on this thread
   f=abRender(id,clip,q,brk||{},nb);abPut(k,f);return f;}
+const AB_REST={};
+function abRest(id){if(AB_REST[id])return AB_REST[id];const M=ART.MON[id],k=abKey(id,'idle',abQ(id,'idle',M.clips.idle,0),'000',0);return AB_REST[id]=AB.cache.get(k)||abRender(id,'idle',0,{},0);}
 function abEnq(id,clip,q,brk,nb,front){const k=abKey(id,clip,q,abBk(brk||{}),nb);if(AB.cache.has(k)||AB.qk.has(k))return;AB.qk.add(k);(front?AB.q.unshift:AB.q.push).call(AB.q,[k,id,clip,q,brk||{},nb]);}
-function abTick(ms){const t0=performance.now();while(AB.q.length&&performance.now()-t0<ms){const [k,id,clip,q,brk,nb]=AB.q.shift();AB.qk.delete(k);if(AB.cache.has(k))continue;
+// ── Background bakers: the art engine also runs in Web Workers, so frames are drawn off the game's thread and come
+// back as bitmaps. A phone draws a frame in tens of milliseconds; on the game's thread that is a visible stutter.
+const ABW={w:[],busy:0,pend:new Map(),max:2,off:false};
+function abWorkers(){if(ABW.w.length||ABW.off)return ABW.w.length>0;
+  try{if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||!new OffscreenCanvas(1,1).getContext('2d'))throw 0;
+    const src=[...document.scripts].map(x=>x.textContent).find(t=>t.includes('// ART:BEGIN')),a=src.indexOf('// ART:BEGIN'),b=src.indexOf('// ART:END');if(a<0||b<0)throw 0;
+    const code=`self.document={createElement:()=>new OffscreenCanvas(1,1)};self.window=self;\n${src.slice(a,b)}\n${abPoseOf.toString()}
+const MATS={},HG={},mats=id=>MATS[id]||(MATS[id]=ART.ENG.materials(Object.assign({},ART.MON[id].look),ART.MON[id].mats));
+onmessage=e=>{const j=e.data;let o;try{let c,ex={};
+  if(j.kind==='sig'){c=ART.SIG.frame(j.id,j.mi,j.q,mats(j.id),{noHunter:1});ex.st=JSON.parse(JSON.stringify(c.st||{}));}
+  else if(j.kind==='hun'){const H=ART.HUN;let G=HG[j.gk];if(!G){const t=j.tiers,gear=H.gearOf(t[0],t[1],t[2],t[3],j.wpn);G=HG[j.gk]={gear,mats:H.mats(gear),clips:H.clips(j.wt)};}
+    const C=G.clips[j.clip],p=ART.ENG.sample(C.keys,j.q);if(j.clip!=='ROLL')delete p.roll;else p.hx=27;['guard','drink','sharpen'].forEach(k=>{if(!(p[k]>.5))delete p[k];});
+    const r=H.build(p,j.wt,G.gear,j.q);c=ART.ENG.render(r.S,H.groups,G.mats,H.W,H.H,r.extra);}
+  else{const M=ART.MON[j.id],p=abPoseOf(M,j.clip,j.q);if(j.nb)p.breath=0;const r=M.build(p,j.brk,j.q);c=ART.ENG.render(r.S,M.groups,mats(j.id),M.W,M.H,r.extra);ex.mouth=r.mouth;}
+  o=Object.assign({k:j.k,b:c.transferToImageBitmap()},ex);postMessage(o,[o.b]);}catch(err){postMessage({k:j.k,err:String(err)});}};`;
+    const url=URL.createObjectURL(new Blob([code],{type:'text/javascript'})),n=Math.max(1,Math.min(3,(navigator.hardwareConcurrency||2)-1));
+    for(let i=0;i<n;i++){const w=new Worker(url);w.n=0;w.onmessage=e=>abGot(w,e.data);w.onerror=()=>{ABW.off=true;};ABW.w.push(w);}return true;}
+  catch(e){ABW.off=true;return false;}}
+function abGot(w,o){w.n--;const j=ABW.pend.get(o.k);ABW.pend.delete(o.k);AB.qk.delete(o.k);if(!j||o.err)return;
+  if(j.kind==='hun'){if(j.gk===HB.gk)HB.cache.set(o.k,o.b);}else abPut(o.k,{c:o.b,mouth:o.mouth,st:o.st});}
+function abSend(item){const [k,id,clip,q,brk,nb]=item;let j;
+  if(clip==='#hun'){if(id!==HB.gk){AB.qk.delete(k);return;}const eq=SAVE.eq,Wg=GEAR[eq.weapon];j={kind:'hun',k,gk:id,clip:brk,q,tiers:[eq.helm,eq.armor,eq.arms,eq.legs].map(huTier),wpn:Wg&&ART.WPN.SPEC[Wg.tier]?Wg.tier:null,wt:Wg.wt};}
+  else if(clip==='#sig')j={kind:'sig',k,id,mi:brk,q};else j={kind:'mon',k,id,clip,q,brk,nb};
+  const w=ABW.w.reduce((a,b)=>b.n<a.n?b:a);w.n++;ABW.pend.set(k,j);w.postMessage(j);}
+function abTick(ms){if(!MH.manual&&abWorkers()){while(AB.q.length){const w=ABW.w.reduce((a,b)=>b.n<a.n?b:a);if(w.n>=ABW.max)return;const it=AB.q.shift();if(AB.cache.has(it[0])||HB.cache.has(it[0])){AB.qk.delete(it[0]);continue;}abSend(it);}return;}const t0=performance.now();while(AB.q.length&&performance.now()-t0<ms){const [k,id,clip,q,brk,nb]=AB.q.shift();AB.qk.delete(k);if(AB.cache.has(k))continue;
   if(clip==='#hun'){if(id===HB.gk&&!HB.cache.has(k))HB.cache.set(k,huRender(brk,q));continue;}
   if(clip==='#sig'){const c=ART.SIG.frame(id,brk,q,abMats(id),{noHunter:1});abPut(k,{c,st:c.st});}else abPut(k,abRender(id,clip,q,brk,nb));}}
 function abBakeClip(id,clip,brk,nb){const C=ART.MON[id].clips[clip];if(!C)return;for(let u=0;u<=C.len+1e-6;u+=1/AFPS)abEnq(id,clip,Math.round(u*AFPS)/AFPS,brk,nb);}
@@ -2653,7 +2683,10 @@ function sigState(){const m=S.m,A=ATTACKS[m.atk],[id,mi]=A.sig,SM=ART.SIG.M[id][
 // a signature move frame in the game: aimed at the real hunter, no stand-in drawn; carries what happened (a grab's hold point)
 function sigFrameG(id,mi,u){const SM=ART.SIG.M[id][mi],q=Math.round(clamp(u,0,SM.len)*AFPS)/AFPS,k='S|'+id+'|'+mi+'|'+q.toFixed(3);let f=AB.cache.get(k);if(f)return f;
   if(!MH.manual)for(let d=1;d<=3;d++)for(const sg of[-1,1]){const kk='S|'+id+'|'+mi+'|'+(Math.round(clamp(q+sg*d/AFPS,0,SM.len)*AFPS)/AFPS).toFixed(3);if(AB.cache.has(kk)){abEnqSig(id,mi,q,1);return AB.cache.get(kk);}}
+  if(!MH.manual&&ABW.w.length){abEnqSig(id,mi,q,1);return sigPad(id);}
   const c=ART.SIG.frame(id,mi,q,abMats(id),{noHunter:1});f={c,st:c.st};abPut(k,f);return f;}
+const SIGPAD={};
+function sigPad(id){if(SIGPAD[id])return SIGPAD[id];const r=abRest(id),c=document.createElement('canvas');c.width=96+ART.SIG.OX;c.height=72;c.getContext('2d').drawImage(r.c,ART.SIG.OX,0);return SIGPAD[id]={c,st:{}};}
 function abEnqSig(id,mi,q,front){const k='S|'+id+'|'+mi+'|'+q.toFixed(3);if(AB.cache.has(k)||AB.qk.has(k))return;AB.qk.add(k);(front?AB.q.unshift:AB.q.push).call(AB.q,[k,id,'#sig',q,mi]);}
 const AB_ROAR={dragon:'roar',brute:'stomp',crab:'smash',serpent:'slam',raptor:'clap'};
 function abClipFor(M,a){let c=AB_MAP[M.rig][a]||'idle';if(M.rig==='crab'&&M.D.sting&&(a==='sweep'||a==='slam'))c='sting';return M.clips[c]?c:'idle';}
@@ -2674,7 +2707,7 @@ function abState(){const m=S.m,D=S.def,M=ART.MON[artId(D)],t=m.t;
   if(m.state==='roar'){const c=AB_ROAR[M.rig];return{clip:M.clips[c]?c:'idle',u:Math.min(m.t*1.1,M.clips[c]?M.clips[c].len:1)};}
   return{clip:'idle',u:S.clock};}
 // where things are on each monster, measured once from its own idle frame
-function abAnch(id){if(AB.anch[id])return AB.anch[id];const f=abFrame(id,'idle',0,{},0),c=f.c,d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let x0=1e9,y0=1e9,x1=-1,y1=-1,ty=0,tn=0;
+function abAnch(id){if(AB.anch[id])return AB.anch[id];const f=abRender(id,'idle',0,{},0),c=f.c,d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let x0=1e9,y0=1e9,x1=-1,y1=-1,ty=0,tn=0;
   for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)if(d[(y*c.width+x)*4+3]>0){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}
   for(let y=0;y<c.height;y++)for(let x=x1-6;x<=x1;x++)if(d[(y*c.width+x)*4+3]>0){ty+=y;tn++;}
   const mo=f.mouth||[x0+8,y0+16],body=[(x0+x1)/2+4,(y0+y1)/2+4];
@@ -3922,6 +3955,7 @@ function huRender(clip,q){const C=HB.clips[clip],p=ART.ENG.sample(C.keys,q);if(c
 const huKey=(clip,q)=>HB.gk+'|'+clip+'|'+q.toFixed(3);
 function huFrame(clip,u){huGear();if(!HB.clips[clip])clip='IDLE';const C=HB.clips[clip],q=huQ(C,u),k=huKey(clip,q);let c=HB.cache.get(k);if(c)return c;
   if(!MH.manual)for(let d=1;d<=3;d++)for(const sg of[-1,1]){const kk=huKey(clip,huQ(C,q+sg*d/HFPS));if(HB.cache.has(kk)){huEnq(clip,q,1);return HB.cache.get(kk);}}
+  if(!MH.manual&&ABW.w.length&&!(clip==='IDLE'&&q===0)){huEnq(clip,q,1);return huFrame('IDLE',0);}   // still baking: standing
   c=huRender(clip,q);HB.cache.set(k,c);return c;}
 function huEnq(clip,q,front){const k=huKey(clip,q);if(HB.cache.has(k)||AB.qk.has(k))return;AB.qk.add(k);(front?AB.q.unshift:AB.q.push).call(AB.q,[k,HB.gk,'#hun',q,clip]);}
 function huPrebake(){if(!hasHu())return;huGear();for(const clip of['IDLE','COMBO','HURT','ROLL','SKILL','POTION','SHARPEN','WIN']){const C=HB.clips[clip];for(let u=0;u<C.len-1e-6||(!C.loop&&u<=C.len+1e-6);u+=1/HFPS)huEnq(clip,huQ(C,u));}}
