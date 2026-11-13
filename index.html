@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.38.2';
+const VER='0.38.3';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1980,7 +1980,7 @@ star:[{n:'STARFALL',hits:[1.1,1.35,1.6,1.85,2.1],d:'The elder\'s own: stars rain
     fx(g,u,F){for(let i=0;i<5;i++){const k=clamp((u-.7-i*.25)/.4,0,1);if(k>0&&k<1){const x=T.x+i*4-6+k*10,y=lerp(-4,GY-3,k);g.globalAlpha=.45;line(g,x-12,y-12,x,y,'#8a7ad8',3);g.globalAlpha=1;line(g,x-8,y-8,x,y,'#c8b8ff',2);disc(g,x,y,2,'#e0d4ff');px(g,x,y,'#ffffff');}else if(k>=1&&k<1.4)FX.burst(g,T.x+i*4+4,GY-2,(k-1)/.4,['#ffffff','#c8b8ff','#8a7ad8'],10);}return{hit:hitAt(u,[1.1,1.35,1.6,1.85,2.1],.08)};}},
   {n:'ECLIPSE',hits:[2.15],d:'The sky goes dark and it crashes down. One huge hit.',len:2.8,keys:[K(0),K(.8,{tilt:.5,ws:1,lift:30,fade:.2}),K(1.9,{lift:36,fade:.6}),K(2.15,{lift:0,fade:0,shk:1}),K(2.8)],
     fx(g,u,F){FX.dark(g,u<2.2?clamp(u-.3,0,.8):clamp(2.6-u,0,.8));if(u>2.15&&u<2.6)FX.ring(g,F.cx,GY,(u-2.15)*90,'#c8b8ff');return{hit:hitAt(u,[2.15])};}}],
-tusk:[{n:'BRISTLE RUSH',hits:[.75,1.95],d:'A charge that doesn\'t stop: through you and back. Two heavy hits.',len:2.4,keys:[K(0),K(.4,{px:56,tilt:-.08,hr:.5,bri:1,bl2:3}),K(.8,{px:10,bri:1,fl1:4,bl2:4}),K(1,{px:-10,fade:1}),K(1.4,{px:110,fade:1}),K(1.6,{px:80,fade:0,bri:1}),K(2,{px:30,bri:1}),K(2.4,{px:50})],
+tusk:[{n:'BRISTLE RUSH',hits:[.75,1.95],d:'Charges, skids, backs off and charges again. Two heavy hits.',len:2.4,keys:[K(0),K(.4,{px:56,tilt:-.08,hr:.5,bri:1,bl2:3}),K(.78,{px:10,bri:1,fl1:4,bl2:4}),K(1,{px:6,tilt:.12,hr:-.3,bri:1}),K(1.35,{px:66,tilt:-.1,fl1:3,bri:.6}),K(1.6,{px:60,tilt:-.08,hr:.5,bri:1,bl2:3}),K(1.95,{px:10,bri:1,fl1:4,bl2:4}),K(2.15,{px:12,tilt:.1,hr:-.2}),K(2.4,{px:50})],
     fx(g,u,F){if(u>.4&&u<2.2)FX.smoke(g,F.cx+20,GY-2,u,4,'#c8a878');return{hit:hitAt(u,[.75,1.95]),knock:u>.75&&u<1.1?(u-.75)/.35:0};}},
   {n:'ROOT OUT',hits:[1.3,1.4],d:'Rips up the ground with its tusks and flings the rocks.',len:1.8,keys:[K(0),K(.5,{px:46,tilt:-.15,hr:.7,bri:.5}),K(.75,{px:48,tilt:.12,hr:-.6,jaw:.3,fl1:4}),K(1.8)],
     fx(g,u,F){FX.rocks(g,[F.mouth[0],GY-4],u-.75,4,'#8a6a48');return{hit:hitAt(u,[1.3,1.4])};}}],
@@ -4082,7 +4082,7 @@ function drawWorld(){
   if(S.def.small)shadow(L.mx+MS_OX+(hasArt(S.def)?20:29)+p.ox,L.mFeet+2,12,3);else shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
   const dead=m.state==='dead';
   if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)&&!(dead&&(S.def.small&&m.t>2||S.trial&&S.respawn>0&&m.t>1))){
-    if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(artId(S.def),st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+abDx()+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:p.oy);S.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;S.abCur={mouth:st.sig?f.st&&f.st.mouth:f.mouth,sig:!!st.sig,dx:st.sig?-st.dx:p.ox,oy:st.sig?0:p.oy};
+    if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(artId(S.def),st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+abDx()+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:Math.max(p.oy,HUD_T+14-(L.mFeet-AB_FEET)-14));   // a leap stays below the top bar and its tipS.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;S.abCur={mouth:st.sig?f.st&&f.st.mouth:f.mouth,sig:!!st.sig,dx:st.sig?-st.dx:p.ox,oy:st.sig?0:p.oy};
       if(S.sigSt&&S.sigSt.wash){for(const[c,a]of S.sigSt.wash){g.globalAlpha=a;g.fillStyle=c;g.fillRect(0,0,W,LH);}g.globalAlpha=1;}   // full-screen flash or darkness from a signature move
       if((p.oy>4&&m.state==='attack')||st.sink){g.save();g.beginPath();g.rect(-8,0,W+16,L.mFeet+3);g.clip();g.drawImage(img,x,y);g.restore();}else g.drawImage(img,x,y);}
     else{const ms=mSprite(S.def,{hx:p.hx,hy:p.hy,jaw:p.jaw,wing:p.wing,tail:p.tail&~1,horn:!m.parts.head.broken,spike:!m.parts.tail.broken,torn:m.parts.wings.broken,glow:p.glow,rage:m.phase>0?1:0},m.flash>0);
