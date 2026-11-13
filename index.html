@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.38.0';
+const VER='0.38.1';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -2632,11 +2632,12 @@ function abWorkers(){if(ABW.w.length||ABW.off)return ABW.w.length>0;
     const src=[...document.scripts].map(x=>x.textContent).find(t=>t.includes('// ART'+':BEGIN')),a=src.indexOf('// ART'+':BEGIN'),b=src.indexOf('// ART'+':END');if(a<0||b<0)throw 0;
     const code=`self.document={createElement:()=>new OffscreenCanvas(1,1)};self.window=self;\n${src.slice(a,b)}\n${abPoseOf.toString()}
 const MATS={},HG={},mats=id=>MATS[id]||(MATS[id]=ART.ENG.materials(Object.assign({},ART.MON[id].look),ART.MON[id].mats));
+const HU_PAD=${JSON.stringify(HU_PAD)};${huPaint.toString()}
 onmessage=e=>{const j=e.data;let o;try{let c,ex={};
   if(j.kind==='sig'){c=ART.SIG.frame(j.id,j.mi,j.q,mats(j.id),{noHunter:1});ex.st=JSON.parse(JSON.stringify(c.st||{}));}
   else if(j.kind==='hun'){const H=ART.HUN;let G=HG[j.gk];if(!G){const t=j.tiers,gear=H.gearOf(t[0],t[1],t[2],t[3],j.wpn);G=HG[j.gk]={gear,mats:H.mats(gear),clips:H.clips(j.wt)};}
     const C=G.clips[j.clip],p=ART.ENG.sample(C.keys,j.q);if(j.clip!=='ROLL')delete p.roll;else p.hx=27;['guard','drink','sharpen'].forEach(k=>{if(!(p[k]>.5))delete p[k];});
-    const r=H.build(p,j.wt,G.gear,j.q);c=ART.ENG.render(r.S,H.groups,G.mats,H.W,H.H,r.extra);}
+    const r=H.build(p,j.wt,G.gear,j.q);c=huPaint(r,H.groups,G.mats);}
   else{const M=ART.MON[j.id],p=abPoseOf(M,j.clip,j.q);if(j.nb)p.breath=0;const r=M.build(p,j.brk,j.q);c=ART.ENG.render(r.S,M.groups,mats(j.id),M.W,M.H,r.extra);ex.mouth=r.mouth;}
   o=Object.assign({k:j.k,b:c.transferToImageBitmap()},ex);postMessage(o,[o.b]);}catch(err){postMessage({k:j.k,err:String(err)});}};`;
     const url=URL.createObjectURL(new Blob([code],{type:'text/javascript'})),n=Math.max(1,Math.min(3,(navigator.hardwareConcurrency||2)-1));
@@ -4001,7 +4002,11 @@ function shadow(cx,cy,rx,ry){g.fillStyle='rgba(0,0,0,.28)';for(let y=-ry;y<=ry;y
 
 // ── the hunter, drawn by the art kit: four armour pieces and a weapon, each from its own monster. Frames are
 // baked in the background like the monster's and the game's states pick a clip and a time in it.
-const HB={cache:new Map(),gk:null,gear:null,mats:null,wt:null,clips:null},HFPS=15,HU_DX=-9,HU_DY=-13;
+// the hunter's frames are padded past the art kit's 56x54 box: a lance reaches 14 px further right and 9 px above it
+const HU_PAD=[2,11,74,68];   // left, top, width, height
+function huPaint(r,groups,mats){const[px,py,w,h]=HU_PAD;for(const q of r.S){if(q.t==='E'){q.x+=px;q.y+=py;}else q.p=q.p.map(v=>[v[0]+px,v[1]+py].concat(v.length>2?[v[2]]:[]));}
+  return ART.ENG.render(r.S,groups,mats,w,h,r.extra?(g=>{g.save();g.translate(px,py);r.extra(g);g.restore();}):null);}
+const HB={cache:new Map(),gk:null,gear:null,mats:null,wt:null,clips:null},HFPS=15,HU_DX=-9-HU_PAD[0],HU_DY=-13-HU_PAD[1];
 const hasHu=()=>typeof ART!=='undefined'&&!!ART.HUN;
 const huTier=id=>{const t=GEAR[id]&&GEAR[id].tier;return ART.HUN.LOOKS[t]?t:'leather';};
 function huGear(){const eq=SAVE.eq,Wg=GEAR[eq.weapon],wpn=Wg&&ART.WPN.SPEC[Wg.tier]?Wg.tier:null,t=[eq.helm,eq.armor,eq.arms,eq.legs].map(huTier),k=t.join(',')+'|'+wpn+'|'+Wg.wt;
@@ -4009,7 +4014,7 @@ function huGear(){const eq=SAVE.eq,Wg=GEAR[eq.weapon],wpn=Wg&&ART.WPN.SPEC[Wg.ti
   return HB;}
 function huQ(C,u){const L=C.len;if(C.loop){u=((u%L)+L)%L;const q=Math.round(u*HFPS)/HFPS;return q>=L-1e-6?0:q;}return Math.round(clamp(u,0,L)*HFPS)/HFPS;}
 function huRender(clip,q){const C=HB.clips[clip],p=ART.ENG.sample(C.keys,q);if(clip!=='ROLL')delete p.roll;else p.hx=27;['guard','drink','sharpen'].forEach(k=>{if(!(p[k]>.5))delete p[k];});
-  const r=ART.HUN.build(p,HB.wt,HB.gear,q);return ART.ENG.render(r.S,ART.HUN.groups,HB.mats,ART.HUN.W,ART.HUN.H,r.extra);}
+  const r=ART.HUN.build(p,HB.wt,HB.gear,q);return huPaint(r,ART.HUN.groups,HB.mats);}
 const huKey=(clip,q)=>HB.gk+'|'+clip+'|'+q.toFixed(3);
 function huFrame(clip,u){huGear();if(!HB.clips[clip])clip='IDLE';const C=HB.clips[clip],q=huQ(C,u),k=huKey(clip,q);let c=HB.cache.get(k);if(c)return c;
   if(!MH.manual)for(let d=1;d<=3;d++)for(const sg of[-1,1]){const kk=huKey(clip,huQ(C,q+sg*d/HFPS));if(HB.cache.has(kk)){huEnq(clip,q,1);return HB.cache.get(kk);}}
@@ -4036,7 +4041,7 @@ function huState(){const h=S.h,wt=HB.wt,Wt=h.g.W,big=wt==='gs'||wt==='hm',sw=(sg
     case 'win':return['WIN',S.clock];
     default:return['IDLE',S.clock];}}
 // draw the hunter with its feet where the old sprite's were: (x,y) is the old sprite's corner
-function huDraw(x,y,clip,u){const[c0,u0]=clip?[clip,u]:huState();if(c0==='DEAD'){const f=huFrame('HURT',u0);g.save();const k=clamp(S.h.t/.3,0,1);g.translate(Math.round(x+18),Math.round(y+40-4*k));g.rotate(-Math.PI/2*k);g.drawImage(f,-27,-53);g.restore();return;}
+function huDraw(x,y,clip,u){const[c0,u0]=clip?[clip,u]:huState();if(c0==='DEAD'){const f=huFrame('HURT',u0);g.save();const k=clamp(S.h.t/.3,0,1);g.translate(Math.round(x+18),Math.round(y+40-4*k));g.rotate(-Math.PI/2*k);g.drawImage(f,-27-HU_PAD[0],-53-HU_PAD[1]);g.restore();return;}
   g.drawImage(huFrame(c0,u0),Math.round(x+HU_DX),Math.round(y+HU_DY));}
 function hunterPose(){
   const h=S.h, p={kind:'stand',a:-1.2,bob:Math.sin(S.clock*4)>0?1:0,lean:0,glow:0,f:0};

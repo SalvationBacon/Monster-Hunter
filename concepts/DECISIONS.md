@@ -484,3 +484,6 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **The Foraging theme** plays during each forage lull and the pack's theme returns after.
 - `tools/build-art.py` now refuses to run unless there is exactly one art block, after a worker's marker strings were mistaken for one.
 
+## v0.38.1: room for the lance
+- The lance's tip was cut off in most animations: the hunter's frames were 56x54 and a lance reaches 14 px past the right edge and 9 px above the top (the greatsword and hammer overshoot by 2 px at the top of a swing). Hunter frames are now 74x68, padded 2 px left and 11 px on top, and drawn shifted by the same amount, so the hunter stays where it was.
+
