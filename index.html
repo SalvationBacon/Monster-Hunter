@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.38.1';
+const VER='0.38.2';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -94,7 +94,7 @@ const WET={time:7,regen:.4};             // soaked: stamina comes back slowly
 const BLIGHT={time:8};                   // the weapon's element or status does nothing
 const BLEED={time:10,tick:.5,dmg:.02,still:1.5};   // hurts while acting; standing still this long stops it
 const STENCH={time:9,roll:4.5};          // no potions; each roll shakes some off
-const NUMB={time:1.4,immune:6};          // cannot act
+const NUMB={time:1.4,immune:15,chance:.25};          // cannot act
 const MUD={time:9,cost:1.8};             // dodging costs more; one roll shakes it off
 // What each status says as the hunt opens, and what it is called when it lands
 const INFLICT={poison:['POISON SPIT: POTIONS CURE IT','POISONED','#7ad84a'],burn:['ON FIRE? ROLL TO PUT IT OUT','ON FIRE! ROLL!','#ff9a2e'],freeze:['FROZEN? TAP TO BREAK FREE','FROZEN! TAP!','#7fd6ff'],
@@ -1285,7 +1285,7 @@ R('reaver','TIDEREAVER','#123a5a','#4cc9ff','#e8f8ff','#0a2238','#1e5a8a',{s:1.0
 const {V,add,lerp2,chain,ik,kit,stump,wound,eyeAt,scale,spike,crystal,bolt,flame,ambient,breath,glowDots}=KIT,PI=Math.PI;
 const GROUND=66;
 const one=c=>ENG.materials({b:c,u:c,h:c,d:c}).horn;
-const groups={h0:{z:1.6,R:2.6,k:1.2,dk:-.6},h1:{z:1.8,R:2.6,k:1.2,dk:-.5},h4:{z:2.1,R:2.6,k:1.2,dk:-.4},h2:{z:5.4,R:2.8,k:1.2},h3:{z:5.6,R:2.8,k:1.2},legF:{z:1,R:3,k:1.4,dk:-.9},neckF:{z:2,R:3,k:1.4,dk:-.5},hood:{z:4.4,R:2,k:1},fin:{z:3.2,R:1.4,k:.8},body:{z:4,R:6,k:2.2},mound:{z:4.5,R:3,k:2},mouth:{z:4.6,R:1,k:1},jaw:{z:4.7,R:2,k:1},
+const groups={h0:{z:1.6,R:2.6,k:1.2,dk:-.6},h1:{z:1.8,R:2.6,k:1.2,dk:-.5},h4:{z:2.1,R:2.6,k:1.2,dk:-.4},h2:{z:5.4,R:2.8,k:1.2},h3:{z:5.6,R:2.8,k:1.2},legF:{z:1,R:3,k:1.4,dk:-.9},neckF:{z:2,R:3,k:1.4,dk:-.5},hood:{z:4.4,R:2,k:1},hoodB:{z:3.6,R:2.2,k:1,dk:-.2},fin:{z:3.2,R:1.4,k:.8},body:{z:4,R:6,k:2.2},mound:{z:4.5,R:3,k:2},mouth:{z:4.6,R:1,k:1},jaw:{z:4.7,R:2,k:1},
   teeth:{z:4.8,R:.6,k:.5,soft:1},head:{z:5,R:3.4,k:1.4},crest:{z:5.2,R:1.4,k:.8},legN:{z:6,R:3.4,k:1.4}};
 const REST=MON.tide.rest,CLIPS=MON.tide.clips;
 function make(id,name,look,B){B=Object.assign({plan:'basilisk',s:1,el:'water',style:'spit',eye:'#bff0ff',glowCol:look.glow||'#ffe680',fx:null},B);
@@ -1302,22 +1302,33 @@ function snake(K,Hn,ah,jaw,brk,g,B,t,G,fang){const {E,C,P}=K,f=V(ah,1),uH=V(ah+P
 
 function build(p,brk,t,B){const K=kit(),{S,E,C,P}=K,G=[],pl=B.plan;let eyes=[],mouth=[10,40];
   if(pl==='basilisk'){
-    // the coil on the ground, then the neck rising straight up with the hood
-    const N=16,pts=[];for(let i=0;i<N;i++){const k=i/(N-1);let x,y;
-      if(k<.5){const a=-PI*.1+k/.5*PI*1.8;x=62+Math.cos(a)*16;y=59+Math.sin(a)*4.5-k*2;}
-      else{const u=(k-.5)/.5;x=48-u*12-Math.sin(u*PI)*4*(1+p.lean)+Math.sin(t*1.6+u*3)*1.5*p.sway;y=57-u*(34+p.rise*1.4)+u*u*p.coil*-4;}pts.push([x,y]);}
-    const rads=pts.map((q,i)=>i<N*.5?5.6-i*.05:5.4-(i-N*.5)*.28);const cut=brk.tail?3:0;C(pts.slice(cut).map((q,i)=>[q[0],q[1],rads[i+cut]]),'body','body');
-    for(let i=Math.max(1,cut);i<N-1;i++){const a=Math.atan2(pts[i+1][1]-pts[i-1][1],pts[i+1][0]-pts[i-1][0]),q=add(pts[i],V(a-PI/2,rads[i]*.6));E(q[0],q[1],1.9,1.2,'scute','body',{a,pri:1.4});}
-    if(brk.tail)wound(K,pts[cut],0,.8,'body');else{const e=pts[0];P([add(e,[0,-1.4]),add(e,[6,0]),add(e,[0,1.4])],'dark','body',{k:.3});}
-    // the hood: a broad flared shield behind the neck, banded inside
-    const hn=pts[N-3],hv=Math.atan2(pts[N-1][1]-pts[N-4][1],pts[N-1][0]-pts[N-4][0]),hw=brk.wings?5:11+Math.sin(t*1.4)*.5;
-    P([add(hn,V(hv,6)),add(add(hn,V(hv,2)),V(hv-PI/2,hw)),add(add(hn,V(hv,-6)),V(hv-PI/2,hw*.8)),add(hn,V(hv,-9)),add(add(hn,V(hv,-6)),V(hv+PI/2,hw*.6)),add(add(hn,V(hv,2)),V(hv+PI/2,hw*.7))],'memb','hood',{k:.6});
-    for(let i=0;i<3;i++)E(...add(add(hn,V(hv,2-i*3)),V(hv-PI/2,hw*.5)),1.6,1.1,'hoodIn','hood',{pri:2.6});
-    const ah=hv+p.hr-.9,r=snake(K,pts[N-1],ah,p.jaw,brk,'head',B,t,G,0);eyes=[r.eye];mouth=r.mouth;G.push(r.eye);
-    // the crown
-    const f=V(ah,1),uH=V(ah+PI/2,1),cb=add(add(pts[N-1],f,.5),uH,3.6);if(!brk.head)for(let i=0;i<5;i++){const b=add(cb,f,-i*1.2+1),a=ah+PI/2+.8-i*.4;spike(K,b,a,4+(i===2?2:0),1,'horn','crest');}else stump(K,cb,add(cb,uH,3),1.2,'crest');
+    // the coil: a spiral on the ground, tail tucked in the middle, the front loop over the back one
+    const N=22,cp=[];for(let i=0;i<N;i++){const k=i/(N-1),a=-1.45*PI+k*2.2*PI,r=7+k*8-p.coil*.8;cp.push([62+Math.cos(a)*r,60.5+Math.sin(a)*(2.2+k*2.6)-(1-k)*3.2,1.6+k*4,Math.sin(a)]);}
+    const cut=brk.tail?4:0;for(let i=Math.max(cut,1);i<N;i++){const A=cp[i-1],Bq=cp[i],g=(A[3]+Bq[3])/2>0?'body':'neckF';C([[A[0],A[1],A[2]],[Bq[0],Bq[1],Bq[2]]],'body',g);}
+    if(brk.tail)wound(K,cp[cut],0,.7,'neckF');else P([add(cp[0],[-.8,-1]),add(cp[0],[-3.6,-3.4]),add(cp[0],[.8,-.6])],'horn','neckF',{k:.2});   // a horn-tipped tail
+    // the neck rises from the front of the coil in an S, and reaches forward to strike
+    const E0=[cp[N-1][0],cp[N-1][1]],L=p.lean,R=p.rise,sw=Math.sin(t*1.6)*1.2*p.sway,bz=(u,a0,a1,a2,a3)=>(1-u)**3*a0+3*(1-u)**2*u*a1+3*(1-u)*u*u*a2+u**3*a3;
+    const P1=[E0[0]-17-L*4,E0[1]-12],P2=[E0[0]+13-L*8,E0[1]-26-R],P3=[E0[0]-4-L*16+sw,E0[1]-38-R*1.3+L*12];
+    const M=10,nk=[];for(let i=0;i<=M;i++){const u=i/M;nk.push([bz(u,E0[0],P1[0],P2[0],P3[0]),bz(u,E0[1],P1[1],P2[1],P3[1]),5.4-u*2.2]);}
+    C(nk.map(q=>q.slice()),'body','body');
+    for(let i=1;i<M;i++){const q=nk[i],a=Math.atan2(nk[i+1][1]-nk[i-1][1],nk[i+1][0]-nk[i-1][0]),f=add(q,V(a-PI/2,q[2]*.62));E(f[0],f[1],1.5,1,'scute','body',{a,pri:1.4});}   // belly scutes up the front
+    // the hood: a broad ribbed shield flaring behind the upper neck, with eye spots
+    const hu=7,hc=nk[hu],nv0=Math.atan2(nk[hu+1][1]-nk[hu-1][1],nk[hu+1][0]-nk[hu-1][0]),nv=V(nv0,1),pv=V(nv0+PI/2,1),hw=(brk.wings?6:12.5)+Math.sin(t*1.4)*.4+p.coil*.6,at=(a,b)=>add(add(hc,nv,a),pv,b);
+    P([at(7,0),at(5,hw*.8),at(-2,hw),at(-8,hw*.6),at(-12,0),at(-8,-hw*.6),at(-2,-hw),at(5,-hw*.8)],'memb','hoodB',{k:.7});
+    P([at(4,0),at(2.6,hw*.55),at(-2,hw*.7),at(-6,hw*.4),at(-8,0),at(-6,-hw*.4),at(-2,-hw*.7),at(2.6,-hw*.55)],'hoodIn','hoodB',{k:.6,pri:1.2});   // the pale inner hood
+    for(const sd of[-1,1]){for(let i=0;i<3;i++)C([at(-2,0).concat([.35]),at(4-i*4.5,sd*hw*.85).concat([.3])],'dark','hoodB',{pri:2.6});E(...at(-1,sd*hw*.55),1.8,1.4,'hoodIn','hoodB',{pri:2.7});E(...at(-1,sd*hw*.55),.7,.6,'dark','hoodB',{pri:2.8});}
+    // the head: a broad royal skull, heavy brows, a lower jaw that drops to show two fangs
+    const ah=Math.atan2(nk[M][1]-nk[M-2][1],nk[M][0]-nk[M-2][0])+p.hr-.5,f=V(ah,1),uH=V(ah+PI/2,1),dH=V(ah-PI/2,1),H0=nk[M],hp=(x,y)=>add(add(H0,f,x),uH,y);
+    E(...hp(1.4,.4),5,3.9,'body','head',{a:ah});P([hp(3,2.8),hp(9.6,1.4),hp(10.4,-.6),hp(3,-2.4)],'body','head',{k:.6});
+    E(...hp(2.4,2.6),2.4,1.1,'dark','head',{a:ah,pri:1.6});   // brow ridge
+    const J=hp(2,-2),jd=V(ah-p.jaw*.9,1);C([J.concat([1.9]),add(J,jd,7.6).concat([1.1])],'body','jaw');
+    if(p.jaw>.05){P([add(J,uH,.6),hp(9.6,-.6),add(J,jd,7.6),J],'mouth','mouth',{pri:2.6});for(const k of[0,1])P([add(hp(6+k*2.4,-1.3),f,-.45),add(hp(6+k*2.4,-1.3),f,.45),add(hp(6.1+k*2.4,-1.3),dH,1.6+p.jaw*2.6)],'tooth','teeth',{k:.2,pri:2.6});}
+    eyes=[hp(3.4,1.2)];mouth=hp(9,-1);G.push(eyes[0]);
+    // the crown: a gold band with five spikes in a fan and a glowing gem
+    const cb=hp(.2,3.4);if(!brk.head){C([hp(-2.4,2.6).concat([.9]),hp(3.4,3.6).concat([.8])],'horn','crest');[[3,-1.8],[4.6,-.9],[6.6,0],[4.6,.9],[3,1.8]].forEach(([l,o],i)=>spike(K,add(cb,f,o*1.4-.4),ah+PI/2+.15-o*.32,l,1.1,'horn','crest'));
+      E(...add(cb,uH,1.2),1.1,1.1,'lava','crest',{pri:2.7});G.push(add(cb,uH,1.2));}else stump(K,cb,add(cb,uH,3),1.2,'crest');
     // the forked tongue flicks out
-    if(Math.sin(t*3)>.4&&p.jaw<.1){const m=add(r.mouth,f,1),e=add(m,f,4);C([m.concat([.35]),e.concat([.3])],'tongue','teeth');for(const s of[-1,1])C([e.concat([.3]),add(add(e,f,1.6),uH,s).concat([.2])],'tongue','teeth');}}
+    if(Math.sin(t*3)>.4&&p.jaw<.1){const m=add(mouth,f,1),e=add(m,f,4);C([m.concat([.35]),e.concat([.3])],'tongue','teeth');for(const sd of[-1,1])C([e.concat([.3]),add(add(e,f,1.6),uH,sd).concat([.2])],'tongue','teeth');}}
   else if(pl==='worm'){
     // bursting from a sand mound: only the front of the worm is above ground
     const N=11,pts=[];for(let i=0;i<N;i++){const k=i/(N-1),x=70-k*44-p.lean*k*k*10,y=GROUND-2-Math.sin(Math.min(1,k*1.3)*PI*.62)*(30+p.rise*1.5)+k*k*12+Math.sin(t*1.8+k*4)*1.2*p.sway;pts.push([x,y]);}
@@ -3542,7 +3553,7 @@ function mHit(i){
   S.shake=Math.max(S.shake,.35);S.stop=.06;addNum(hc.x+4,hc.y-18,''+dmg,'#ff6a4d',.9);sfx('hurt');buzz(80);
   for(let k=0;k<8;k++)S.pt.push({x:hc.x,y:hc.y,vx:rnd(-80,10),vy:rnd(-80,-10),life:.4,col:'#e2483d',g:220});
   if(h.hp<=0&&!secondWind()){h.hp=0;h.state='dead';S.endT=0;S.fail='YOU FAINTED';sfx('lose');return;}
-  if(A.st)applyStatus(D.inflict);
+  if(A.st&&(D.inflict!=='numb'||Math.random()<NUMB.chance))applyStatus(D.inflict);   // numbing is a chance per hit, not every hit
 }
 
 // ═══════════════════════════════════════════════════

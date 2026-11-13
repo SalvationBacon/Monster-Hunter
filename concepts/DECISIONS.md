@@ -487,3 +487,7 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 ## v0.38.1: room for the lance
 - The lance's tip was cut off in most animations: the hunter's frames were 56x54 and a lance reaches 14 px past the right edge and 9 px above the top (the greatsword and hammer overshoot by 2 px at the top of a swing). Hunter frames are now 74x68, padded 2 px left and 11 px on top, and drawn shifted by the same amount, so the hunter stays where it was.
 
+## v0.38.2: Bogcrown and numbing
+- **The Bogcrown is redrawn** as a king cobra. A spiral coil with the tail tucked in and the front loop over the back, a neck rising from it in an S-curve, a broad ribbed hood flaring behind the upper neck with a pale inside and eye spots, a bigger head with heavy brows and fangs, and a gold crown of five spikes with a glowing gem. It faces the hunter, and its strike uncoils the neck forward. (Before, it was a stiff L-shaped tube with a lump for a hood and a nub for a crown.)
+- **Numbing (the hunter's paralysis) is rarer.** Every status hit used to numb with only 6 seconds of immunity after, and signature moves carry the status too, so a Voltwing numbed a hunter who stood and fought about 4.7 times a minute. Now a hit numbs 25% of the time and immunity lasts 15 seconds: at most about once a minute (0.4 for the other numbing monsters).
+
