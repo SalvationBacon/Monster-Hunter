@@ -495,3 +495,19 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Bristle Rush** (Tuskhide) used to charge through the hunter off the left edge and come back in from the right. Now it charges in, skids to a stop, hops back and charges again, all on screen; the two hits keep their timing.
 - **Leaps and dives** (the Tuskhide's leap, the Fernwing's dive and the like, from the original sprites) jumped the monster off the top of the screen, leaving only its shadow. The art monster's height is now capped so it stays below the top bar and the tip banner.
 
+## v0.39.0: harder, with stamina and livelier monsters
+- **Stamina matters.** Before, only rolling used it (25 of 100) and it refilled in about 3 seconds, so it never ran out. Now:
+  - every swing costs stamina by how long it takes (a dual-blade slash 3, a greatsword swing 7, a hammer swing 10);
+  - holding a charge drains it (7 a second), and releasing a charged hit costs 12, 17 or 22 by level;
+  - each blade-dance hit costs 3;
+  - a roll costs 30 (dual blades 20), up from 25 and 15.
+  - Stamina refills at 36 a second after half a second without spending.
+  - Hitting zero leaves you **WINDED** for 1.3 seconds: you can't swing or roll, but stamina comes back meanwhile. Mashing becomes a burst then a breather, and you choose between pressing on and keeping a roll in hand. A perfect dodge still gives 25 back.
+- **Harder hunts.** Monster damage is scaled by rank, tuned with the test bots so an average hunter in the previous monster's gear wins about two hunts in three: about 2.1x in ranks 1–6, 1.45x for the apex monsters, 1.05x for the elder. The Fernwing, the first hunt, stays gentle (about 1.05x; an average new hunter wins about 85%). Pauses between attacks are shorter, and recovery is 20% quicker.
+- **Combos:** after an attack a monster may go straight into another (12%, 25%, 40% of the time by phase; up to two in a row when enraged). A combo is never a heavy or signature move.
+- **Held wind-ups and feints** (10–22% of attacks by phase): the monster freezes at the peak of its wind-up, trembling, for 0.3–0.55 seconds before the hit, or it fakes it ("FEINT!") and pulls back without attacking.
+- **Openings:** after a heavy or single-hit signature move the monster is **WIDE OPEN** for 1.8 seconds, panting, and takes 25% more damage.
+- **Rage:** in its last third of health a monster glows red and steams, hits 20% harder and attacks 10% faster.
+- **Snapjaws** have a quarter less health (10% of their biome monster's, was 13%) and an alpha 1.8x (was 2.2x), so expeditions stay quick with stamina.
+- **Tests:** the bots keep a roll's worth of stamina in hand. The balance checks now look at the ladder's overall win rate (50–88%) rather than two wins in three per monster, which is luck at this difficulty; all four iron weapons together must beat the Fernwing 15 times in 24. The mechanics tests run without feints or combos so their timing is exact.
+

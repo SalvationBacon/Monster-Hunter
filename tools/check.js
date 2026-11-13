@@ -16,7 +16,8 @@ const shots=process.argv[2];
   await shot('title');
   await ev(()=>{MH.manual=true;for(const k in MH.GEAR)MH.SAVE.own[k]=true;window.EQ=(w,ar,ch)=>{ar=ar||'leather';const t=ar==='leather'?null:ar.slice(0,-3);Object.assign(MH.SAVE.eq,{weapon:w||'iron_gs',armor:ar,helm:t?t+'_he':'leather_helm',arms:t?t+'_ga':'leather_arms',legs:t?t+'_bo':'leather_legs',charm:ch||null});MH.SAVE.lv={};MH.SAVE.potions=99;};
     // a quiet hunt for measuring: the monster does nothing and cannot dodge
-    window.QUIET=(mon,o)=>{MH.newHunt(mon,o);const S=MH.S,m=S.m;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;S.h.inv=1e9;return S;};
+    window.FIGHT0={feint:MH.FIGHT.feint,combo:MH.FIGHT.combo};MH.FIGHT.feint=[0,0,0];MH.FIGHT.combo=[0,0,0];   // mechanics tests need exact timing; the bots fight the real thing
+    window.QUIET=(mon,o)=>{MH.newHunt(mon,o);const S=MH.S,m=S.m;m.evadeCd=1e9;m.wait=1e9;m.qteT=1e9;S.h.inv=1e9;S.h.noStam=true;return S;};   // mechanics tests: no stamina limit
     window.RUN=n=>{for(let i=0;i<n;i++)MH.update(1/60);};});
 
   // ── the roster ──
@@ -39,10 +40,10 @@ const shots=process.argv[2];
     for(const id in MH.GEAR){const G=MH.GEAR[id];if(!G.sk)continue;let x=19+(G.hp?w('HP '+Math.round(G.hp*1.4))+4:0);for(const [k,n] of Object.entries(G.sk))x+=w(MH.PERKS[k].tag+'+'+n)+3;if(x>124)long.push(id);}
     for(const k of MH.SK){const K=MH.PERKS[k];if(w(K.name)>80)long.push(K.name);for(let L=1;L<=K.max;L++)if(w(K.d(L))>116)long.push(K.d(L));}
     return long.length?[...new Set(long)].join(' | '):true;}),'every name, tip, story line and quest line fits the screen');
-  ok(await ev(()=>{EQ();for(const id of MH.HUNTS)for(const a of new Set(MH.MONSTERS[id].moves)){MH.newHunt(id);const S=MH.S,m=S.m,D=MH.MONSTERS[id];S.h.hp=S.h.max=1e7;m.evadeCd=1e9;m.qteT=1e9;S.timeLeft=1e9;
+  ok(await ev(()=>{EQ();const F=MH.FIGHT,f0=F.feint,c0=F.combo;F.feint=[0,0,0];F.combo=[0,0,0];for(const id of MH.HUNTS)for(const a of new Set(MH.MONSTERS[id].moves)){MH.newHunt(id);const S=MH.S,m=S.m,D=MH.MONSTERS[id];S.h.hp=S.h.max=1e7;m.evadeCd=1e9;m.qteT=1e9;S.timeLeft=1e9;
       const pool=D.pools,tr=D.trait;D.pools=[[a],[a],[a]];D.trait=null;m.wait=0;let t=0,moved=false;const p0=JSON.stringify(MH.mPose());
       while(t<8&&m.state!=='recover'){MH.update(1/60);t+=1/60;if(m.state==='attack'&&JSON.stringify(MH.mPose())!==p0)moved=true;}D.pools=pool;D.trait=tr;
-      if(m.state!=='recover'||!moved||S.stats.taken<=0)return id+':'+a;}return true;}),'every move of every monster animates, lands its hits and ends');
+      if(m.state!=='recover'||!moved||S.stats.taken<=0){F.feint=f0;F.combo=c0;return id+':'+a;}}F.feint=f0;F.combo=c0;return true;}),'every move of every monster animates, lands its hits and ends');
 
   // ── music ──
   ok(await ev(()=>{const sig=MH.HUNTS.map(id=>{const t=MH.monsterTrack(MH.MONSTERS[id]);return JSON.stringify([t.scale,t.root,t.lead,t.groove,t.bpm,t.bassPat,t.sec.A.lead.slice(0,8)]);});
@@ -62,7 +63,7 @@ const shots=process.argv[2];
   // ── bots ──
   // skill: chance to dodge each incoming hit and to tap each weak point. It counters, sharpens, drinks, rolls out fire and taps out of ice.
   const bot=(monster,eq,skill)=>ev(({monster,eq,skill})=>{
-    EQ(eq.weapon,eq.armor,eq.charm);MH.newHunt(monster);const S=MH.S;let t=0,decided='',will=false,qdec=null;
+    if(window.FIGHT0){MH.FIGHT.feint=FIGHT0.feint;MH.FIGHT.combo=FIGHT0.combo;}EQ(eq.weapon,eq.armor,eq.charm);MH.newHunt(monster);const S=MH.S;let t=0,decided='',will=false,qdec=null;
     while(S.mode==='hunt'&&t<600){
       const m=S.m,h=S.h;
       if(m.state==='attack'&&m.hi<m.hits.length){const d=m.hits[m.hi]-m.t,key=m.hi+':'+m.atk+':'+m.hits[0];if(decided!==key){decided=key;will=Math.random()<skill;}
@@ -74,9 +75,10 @@ const shots=process.argv[2];
       if((h.burn>0||h.mud>0||h.stench>0)&&skill>.5&&h.st>70&&h.state==='idle'&&m.state!=='attack')MH.actDodge(-1);
       if(h.sharp<25&&h.state==='idle'&&calm)MH.actSharpen();
       if(h.hp<h.max*.5&&h.potions>0&&h.stench<=0&&h.state==='idle'&&m.state!=='attack')MH.actPotion();
-      else if(h.state==='idle'&&m.state!=='shell'&&!(h.bleed>0&&h.hp<h.max*.3))MH.actTap('head');
+      else if(h.state==='idle'&&m.state!=='shell'&&!(h.bleed>0&&h.hp<h.max*.3)&&(skill<=.5||h.st>=h.g.W.dodge+10||m.open>0))MH.actTap('head');   // a sensible hunter keeps a dodge in reserve, unless the monster is wide open
       MH.update(1/60);t+=1/60;
     }
+    if(window.FIGHT0){MH.FIGHT.feint=[0,0,0];MH.FIGHT.combo=[0,0,0];}
     return{win:S.mode==='loot',time:MH.MONSTERS[monster].time-S.timeLeft,stats:S.stats,breaks:['head','wings','tail'].filter(k=>S.m.parts[k].broken),loot:S.loot&&S.loot.drops,fail:S.fail,mhp:Math.round(S.m.hp/S.m.max*100)};
   },{monster,eq,skill});
   const avg=a=>a.length?Math.round(a.reduce((s,v)=>s+v,0)/a.length):0;
@@ -86,24 +88,27 @@ const shots=process.argv[2];
   const set=(t,wt)=>({weapon:t+'_'+(wt||'gs'),armor:t==='iron'?'leather':t+'_ar',charm:null});
   console.log('  Fernwing, starter greatsword');
   let r=await trial('skilled','fern',set('iron'),.95);
-  ok(r.wins.length===6,'a skilled bot always beats the Fernwing');ok(r.time>30&&r.time<60,'that hunt takes under a minute ('+r.time+'s)');
+  ok(r.wins.length===6,'a skilled bot always beats the Fernwing');ok(r.time>30&&r.time<85,'that hunt takes a minute or so ('+r.time+'s)');
   ok(r.wins.every(x=>x.breaks.length>=1)&&r.wins.every(x=>x.stats.counters>0&&x.stats.stuns>0)&&r.wins.every(x=>x.stats.evaded>0),'it breaks parts, counters, stuns, and the monster dodges some hits');
   ok(r.wins.every(x=>x.breaks.every(k=>x.loot.some(d=>d.id==={head:'horn',wings:'wing',tail:'spike'}[k]))),'broken parts drop their loot');
   await trial('average','fern',set('iron'),.7);await trial('casual','fern',set('iron'),.45);
   r=await trial('never dodges','fern',set('iron'),0);ok(r.wins.length<=1,'never dodging loses the hunt');
   console.log('  Each weapon type against the Fernwing (average bot)');
-  for(const wt of ['gs','db','hm','ln']){r=await trial(wt,'fern',set('iron',wt),.7);ok(r.wins.length>=5&&r.time>30&&r.time<75,'the iron '+wt+' wins in about a minute ('+r.time+'s)');}
+  {let tw=0,few=[],slow=[];for(const wt of ['gs','db','hm','ln']){r=await trial(wt,'fern',set('iron',wt),.7);tw+=r.wins.length;if(r.wins.length<2)few.push(wt);if(r.wins.length&&(r.time<30||r.time>105))slow.push(wt+' '+r.time+'s');}
+    ok(tw>=15&&!few.length&&!slow.length||[tw+'/24',few.join(),slow.join()].join(' '),'every iron weapon can beat the Fernwing, most of the time, in a minute and a half or less');}
   console.log('  The ladder: each monster in the gear of the one before it (average bot, 3 hunts each)');
-  const order=await ev(()=>MH.HUNTS.map(id=>({id,rank:MH.MONSTERS[id].rank,time:MH.MONSTERS[id].time})));const weak=[],slow=[];
+  const order=await ev(()=>MH.HUNTS.map(id=>({id,rank:MH.MONSTERS[id].rank,time:MH.MONSTERS[id].time})));const weak=[],slow=[];let lw=0,ln=0;
   for(let i=1;i<order.length;i++){const o=order[i],n=o.rank===8?12:3,res=await trial(o.id+' (rank '+o.rank+') in '+order[i-1].id+' gear',o.id,set(order[i-1].id),.7,n);
-    if(res.wins.length<Math.ceil(n*2/3))weak.push(o.id);if(res.wins.length&&res.time>o.time*.75)slow.push(o.id+' '+res.time+'s');}
-  ok(weak.length===0||weak.join(', '),'every monster can be beaten in the gear of the one before it');
+    if(o.rank<8){lw+=res.wins.length;ln+=n;}else if(res.wins.length<3)weak.push(o.id);if(res.wins.length&&res.time>o.time*.75)slow.push(o.id+' '+res.time+'s');}
+  console.log('     ladder: '+lw+'/'+ln+' wins ('+Math.round(100*lw/ln)+'%)');
+  ok(lw/ln>=.5&&lw/ln<=.88||Math.round(100*lw/ln)+'%','an average hunter in the gear of the monster before wins about two hunts in three: hard, not hopeless');
+  ok(weak.length===0||weak.join(', '),'and the Hollow Star can still be beaten in the apex gear');
   ok(slow.length===0||slow.join(', '),'and none of those hunts runs close to its time limit');
   r=await trial('the elder in its own gear, skilled','star',set('star'),.95,3);ok(r.wins.length>=2,'the Hollow Star falls to a skilled hunter in the best gear');
   r=await trial('the elder in rank 3 gear, no element or status edge','star',set('plume'),.7,8);ok(r.wins.length<=2,'and not to one in rank 3 gear');
 
   // ── weapons ──
-  const dps=await ev(()=>{const out={};for(const wt of ['gs','db','hm','ln']){EQ('iron_'+wt);const S=QUIET('fern'),m=S.m;m.hp=m.max=1e9;m.stunMax=1e9;S.timeLeft=1e9;let hits=0,last=0;for(let i=0;i<60*30;i++){MH.actTap('body');MH.update(1/60);if(S.stats.dealt!==last){hits++;last=S.stats.dealt;}}
+  const dps=await ev(()=>{const out={};for(const wt of ['gs','db','hm','ln']){EQ('iron_'+wt);const S=QUIET('fern'),m=S.m;m.hp=m.max=1e9;m.stunMax=1e9;S.timeLeft=1e9;let hits=0,last=0;for(let i=0;i<60*30;i++){S.h.st=100;S.h.winded=0;MH.actTap('body');MH.update(1/60);if(S.stats.dealt!==last){hits++;last=S.stats.dealt;}}
     out[wt]={dps:S.stats.dealt/30,rate:hits/30};}return out;});
   console.log('     tap damage per second: '+Object.entries(dps).map(([k,v])=>k+' '+v.dps.toFixed(1)+' ('+v.rate.toFixed(1)+' hits/s)').join(', '));
   const dv=Object.values(dps).map(v=>v.dps);ok(Math.max(...dv)/Math.min(...dv)<1.06,'all four weapon types deal the same tap damage per second, within 6%');
@@ -141,7 +146,7 @@ const shots=process.argv[2];
     const r=c1==='{"scale":3,"claw":1}'&&Math.abs(a1-1.404)<1e-6&&sc===96&&MH.lvOf('fern_gs')===5&&Math.abs(g.atk-1.82)<1e-6&&g.hp===162&&MH.upCost('fern_gs')===null&&S0.bag.quill_scale===99-12&&S0.bag.rare===0;
     S0.lv={fern_gs:4};S0.bag={scale:99,claw:99,horn:9,wing:9,quill_scale:99};MH.upgradeTap('fern_gs');const noRare=MH.lvOf('fern_gs')===4;S0.lv={};S0.bag={};MH.upgradeTap('fern_gs');return r&&noRare&&MH.lvOf('fern_gs')===0&&MH.upCost('fern_ch')===null;}),
     'upgrades cost materials, add 8% a level and stop at +5; the last levels need the next monster\'s scales and the rare drop; charms have no levels');
-  ok(await ev(()=>{const taken=ar=>{let n=0;for(let k=0;k<12;k++){EQ('iron_gs',ar);MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}n+=S.stats.taken/Math.round(MH.ATTACKS[m.atk].dmg*MH.MONSTERS.ember.dmg);}return n/12;};
+  ok(await ev(()=>{const taken=ar=>{let n=0;for(let k=0;k<12;k++){EQ('iron_gs',ar);MH.newHunt('ember');const S=MH.S,m=S.m;m.wait=0;m.qteT=99;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}n+=S.stats.taken/Math.round(MH.ATTACKS[m.atk].dmg*MH.MONSTERS.ember.dmg*MH.fightDmg(MH.MONSTERS.ember));}return n/12;};
     const a=taken('obsid_ar'),c=taken('frost_ar');return Math.abs(a-.75)<.06&&Math.abs(c-1)<.02||a+','+c;}),'armor takes 25% less from its own monster\'s element');
   ok(await ev(()=>{EQ('ember_gs','frost_ar','relic_weak');const g=MH.gearStats();return g.elem==='fire'&&g.perks.might===3&&Math.abs(g.atk-1.66*1.12)<.001&&g.perks.weakspot===2&&g.perks.keenedge===1&&g.hp===Math.round((140+8*MH.MONSTERS.frost.L)*(1+.04*(g.perks.vigor||0)))||JSON.stringify([g.perks,g.atk,g.hp]);}),'gear adds up: element, attack with three levels of Might, health, and the charm\'s skills');
   // equip pieces until a skill reaches a level, starting from a charm; returns the slots used
@@ -219,7 +224,18 @@ const shots=process.argv[2];
   ok(await ev(()=>{const S=QUIET('mire'),h=S.h;h.hp=40;MH.applyStatus('stench');MH.actPotion();const blocked=h.state!=='drink'&&h.potions===3;MH.actDodge(-1);RUN(40);const half=h.stench>0;MH.actDodge(-1);RUN(40);h.state='idle';MH.actPotion();
     return blocked&&half&&h.stench===0&&h.state==='drink';}),'stench blocks potions until two rolls air it out');
   ok(await ev(()=>{const S=QUIET('dust'),h=S.h;MH.applyStatus('numb');const st=h.state==='numb';MH.actTap('body');MH.actDodge(-1);MH.actPotion();MH.actSharpen();const stuck=h.state==='numb';RUN(100);MH.applyStatus('numb');return st&&stuck&&h.state==='idle';}),'numbed: the hunter cannot act for a moment, then is safe from it for a while');
-  ok(await ev(()=>{const S=QUIET('mud'),h=S.h;MH.applyStatus('mud');MH.actDodge(-1);const cost=100-h.st;RUN(40);return Math.abs(cost-45)<.01&&h.mud===0;}),'mud makes the next roll cost 80% more, and that roll shakes it off');
+  ok(await ev(()=>{EQ('iron_gs');const S=QUIET('fern'),h=S.h;h.noStam=false;const R=[];MH.actTap('body');R.push(Math.abs(100-h.st-MH.tapCost(h.g.W,0))<.01);
+    h.st=3;h.state='idle';h.comboT=0;MH.actTap('body');R.push(h.st===0&&h.winded>0);RUN(10);h.state='idle';const s0=h.state;MH.actTap('body');R.push(h.state!=='atk');MH.actDodge(-1);R.push(h.state!=='dodge');
+    RUN(80);R.push(!(h.winded>0)&&h.st>30);h.state='idle';MH.actTap('body');R.push(h.state==='atk');return R.every(x=>x)||R.join();}),
+    'attacks cost stamina; running out leaves you winded, unable to swing or roll, while it comes back');
+  ok(await ev(()=>{EQ('iron_gs');const F=MH.FIGHT,R=[];
+    {const S=QUIET('tusk'),m=S.m;S.h.hp=S.h.max=1e6;S.def.pools=S.def.pools.map(()=>['rush']);m.wait=0;let t=0;while(m.state!=='recover'&&t<8){MH.update(1/60);t+=1/60;}R.push(m.open>0);
+      const a=MH.dealDamage;const d0=S.stats.dealt;MH.actTap('body');RUN(20);const open=S.stats.dealt-d0;S.m.open=0;const d1=S.stats.dealt;S.h.state='idle';S.h.comboT=0;MH.actTap('body');RUN(20);const shut=S.stats.dealt-d1;R.push(open>shut*1.15);}
+    {const hit=ph=>{const S=QUIET('fern'),m=S.m;S.h.inv=0;S.h.hp=S.h.max=1e6;m.phase=ph;S.def.pools=S.def.pools.map(()=>['bite']);m.wait=0;let t=0;while(S.stats.taken===0&&t<6){MH.update(1/60);t+=1/60;}return S.stats.taken;};R.push(Math.abs(hit(2)/hit(0)-1.2)<.08);}
+    {const f0=F.feint,k0=F.fake;F.feint=[1,1,1];F.fake=1;const S=QUIET('fern'),m=S.m;S.h.inv=0;S.h.hp=S.h.max=1e6;m.wait=0;let t=0,att=false;while(t<3&&!(att&&m.state==='recover')){MH.update(1/60);t+=1/60;if(m.state==='attack')att=true;}R.push(m.state==='recover'&&S.stats.taken===0);F.feint=f0;F.fake=k0;}
+    {const c0=F.combo;F.combo=[1,1,1];const S=QUIET('fern'),m=S.m;S.h.inv=0;S.h.hp=S.h.max=1e6;S.def.pools=S.def.pools.map(()=>['bite']);m.wait=0;let t=0,starts=0,last=null;while(t<6&&m.state!=='recover'){if(m.state==='attack'&&m.hits!==last){starts++;last=m.hits;}MH.update(1/60);t+=1/60;}R.push(starts===2);F.combo=c0;}
+    return R.every(x=>x)||R.join();}),'a big move leaves the monster wide open for extra damage; enraged it hits 20% harder; feints pull back without a hit; combos chain straight into another attack');
+  ok(await ev(()=>{const S=QUIET('mud'),h=S.h;MH.applyStatus('mud');MH.actDodge(-1);const cost=100-h.st;RUN(40);return Math.abs(cost-54)<.01&&h.mud===0;}),'mud makes the next roll cost 80% more, and that roll shakes it off');
   ok(await ev(()=>{const S=QUIET('ember',{meal:'tonic'});MH.applyStatus('burn');const a=S.h.burn===0;MH.applyStatus('poison');const c=S.h.poison>0;EQ();const T=QUIET('fern',{meal:'fish'});let t=0;while(T.h.sharp>=MH.SHARP.lo&&t<120){MH.actTap('body');MH.update(1/60);t+=1/60;}
     return a&&c&&t>35&&t<70;}),'Cool Tonic stops burning only, and Grilled Icefish makes the edge last twice as long');
 
@@ -250,7 +266,7 @@ const shots=process.argv[2];
     'an expedition in the swamp, coast or ruins turns up that biome\'s ingredients and creatures');
   ok(await ev(src=>{const run=eval(src),runs=[];for(let k=0;k<12;k++)runs.push(run('fern'));MH.toCamp('hunt');
     const avg=runs.reduce((a,r)=>a+r.items,0)/runs.length,max=Math.max(...runs.map(r=>r.items)),herbs=runs.reduce((a,r)=>a+r.herb,0)/runs.length;
-    return avg>=8&&avg<=13&&max<=16&&herbs<=12&&runs.every(r=>r.mode==='loot'&&r.lulls===3&&r.caught===1&&r.seen===1&&r.t<60)||JSON.stringify({avg,max,herbs,r:runs.map(r=>r.mode+r.lulls+r.caught+r.seen+'/'+(r.t|0)).join(' ')});},EXPED_RUN),
+    return avg>=8&&avg<=13&&max<=16&&herbs<=12&&runs.every(r=>r.mode==='loot'&&r.lulls===3&&r.caught===1&&r.seen===1&&r.t<80)||JSON.stringify({avg,max,herbs,r:runs.map(r=>r.mode+r.lulls+r.caught+r.seen+'/'+(r.t|0)).join(' ')});},EXPED_RUN),
     'a perfect expedition: three Snapjaws with a forage lull after each, about ten things gathered, three or so potions\' worth of herbs, and exactly one creature');
   ok(await ev(()=>{EQ();const pr=(mon,st,meal)=>{const S=QUIET(mon,{meal});MH.applyStatus(st);return !(S.h[st]>0||S.h.state==='numb');};
     return pr('mud','mud','beanbroth')&&pr('mire','stench','beanbroth')&&pr('quill','bleed','lilytea')&&pr('shell','wet','kelpwrap')&&pr('dust','numb','chowder')&&pr('dread','blight','figpie')&&!pr('dread','blight','kelpwrap');}),
@@ -298,9 +314,9 @@ const shots=process.argv[2];
   ok(await ev(()=>{const S=MH.SAVE;Object.assign(S.eq,{parmor:'pip_vest'});const T=QUIET('fern',{role:'trapper'}),m=T.m;m.wait=1e9;let first=0,second=0,len=0;for(let i=0;i<60*35;i++){const st=m.state;MH.update(1/60);if(m.state==='stagger'&&st!=='stagger'){if(!first)first=T.clock;else if(!second)second=T.clock;}if(m.state==='stagger')len++;}const traps=T.stats.traps;
     Object.assign(S.eq,{parmor:'storm_pa'});const U=QUIET('fern',{role:'trapper'});U.m.wait=1e9;let l2=0;for(let i=0;i<60*15;i++){MH.update(1/60);if(U.m.state==='stagger')l2++;}Object.assign(S.eq,{parmor:'pip_vest'});
     return Math.abs(first-8)<.1&&Math.abs(second-28)<.1&&traps===2&&Math.abs(len/60-5)<.1&&Math.abs(l2/60-2.5*MH.GEAR.storm_pa.care)<.1||[first,second,len/60,l2/60,traps].join(',');}),'Pip the trapper pins the monster at 8 seconds and every 20 after, longer in a better vest');
-  ok(await ev(()=>{const S=MH.SAVE;EQ();const win=role=>{let n=0;for(let k=0;k<40;k++){MH.newHunt('fern',{role});const H=MH.S,m=H.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);const late=(m.hits[0]-m.t)-.3;
+  ok(await ev(()=>{const S=MH.SAVE,F=MH.FIGHT,f0=F.feint;F.feint=[0,0,0];EQ();const win=role=>{let n=0;for(let k=0;k<40;k++){MH.newHunt('fern',{role});const H=MH.S,m=H.m;m.evadeCd=1e9;m.qteT=1e9;m.wait=0;MH.update(1/60);const late=(m.hits[0]-m.t)-.3;
       for(let t=0;t<late&&m.state==='attack';t+=1/60)MH.update(1/60);MH.actDodge(-1);let u=0;while(m.state==='attack'&&m.hi===0&&u<2){MH.update(1/60);u+=1/60;}if(H.h.counter>0)n++;}return n/40;};
-    const a=win('rest'),b=win('scout');return a===0&&b===1||a+','+b;}),'Pip the scout turns a dodge 0.3 seconds early into a perfect, which it would not be alone');
+    const a=win('rest'),b=win('scout');F.feint=f0;return a===0&&b===1||a+','+b;}),'Pip the scout turns a dodge 0.3 seconds early into a perfect, which it would not be alone');
   ok(await ev(()=>{const loot=role=>{let n=0;for(let k=0;k<200;k++){MH.newHunt('fern',{role});const d=MH.rollLoot().drops;n+=d.find(x=>x.id==='scale').n+(d.find(x=>x.id==='herb')||{n:0}).n;}return n/200;};Object.assign(MH.SAVE.eq,{parmor:'pip_vest'});const v=loot('gatherer')-loot('rest');MH.SAVE.bag={};MH.SAVE.wins={fern:1};MH.SAVE.dry={};return Math.abs(v-3)<.3;}),'Pip the gatherer brings back one more of each common drop and two herbs');
   ok(await ev(()=>{const S=MH.SAVE;S.side={};S.wins.fern=1;MH.fakeNow=Date.UTC(2027,0,4,12);MH.ensureQuests();const d1=JSON.stringify(S.daily.q.map(q=>q.k)),w1=S.weekly.key,n=S.daily.q.length,uniq=new Set(S.daily.q.map(q=>q.k)).size;
     MH.qEvent('hunt','fern');MH.qEvent('gather');MH.qEvent('break',null,2);MH.qEvent('perfect',null,3);MH.qEvent('catch',null,1);MH.qEvent('small');MH.qEvent('meal');MH.qEvent('fast');const moved=S.daily.q.some(q=>q.p>0);MH.ensureQuests();const same=JSON.stringify(S.daily.q.map(q=>q.k))===d1&&S.daily.q.some(q=>q.p>0);
