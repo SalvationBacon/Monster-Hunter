@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.39.1';
+const VER='0.39.2';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -2594,21 +2594,63 @@ function smallSpr(p,flash){
 }
 RIGS.small={spr:smallSpr,head:p=>[13+p.hx,27+p.hy],mouth:p=>[8+p.hx,33+p.hy],pos:{head:p=>[14+p.hx,30+p.hy],tail:p=>[48,39+p.tail],wings:p=>[29,38],body:p=>[29,40]}};
 const palCols=()=>{const w=GEAR[SAVE.eq.pweapon]||GEAR.pip_fang,a=GEAR[SAVE.eq.parmor]||GEAR.pip_vest,D=MONSTERS[a.tier];return[w.tier==='iron'?'#c8a070':weaponCol(SAVE.eq.pweapon),D?D.look.b:'#e2483d'];};
-// Pip, drawn by the art engine: a round furry little hunter with big ears, its vest and the fang it carries
-const PIPC={};
-function palArt(f){const [wc,vc]=palCols(),k=f+wc+vc;if(PIPC[k])return PIPC[k];
-  try{const one=c=>ART.ENG.materials({b:c,u:c,h:c,d:c}).horn,M=ART.ENG.materials({b:'#5ac8b0',u:'#f0ead8',h:'#f0ead8',d:'#3a9a88'},{vest:one(vc),fang:Object.assign(one(wc),{flat:.3}),inner:one('#f0a0a8')}),
-      {S,E,C,P}=ART.KIT.kit(),b=f?0:.4,G={back:{z:1,R:1,k:.6},body:{z:2,R:2,k:1},front:{z:3,R:1,k:.6}};
+// Pip, drawn by the art engine: a round furry little hunter with big ears, wearing its vest and holding its fang.
+// Each monster's vest looks like that monster (its colours, and a feature by body: horns and a wing cape, a fur collar,
+// a back fin, a feather ruff, a shell plate), and each fang is a little dagger of that monster's own blade.
+const PIPC={},PIP_ELC={nature:'#8ad86a',fire:'#ffb03a',ice:'#bfeaff',thunder:'#ffe14d',water:'#7fd6ff',earth:'#d8b070',dragon:'#ff6ab0'};
+const pipTiers=()=>{const w=GEAR[SAVE.eq.pweapon]||GEAR.pip_fang,v=GEAR[SAVE.eq.parmor]||GEAR.pip_vest;return[MONSTERS[w.tier]?w.tier:null,MONSTERS[v.tier]?v.tier:null];};
+const pipLook=t=>t&&ART.HUN.LOOKS[t];
+function pipMats(wt,vt){const one=c=>ART.ENG.materials({b:c,u:c,h:c,d:c}).horn,V=pipLook(vt),Wl=pipLook(wt),scarf='#e2483d';
+  const M=ART.ENG.materials({b:'#5ac8b0',u:'#f0ead8',h:'#f0ead8',d:'#3a9a88'},{inner:one('#f0a0a8'),twig:one('#a07040'),
+    vest:V?Object.assign(one(V.b),{tex:V.rig==='brute'?'fur':V.rig==='crab'?'spot':'scale'}):one(scarf),vestU:one(V?V.u:'#f0c0b0'),vestH:one(V?V.h:'#f0ead8'),vestD:one(V?V.d:'#a02a2a'),
+    vestM:one(V?ART.ENG.mix(V.b,V.u,.4):scarf),gem:Object.assign(one(V?PIP_ELC[V.el]||V.h:'#ffe14d'),{flat:.9})});
+  const lo=Wl||{b:'#a07040',h:'#e8e2cc',d:'#5a3a24'};
+  return Object.assign(M,{fBlade:Object.assign(one(ART.ENG.mix(lo.h,'#ffffff',.15)),{dk:-.1}),fGuard:one(lo.b),fGrip:one(lo.d),leaf:one('#6ad84a')},Wl?{gem:Object.assign(one(PIP_ELC[Wl.el]||Wl.h),{flat:.9})}:{});}
+// the vest and its feature, on Pip (x,y offsets the body) or on its own for the icon
+function pipVest(K,vt,b,icon){const{E,C,P}=K,V=pipLook(vt),rig=V?V.rig:'scarf',y=b,g='body';
+  if(icon){P([[2,3],[10,3],[10.6,10],[6,11],[1.4,10]],'vest',g,{k:.6});P([[4.4,3],[7.6,3],[6,6.4]],'vestD',g,{k:.3,pri:2.6});E(6,7.6,1,1,'gem',g,{pri:2.7});}
+  else{C([[3,10+y,1.1],[12,10+y,1.1]],'vest',g,{pri:2.7,top:1});E(7.6,10.4+y,1,1,'gem',g,{pri:2.8,top:1});}
+  const o=icon?{dx:0,dy:-7}:{dx:0,dy:y},q=(x,yy)=>[x+o.dx,yy+o.dy];
+  if(rig==='wyvern'){if(icon){for(const s of[-1,1])P([[6+s*3.4,4],[6+s*5.6,.6],[6+s*4.8,4.4]],'vestH',g,{k:.2,pri:2.6});P([[1.4,4],[0,9],[2.6,8]],'vestM','back',{k:.3});}
+    else{for(const x of[5.4,9.6])P([q(x-.7,4.8),q(x,2.4),q(x+.7,4.8)],'vestH','front',{k:.2});P([q(2,7),q(-.2,11.6),q(3,10.6)],'vestM','back',{k:.3});}}      // little horns and a wing-flap cape
+  else if(rig==='brute'){if(icon)E(6,3.6,5,2,'vestU',g,{pri:2.5});else E(...q(7.4,9.4),5.2,1.7,'vestU','front',{pri:1});}                                           // a fur collar
+  else if(rig==='serpent'){if(icon){for(let i=0;i<3;i++)P([[3+i*3,3],[4.4+i*3,.4],[5.6+i*3,3]],'vestH',g,{k:.2,pri:2.6});}else for(let i=0;i<3;i++)P([q(1.6+i*.6,7.6-i*1.6),q(-.4+i*.6,6.2-i*1.6),q(1.4+i*.6,6-i*1.6)],'vestH','back',{k:.2});}   // a fin down the back
+  else if(rig==='raptor'){if(icon){for(let i=0;i<5;i++)E(2+i*2,3,1.3,2,i%2?'vestH':'vestU',g,{pri:2.6});}else{for(let i=0;i<5;i++)E(...q(3.4+i*2,9),1.1,1.6,i%2?'vestH':'vestU','front',{pri:1});C([q(7,4),q(6,.4)].map(v=>v.concat([.5])),'vestH','front');E(...q(6,.4),1,.8,'vestU','front');}}   // a feather ruff and a plume
+  else if(rig==='crab'){if(icon){E(6,5.6,4.4,3,'vestD',g,{pri:2.5});for(const s of[-1,1])C([[6+s*1.4,3],[6+s*3.6,0]].map(v=>v.concat([.3])),'vestH',g);}
+    else{E(...q(4,7.2),3.4,2.6,'vestD','back',{});for(const x of[6,9])C([q(x,4.6),q(x+(x<7?-1.4:1.4),1.2)].map(v=>v.concat([.25])),'vestH','front');}}}   // a shell plate and feelers
+// the fang: a little dagger of the monster's blade, or the starting twig
+const PIP_BLADE={horn:'curve',tusk:'curve',tusks:'curve',fang:'curve',beak:'curve',pincer:'curve',stinger:'curve',sting:'curve',horn1:'curve',
+  crystal:'straight',leaf:'straight',feather:'straight',quill:'straight',fin:'straight',jagged:'jag',bolt:'jag',axe:'broad',cloud:'broad',void:'broad'};
+function pipFang(K,wt,at,a,len){len=len||8;const V=(an,l)=>[Math.cos(an)*l,Math.sin(an)*l],add=(p,q,k)=>[p[0]+q[0]*(k??1),p[1]+q[1]*(k??1)],u=V(a,1),n=V(a+Math.PI/2,1),q=(k,s)=>add(add(at,u,k*len),n,s);
+  if(!wt){K.P([q(0,.6),q(1.05,.3),q(1.1,-.4),q(0,-.6)],'twig','front',{k:.3});K.E(...q(.55,.9),.7,.5,'leaf','front');return;}
+  const type=PIP_BLADE[(ART.WPN.SPEC[wt]||{}).blade]||'straight',b0=.32;
+  K.C([q(-.12,0).concat([.6]),q(b0,0).concat([.55])],'fGrip','front');                                        // the grip
+  if(type==='curve')K.P([q(b0,1),q(.7,1.2),q(1.05,.9),q(.8,-.1),q(b0,-1)],'fBlade','front',{k:.4});
+  else if(type==='jag')K.P([q(b0,1),q(.55,.4),q(.7,1.1),q(1.05,0),q(.7,-.4),q(.5,-1),q(b0,-1)],'fBlade','front',{k:.2});
+  else if(type==='broad')K.P([q(b0,.9),q(.62,1.8),q(1,1.2),q(1.02,-.6),q(b0,-.9)],'fBlade','front',{k:.4});
+  else K.P([q(b0,.9),q(1,.4),q(1.12,0),q(1,-.4),q(b0,-.9)],'fBlade','front',{k:.3});
+  K.C([q(b0,1.5).concat([.5]),q(b0,-1.5).concat([.5])],'fGuard','front',{pri:2.6});K.E(...q(b0,0),.6,.6,'gem','front',{pri:2.7});}
+function palArt(f){const[wt,vt]=pipTiers(),k=f+'|'+wt+'|'+vt;if(k in PIPC)return PIPC[k];PIPC[k]=null;
+  try{const M=pipMats(wt,vt),K=ART.KIT.kit(),{S,E,C,P}=K,b=f?0:.4,G={back:{z:1,R:1,k:.6},body:{z:2,R:2,k:1},front:{z:3,R:1,k:.6}};
     C([[3.4,9.6,1],[1.4,7.4,.9],[1.6,5.6,.7]],'hide','back');                                        // tail curling up behind
     E(7.4,8.2+b,5.4,4.6,'hide','body');E(7.8,10+b,3.4,2.2,'belly','body',{pri:1});                    // round body and pale belly
     P([[3.2,5.4+b],[3.6,.6+b],[6.4,4.2+b]],'hide','body',{k:.4});P([[8.6,4.2+b],[11.4,.6+b],[11.8,5.4+b]],'hide','body',{k:.4});   // ears
     P([[3.9,4.6+b],[4,2+b],[5.6,4.2+b]],'inner','body',{pri:2.6,top:1});P([[9.4,4.2+b],[11,2+b],[11.1,4.6+b]],'inner','body',{pri:2.6,top:1});
-    C([[3,10+b,1.1],[12,10+b,1.1]],'vest','body',{pri:2.7,top:1});E(7.6,10.4+b,1,1,'fang','body',{pri:2.8,top:1});   // the vest and its clasp
+    pipVest(K,vt,b,false);
     E(4.6+(f?1:0),12.6,1.3,.8,'dark','front');E(9.6-(f?1:0),12.6,1.3,.8,'dark','front');            // feet
-    P([[12.2,9.6+b],[14.2,1.2+b],[15.2,1.8+b],[13.4,10.2+b]],'fang','front',{k:.3});C([[11.8,9.6+b,.9],[13.6,9.4+b,.8]],'hide','front');   // the fang, held in a paw
+    pipFang(K,wt,[12.8,10.4+b],-Math.PI/2+.3,8.4);C([[11.8,9.8+b,.9],[13.6,9.6+b,.8]],'hide','front');   // held in a paw
+    for(const q of S)if(q.pri>=2.5)q.top=1;
     PIPC[k]=ART.ENG.render(S,G,M,16,14,g=>{g.fillStyle='#141826';g.fillRect(5,6+Math.round(b),1,2);g.fillRect(9,6+Math.round(b),1,2);g.fillStyle='#ffffff';g.fillRect(5,6+Math.round(b),1,1);g.fillRect(9,6+Math.round(b),1,1);
       g.fillStyle='#3a2a2a';g.fillRect(7,8+Math.round(b),1,1);});}catch(e){PIPC[k]=null;}
   return PIPC[k];}
+// Pip's gear icons: the vest on its own, the fang laid on the diagonal
+const PIPICON={};
+function pipIcon(id){if(id in PIPICON)return PIPICON[id];PIPICON[id]=null;
+  try{const G=GEAR[id],t=MONSTERS[G.tier]?G.tier:null,isW=G.slot==='pweapon',M=pipMats(isW?t:null,isW?null:t),K=ART.KIT.kit();
+    if(isW)pipFang(K,t,[2.4,9.6],-Math.PI/4,10.4);else pipVest(K,t,0,true);
+    for(const q of K.S)if(q.pri>=2.5)q.top=1;
+    PIPICON[id]=ART.ENG.render(K.S,{back:{z:1,R:.8,k:.5},body:{z:2,R:1.2,k:.6},front:{z:3,R:.8,k:.5},a:{z:3,R:1,k:.5}},M,12,12);}catch(e){PIPICON[id]=null;}
+  return PIPICON[id];}
 const palSpr=f=>(typeof ART!=='undefined'&&palArt(f))||palSprOld(f);
 const palSprOld=f=>{const [wc,vc]=palCols();return shapeSpr('pal:'+f+wc+vc,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:vc,5:'#3a9a88',6:wc},a=>{a.off(1,1);
   a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);
@@ -2873,6 +2915,7 @@ function armorIcon(id){if(id in AICON)return AICON[id];AICON[id]=null;
     AICON[id]=ART.ENG.render(S,H.groups,H.mats(gear),12,12);}catch(e){AICON[id]=null;}
   return AICON[id];}
 const gearSpr=id=>{const G=GEAR[id];if(G.slot==='weapon'&&MONSTERS[G.tier]&&typeof ART!=='undefined'){const c=wpnIcon(id);if(c)return c;}
+  if(pipSlot(G)&&typeof ART!=='undefined'){const c=pipIcon(id);if(c)return c;}
   if((isArmor(G.slot)||G.slot==='weapon')&&typeof ART!=='undefined'&&ART.HUN){const c=armorIcon(id);if(c)return c;}
   return gearSprOld(id);};
 const gearSprOld=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?(G.trial?'#ffd34d':'#4cc9ff'):weaponCol(id);

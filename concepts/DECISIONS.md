@@ -515,3 +515,8 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **A lost hunt keeps the parts you broke.** Each part's material goes in the bag the moment it breaks, and the fail screen lists them under "YOU KEEP WHAT BROKE OFF". Nothing else drops on a loss.
 - In a Rank Trial this covers parts broken on any of the three monsters, and a cleared trial now pays those part materials too (before, trial loot had no part drops).
 
+## v0.39.2: Pip's gear looks like its monster
+- **Vests** take the monster's colours, a texture by body (fur for beasts, spots for crabs, scales otherwise), an element gem on the clasp, and a feature by body: little horns and a wing-flap cape (dragons), a fur collar (beasts), a fin down the back (serpents), a feather ruff and plume (birds), a shell plate and feelers (crabs). The starting scarf stays red.
+- **Fangs** are little daggers in the monster's colours: the blade in its horn colour, shaped by its weapon's blade (curved for horns, tusks, fangs, beaks, pincers and stingers; straight for crystal, leaf, feather, quill and fin; jagged for bolts; broad for axes, clouds and the void), with a guard in its body colour and an element gem. The starting twig has a leaf.
+- Both show on Pip and as their gear icons.
+
