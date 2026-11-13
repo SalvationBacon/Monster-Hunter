@@ -14,8 +14,7 @@ Ideas agreed on but not built yet. Newest first.
 - Touches: `unlocked()`, `rankOpen()` and `lockText()`; the hunt list (the next locked monster says "BEAT X FIRST"); the camp home's NEXT UP; story chapters gated on rank ("REACH RANK 3"); the guides; the test-bot ladder; and quests that count rank wins.
 
 ## Art follow-ups
-- The small pack monsters (Snapjaws) still use the old pixel sprites.
-- Monster weak points and part positions come from the idle pose; during big moves the red circle can sit away from the part.
+- The gathering creatures (32 bugs, fish and critters) and ingredient icons are still the small hand-made pixel sprites.
 - Art sources live in `art/*.js`; run `python3 tools/build-art.py` after editing them to inline them into `index.html`.
 
 ## Earlier ideas still open

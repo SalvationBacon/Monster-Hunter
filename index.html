@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.33.0';
+const VER='0.34.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -1544,6 +1544,101 @@ R('plume','PLUMECREST','#3a9ac8','#f0f0e0','#ff7aa8','#2a6a90',{plan:'fenghuang'
 R('dread','DREADBEAK','#4a2a4a','#c8a0b8','#e0508a','#2a1a2e',{plan:'griffin',lionCol:'#8a6a7a',beakCol:'#e8d8c8',beakL:7.5,el:'dragon',style:'breath',fx:'motes',eye:'#ff7ab0',glowCol:'#ff6ab0',neckL:8});
 R('temp','TEMPESTBEAK','#3a3f7a','#c8c8f0','#ffe14d','#23265a',{plan:'roc',beakCol:'#ffd34d',beakL:8,el:'thunder',style:'breath',fx:'sparks',eye:'#ffe14d',glowCol:'#ffe14d',neckL:7});
 })();
+// SNAPJAWS: the small pack hunters, one kind per biome. A lean little dromaeosaur: a long horizontal body held level
+// over long legs, a stiff balancing tail, a long low head full of teeth, small grasping hands and a raised sickle claw
+// on each foot. Each biome gives it its own skin (feathered or scaled), crest, back, markings and tail tip.
+(()=>{
+const {V,add,lerp2,chain,ik,kit,spike,bolt,ambient,glowDots,eyeAt}=KIT,PI=Math.PI;
+const GROUND=66;
+const one=c=>ENG.materials({b:c,u:c,h:c,d:c}).horn;
+const groups={armF:{z:1,R:1.4,k:.8,dk:-1},legF:{z:2,R:2.4,k:1.4,dk:-.9},tailF:{z:3,R:1.2,k:.7},back:{z:3.4,R:1.2,k:.7},body:{z:4,R:4,k:2},
+  jaw:{z:4.05,R:1,k:.8},head:{z:4.3,R:2.2,k:1.2},crest:{z:4.6,R:1.2,k:.7},legN:{z:6,R:2.6,k:1.4},armN:{z:7,R:1.4,k:.8}};
+const rest={px:60,py:47,tilt:.04,n1:-.25,n2:-.35,hr:-.55,jaw:0,arm:0,fN:0,lN:0,fF:0,lF:0,tb:-.12,crouch:0,crest:0,breath:0,tw:1};
+const clips={idle:{len:2,loop:1,keys:[[0,{}],[.5,{n1:-.35,hr:-.45,crest:.4,tb:-.08}],[1,{py:47.5,jaw:.12,tb:-.16}],[1.5,{n1:-.2,hr:-.65,arm:.2}],[2,{}]]},
+  // the bite: rock back, then lunge, neck out and jaws wide, and snap shut
+  peck:{len:1.0,keys:[[0,{}],[.32,{px:63,py:46,crouch:.4,tilt:-.08,n1:-.05,n2:-.1,hr:-.75,jaw:.25,crest:1,arm:.3,tb:.05}],
+    [.44,{px:51,py:47,crouch:.1,tilt:.12,n1:-.7,n2:-.55,hr:-.1,jaw:1,arm:.8,fN:-6,lN:2,tb:-.35}],[.52,{px:50,tilt:.14,n1:-.75,n2:-.55,hr:-.05,jaw:0,arm:.9,fN:-6,tb:-.4}],
+    [.62,{px:52,jaw:.35,n1:-.6,hr:-.2}],[1,{}]]},
+  // a leap with both sickle claws forward
+  pounce:{len:1.3,keys:[[0,{}],[.35,{px:63,py:49,crouch:1,tilt:.2,arm:.4,crest:1,jaw:.3,tb:-.3}],[.55,{px:46,py:30,crouch:0,tilt:-.25,arm:1,fN:-10,lN:24,fF:-9,lF:23,jaw:1,tb:.25}],
+    [.75,{px:40,py:42,tilt:.15,arm:.6,fN:-6,lN:8,fF:-4,lF:8,jaw:.4}],[.9,{px:42,py:48,crouch:.7,tilt:.1}],[1.3,{}]]},
+  sweep:{len:1.2,keys:[[0,{}],[.4,{px:62,tilt:.1,tb:-.7,crouch:.3}],[.55,{px:58,tilt:0,tb:.9,fF:3,crouch:.2}],[.68,{px:57,tb:1.5,fF:3}],[.85,{tb:.6}],[1.2,{}]]},
+  // a hiss: head up, jaws open, hands spread, crest raised
+  clap:{len:1.2,keys:[[0,{}],[.3,{tilt:.2,n1:.05,n2:0,hr:-.75,jaw:1,crest:1,arm:1,py:46}],[.8,{tilt:.22,n1:.08,n2:0,hr:-.8,jaw:.9,crest:1,arm:1.1,py:46}],[1.2,{}]]},
+  flinch:{len:.6,keys:[[0,{}],[.08,{px:63,py:46,tilt:-.25,n1:.1,hr:-1,arm:.6,crest:1,jaw:.5,tb:.2}],[.6,{}]]}};
+
+function make(id,name,look,D){D=Object.assign({skin:'feather',crest:'swept',back:null,marks:null,tail:'fan',fx:null,el:'nature',eye:'#ffe14d',glowCol:look.glow||'#ffe680'},D);
+  const mats={sk:Object.assign(one(look.b),{tex:D.skin==='feather'?'fur':'scale'}),skU:one(look.u),skD:one(look.d),acc:one(look.h),lava:Object.assign(one(D.glowCol),{flat:.95}),bone:one('#ece4d0')};
+  return MON[id]={id,name,rig:'raptor',el:D.el,style:'spit',D,W:96,H:72,look,mats,groups,rest,clips,build(p,brk,t){return build(p,brk,t,D);}};}
+
+function build(p,brk,t,D){const K=kit(),{S,E,C,P}=K,glows=[],br=Math.sin(t*3)*.3;
+  const Pv=[p.px,p.py+p.crouch*3],fwd=PI+p.tilt,fv=V(fwd,1),up=V(fwd+PI/2,1),Cv=add(Pv,fv,10);
+  // body: a deep chest tapering to the hips, a pale underside
+  E(Pv[0],Pv[1],5.4,4.6,'sk','body',{a:-p.tilt});C([[Pv[0],Pv[1],4.6],[Cv[0],Cv[1]+.4,5+br]],'sk','body');
+  C([[Pv[0]-1,Pv[1]+2.4,2.6],[Cv[0]+.5,Cv[1]+2.6,3.4]],'skU','body',{pri:1.2});
+  if(D.marks==='stripes')for(let i=0;i<4;i++){const q=add(add(Pv,fv,-1+i*3.3),up,3.6);E(q[0],q[1],.8,2.4,'skD','body',{a:-p.tilt+.35,pri:2.6,k:.4});}
+  if(D.marks==='spots')for(let i=0;i<5;i++){const q=add(add(Pv,fv,-2+i*2.8),up,2.4+(i%2)*1.6);E(q[0],q[1],.9,.8,'skD','body',{pri:2.6,k:.4});}
+  if(D.marks==='bolts')for(let i=0;i<2;i++)bolt(K,add(add(Pv,fv,1+i*5),up,3.8),PI/2+.4,4,.9,'lava','body',{pri:2.6});
+  // down the back
+  for(let i=0;i<4;i++){const q=add(add(Pv,fv,-1+i*3.4),up,4.4),ua=fwd+PI/2+.45;
+    if(D.back==='spines')spike(K,q,ua,2.6+(i%2),.8,'bone','back');
+    else if(D.back==='plumes')E(...add(q,V(ua,1.6)),2.4,.9,i%2?'skU':'skD','back',{a:ua});}
+  // neck: up and forward from the chest
+  const N0=add(add(Cv,fv,1.5),up,2.4),nk=chain(N0[0],N0[1],fwd+1.3,[[5.4,p.n1],[4.6,p.n2]]),Hn=nk[2];
+  C([[Cv[0],Cv[1],4],[nk[1][0],nk[1][1],2.5],[Hn[0],Hn[1],2.2]],'sk','body');C([[Cv[0]-.4,Cv[1]+2,2.4],[nk[1][0]+.4,nk[1][1]+1.4,1.6]],'skU','body',{pri:.9});
+  // head: a long low skull, the upper jaw lined with teeth, a lower jaw that drops open
+  const na=Math.atan2(Hn[1]-nk[1][1],Hn[0]-nk[1][0]),ah=na+p.hr,f=V(ah,1),uH=V(ah+PI/2,1),dH=V(ah-PI/2,1),bk=V(ah+PI,1);
+  const Hc=add(Hn,f,1.6);E(Hc[0],Hc[1],3.8,3,'sk','head',{a:ah});
+  const s0=add(add(Hc,f,1.8),uH,.4),s1=add(add(Hc,f,8.4),dH,.1);C([s0.concat([2.3]),s1.concat([1.3])],'sk','head');
+  const aj=ah-p.jaw*.75,J0=add(add(Hc,f,.8),dH,1.4),J1=add(J0,V(aj,6.2));C([J0.concat([1.5]),J1.concat([.9])],'sk','jaw');C([add(J0,dH,.7).concat([.8]),add(J1,V(aj-PI/2,.4)).concat([.5])],'skU','jaw',{pri:1});
+  if(p.jaw>.08){P([add(s0,dH,1.2),add(s1,dH,.9),J1,J0],'mouth','jaw');{const b=add(add(J0,V(aj,4.6)),V(aj+PI/2,.5));P([add(b,V(aj,-.3)),add(b,V(aj,.3)),add(b,V(aj+PI/2,.8))],'tooth','jaw',{pri:2.6});}}
+  if(p.jaw<=.08)C([add(s0,dH,1.5).concat([.35]),add(s1,dH,.7).concat([.3])],'mouth','head',{pri:2.6});   // the grin line
+  {const open=p.jaw>.08;for(const k of open?[.55,.85]:[.35,.6,.85]){const q=add(lerp2(s0,s1,k),dH,open?1.5-k*.6:1.6-k*.7);P([add(q,f,-.35),add(q,f,.35),add(q,dH,open?.7:.8)],'tooth','head',{pri:2.7});}}
+  E(...add(add(Hc,f,-.4),uH,1.4),1.4,.9,'skD','head',{a:ah,pri:1.5});   // brow ridge over the eye
+  // crest
+  const cb=add(add(Hc,bk,1),uH,2),cr=p.crest,hb=brk.head;
+  if(D.crest==='swept')for(let i=0;i<3;i++){const b=add(cb,bk,i*1.1),a=ah+PI-.5-i*.15-cr*.35+Math.sin(t*3+i)*.04,l=(hb?2:6-i*1.2)+cr*1.5;
+      P([b,add(add(b,V(a,l*.5)),V(a+PI/2,1)),add(b,V(a,l)),add(add(b,V(a,l*.5)),V(a-PI/2,.7))],['acc','skU','skD'][i],'crest',{k:.4});}
+  else if(D.crest==='frill')for(let i=0;i<5;i++){const a=ah+PI*.6+i*.24,l=(hb?2:4.2)*(1+cr*.35),q=add(add(Hc,bk,1.6),V(a,1.6));P([add(q,V(a+PI/2,.9)),add(q,V(a,l)),add(q,V(a-PI/2,.9))],i%2?'acc':'skD','crest',{k:.4});}
+  else if(D.crest==='bony'){P([add(cb,f,2.4),add(add(cb,uH,2.6+cr),f,.2),add(add(cb,uH,2.2+cr),bk,2.8),add(cb,bk,3.4)],'bone','crest',{k:.4});glows.push(add(add(cb,uH,1.4),bk,.6));}
+  else if(D.crest==='bolt')for(let i=0;i<2;i++)bolt(K,add(cb,bk,i*1.2),ah+PI-.6-i*.3-cr*.3,(hb?2:5.5-i)+cr*1.5,1.1,i?'lava':'acc','crest');
+  else if(D.crest==='fan')for(let i=0;i<4;i++){const a=ah+PI/2+.75-i*.32-cr*.2,l=(hb?2:5.2+(i===1?1.4:0))*(1+cr*.3),q=add(cb,V(a,l));C([cb.concat([.5]),q.concat([.4])],'skD','crest');E(q[0],q[1],1.3,.9,i%2?'acc':'skU','crest',{a,pri:1});}
+  else if(D.crest==='horns')for(const s of[0,1]){const b=add(cb,bk,s*1.6);spike(K,b,ah+PI-.9-s*.2-cr*.2,3.6-s*.6,1,'bone','crest');}
+  // tail: long and held stiffly out behind, with a tip that suits the biome
+  const ts=[];for(let i=0;i<6;i++)ts.push([3.7,(i?-.02:0)+Math.sin(t*2.6-i*.7)*.05*p.tw]);const front=p.tb>1.1,tg=front?'armN':'body';
+  const T0=add(add(Pv,fv,-3),up,1),tl=chain(T0[0],T0[1],p.tilt*-1+p.tb,ts);C(tl.map((q,i)=>[q[0],q[1],Math.max(.7,3.8-i*.55)]),'sk',tg);
+  C(tl.slice(0,4).map((q,i)=>[q[0],q[1]+1.6-i*.3,Math.max(.6,2-i*.4)]),'skU',tg,{pri:.9});
+  const te=tl[tl.length-1],ta=Math.atan2(te[1]-tl[tl.length-2][1],te[0]-tl[tl.length-2][0]),fg=front?'armN':'tailF';
+  if(D.tail==='fan')[[-.35,6],[0,7],[.35,6]].forEach(([da,l],i)=>{const a=ta+da+Math.sin(t*3+i)*.05,c=add(te,V(a,l*.5));E(c[0],c[1],l*.5,1.2,['skD','acc','skD'][i],fg,{a,pri:i*.1});});
+  else if(D.tail==='plumes')for(let i=0;i<3;i++){const a=ta-.3+i*.3+Math.sin(t*2+i)*.08,e=add(te,V(a,6+i*1.5));C([te.concat([.5]),e.concat([.3])],'skD',fg);E(e[0],e[1],1.3,1.3,i===1?'acc':'skU',fg,{});}
+  else if(D.tail==='spike')P([add(te,V(ta+PI/2,1.2)),add(te,V(ta,4.4)),add(te,V(ta-PI/2,1.2))],'bone',fg,{k:.3});
+  else if(D.tail==='club'){E(...add(te,V(ta,1.6)),2.2,1.8,'bone',fg,{a:ta});glows.push(add(te,V(ta,1.6)));}
+  // legs: a muscled thigh, knee forward, a long shank to a high ankle, toes, and the sickle claw held up off the ground
+  const leg=(hip,fx,lift,g)=>{const fy=GROUND-lift,an=[fx+2.6,fy-5],kn=ik(hip[0],hip[1],an[0],an[1],6.6,6.6,-1);
+    E(hip[0],hip[1]+.6,3.6,4.4,'sk',g,{a:.3,bulge:1});C([[hip[0],hip[1]+.8,3.2],[kn[0],kn[1],1.9],[an[0],an[1],1.2]],'sk',g);
+    C([[an[0],an[1],1],[fx,fy-.7,.7]],'sk',g);for(const d of[-2.4,-1])C([[fx,fy-.4,.55],[fx+d,fy+.2,.3]],'claw',g);
+    const sc=[fx+.4,fy-1.3];C([sc.concat([.55]),add(sc,[-1.2,-1.8]).concat([.4]),add(sc,[-2.2,-1]).concat([.2])],'claw',g,{pri:2.6});};
+  const hip=add(Pv,V(fwd+1.5,2));leg(add(hip,[2.4,-.4]),p.px+1+p.fF,Math.max(0,p.lF),'legF');leg(hip,p.px-5+p.fN,Math.max(0,p.lN),'legN');
+  // hands: small arms with three curved claws, raised to grab in an attack
+  const arm=(sh,g,sc)=>{const a1=fwd-.95+p.arm*.85,el=add(sh,V(a1,3*sc)),a2=a1+.85-p.arm*.3,wr=add(el,V(a2,2.8*sc));
+    C([[sh[0],sh[1],1.3*sc],[el[0],el[1],.9*sc],[wr[0],wr[1],.7*sc]],'sk',g);
+    if(D.skin==='feather')E(...lerp2(el,wr,.6),1.6*sc,.6*sc,'skD',g,{a:a2+.4,pri:.5});
+    for(const d of[-.55,-.1,.35])C([[wr[0],wr[1],.5],add(wr,V(a2+d+.4,1.7)).concat([.25])],'claw',g,{pri:2.6});};
+  const sh=add(add(Cv,fv,.5),up,-1.2);arm(add(sh,[2.4,-.6]),'armF',.9);arm(sh,'armN',1);
+  for(const q of S)if(q.pri>=2.5)q.top=1;   // small details colour only themselves
+  const eye=add(add(Hc,f,-.2),uH,.9),blink=(t%2.7)<.09,mouth=lerp2(s1,J1,.5);
+  return{S,mouth,extra:g=>{glowDots(g,glows,D.glowCol,t);if(D.fx)ambient(g,D.fx,t,[Pv[0]-20,20,Pv[0]+20,60],3);eyeAt(g,eye[0]-1,eye[1]-1,D.eye,blink,1,0);}};}
+
+const R=(id,b,u,h,d,D)=>make(id,'SNAPJAW',{b,u,h,d,glow:D.glowCol},D);
+R('snap0','#7aa84a','#e0e8b0','#e0a03a','#3f6a34',{skin:'feather',crest:'swept',marks:'stripes',tail:'fan',el:'nature',eye:'#ffe14d'});          // forest
+R('snap1','#a8503a','#e8b080','#ffb03a','#4a2420',{skin:'scale',crest:'bony',back:'spines',tail:'club',el:'fire',fx:'embers',eye:'#ffb03a',glowCol:'#ff9a3a'});   // volcano
+R('snap2','#c9a05a','#f2dca0','#e05a3a','#7a5a2c',{skin:'scale',crest:'frill',marks:'stripes',tail:'spike',el:'earth',eye:'#ffd34d'});          // desert
+R('snap3','#c8dcea','#f4fbff','#6cc4f0','#6a90b0',{skin:'feather',crest:'swept',back:'plumes',tail:'plumes',el:'ice',eye:'#6cc4f0'});            // tundra
+R('snap4','#6a70b8','#e0e0f4','#ffe14d','#3a3f7a',{skin:'feather',crest:'bolt',marks:'bolts',tail:'fan',el:'thunder',eye:'#ffe14d',glowCol:'#ffe14d'});   // storm peaks
+R('snap5','#6a7a4a','#c8d8a0','#c8f08a','#3a4a2a',{skin:'scale',crest:'frill',back:'spines',marks:'spots',tail:'spike',el:'nature',eye:'#c8f08a'});   // swamp
+R('snap6','#c8a87a','#f0ead8','#3a9ac8','#7a5a3a',{skin:'feather',crest:'fan',marks:'spots',tail:'plumes',el:'water',eye:'#ffffff'});            // coast
+R('snap7','#8a7a9a','#d8c8e0','#e0508a','#4a3a5a',{skin:'scale',crest:'horns',back:'spines',tail:'club',el:'dragon',eye:'#ff7ab0',glowCol:'#ff6ab0'});   // ruins
+})();
 // PART ICONS: each monster's materials drawn from its own body. Its horn icon is its horn style, its tail icon is its
 // tail tip, its wing icon its own membrane or feathers, its scale its own plate, its core shaped by its element.
 const ICON=(()=>{
@@ -1987,7 +2082,7 @@ function sigFrame(id,mi,u,mats,opt){opt=opt||{};const M=MON[id],S=SIG.M[id][mi],
   if(spin){g.translate(cx,cy);g.rotate(spin);g.translate(-cx,-cy);}g.drawImage(img,Math.round(sh),Math.round(sink));g.restore();
   const mouth=r.mouth?[r.mouth[0]+sh,r.mouth[1]+sink]:[cx-20,cy];
   const F={mouth,cx:cx+sh,cy:cy+sink,img,ox:Math.round(sh),oy:Math.round(sink),eye:[mouth[0]-3,mouth[1]-4],lure:[mouth[0]+2,mouth[1]-13],claw:mouth,talon:[cx-3,bb[3]-2+sink],P:p};
-  const st=S.fx(g,u,F)||{};if(!opt.noHunter)SIG.hunter(g,st);g.setTransform(1,0,0,1,0,0);if(wash.length)st.wash=wash;o.st=st;return o;}
+  const st=S.fx(g,u,F)||{};if(!opt.noHunter)SIG.hunter(g,st);g.setTransform(1,0,0,1,0,0);if(wash.length)st.wash=wash;st.mouth=[F.mouth[0],F.mouth[1]];o.st=st;return o;}
 SIG.OX=OX;
 SIG.reach=id=>reach(id,MON[id]);
 SIG.frame=sigFrame;
@@ -2472,7 +2567,23 @@ function smallSpr(p,flash){
 }
 RIGS.small={spr:smallSpr,head:p=>[13+p.hx,27+p.hy],mouth:p=>[8+p.hx,33+p.hy],pos:{head:p=>[14+p.hx,30+p.hy],tail:p=>[48,39+p.tail],wings:p=>[29,38],body:p=>[29,40]}};
 const palCols=()=>{const w=GEAR[SAVE.eq.pweapon]||GEAR.pip_fang,a=GEAR[SAVE.eq.parmor]||GEAR.pip_vest,D=MONSTERS[a.tier];return[w.tier==='iron'?'#c8a070':weaponCol(SAVE.eq.pweapon),D?D.look.b:'#e2483d'];};
-const palSpr=f=>{const [wc,vc]=palCols();return shapeSpr('pal:'+f+wc+vc,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:vc,5:'#3a9a88',6:wc},a=>{a.off(1,1);
+// Pip, drawn by the art engine: a round furry little hunter with big ears, its vest and the fang it carries
+const PIPC={};
+function palArt(f){const [wc,vc]=palCols(),k=f+wc+vc;if(PIPC[k])return PIPC[k];
+  try{const one=c=>ART.ENG.materials({b:c,u:c,h:c,d:c}).horn,M=ART.ENG.materials({b:'#5ac8b0',u:'#f0ead8',h:'#f0ead8',d:'#3a9a88'},{vest:one(vc),fang:Object.assign(one(wc),{flat:.3}),inner:one('#f0a0a8')}),
+      {S,E,C,P}=ART.KIT.kit(),b=f?0:.4,G={back:{z:1,R:1,k:.6},body:{z:2,R:2,k:1},front:{z:3,R:1,k:.6}};
+    C([[3.4,9.6,1],[1.4,7.4,.9],[1.6,5.6,.7]],'hide','back');                                        // tail curling up behind
+    E(7.4,8.2+b,5.4,4.6,'hide','body');E(7.8,10+b,3.4,2.2,'belly','body',{pri:1});                    // round body and pale belly
+    P([[3.2,5.4+b],[3.6,.6+b],[6.4,4.2+b]],'hide','body',{k:.4});P([[8.6,4.2+b],[11.4,.6+b],[11.8,5.4+b]],'hide','body',{k:.4});   // ears
+    P([[3.9,4.6+b],[4,2+b],[5.6,4.2+b]],'inner','body',{pri:2.6,top:1});P([[9.4,4.2+b],[11,2+b],[11.1,4.6+b]],'inner','body',{pri:2.6,top:1});
+    C([[3,10+b,1.1],[12,10+b,1.1]],'vest','body',{pri:2.7,top:1});E(7.6,10.4+b,1,1,'fang','body',{pri:2.8,top:1});   // the vest and its clasp
+    E(4.6+(f?1:0),12.6,1.3,.8,'dark','front');E(9.6-(f?1:0),12.6,1.3,.8,'dark','front');            // feet
+    P([[12.2,9.6+b],[14.2,1.2+b],[15.2,1.8+b],[13.4,10.2+b]],'fang','front',{k:.3});C([[11.8,9.6+b,.9],[13.6,9.4+b,.8]],'hide','front');   // the fang, held in a paw
+    PIPC[k]=ART.ENG.render(S,G,M,16,14,g=>{g.fillStyle='#141826';g.fillRect(5,6+Math.round(b),1,2);g.fillRect(9,6+Math.round(b),1,2);g.fillStyle='#ffffff';g.fillRect(5,6+Math.round(b),1,1);g.fillRect(9,6+Math.round(b),1,1);
+      g.fillStyle='#3a2a2a';g.fillRect(7,8+Math.round(b),1,1);});}catch(e){PIPC[k]=null;}
+  return PIPC[k];}
+const palSpr=f=>(typeof ART!=='undefined'&&palArt(f))||palSprOld(f);
+const palSprOld=f=>{const [wc,vc]=palCols();return shapeSpr('pal:'+f+wc+vc,16,14,{1:'#5ac8b0',2:'#f0ead8',3:'!#141826',4:vc,5:'#3a9a88',6:wc},a=>{a.off(1,1);
   a.poly([[2,5],[3,0],[6,4]],5);a.poly([[8,4],[11,0],[12,5]],5);a.ell(7,7,6,5,1);a.ell(7,9,4,3,2);a.rect(2,10,10,2,4);a.px(5,6,3);a.px(9,6,3);a.rect(4+f,12,2,1,5);a.rect(8-f,12,2,1,5);
   a.poly([[12,9],[14,1],[15,2],[13,10]],6);});};                                   // the fang it carries
 const mSpriteOld=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.look,lk:D.id,fxc:D.fxc[0]},p),flash);
@@ -2483,7 +2594,8 @@ const mSpriteOld=(D,p,flash)=>RIGS[D.rig].spr(Object.assign({kind:D.kind,look:D.
 // ═══════════════════════════════════════════════════
 const AB={cache:new Map(),q:[],qk:new Set(),mats:{},anch:{},white:new WeakMap(),port:{},max:900};
 const AFPS=12, AB_W=96, AB_H=72, AB_DX=-6, AB_FEET=66;                    // frames are 96x72, feet at y 66
-const hasArt=D=>!!(D&&!D.small&&ART.MON[D.id]);
+const artId=D=>D.small?'snap'+D.biome:D.id;   // the pack's Snapjaws have one design per biome
+const hasArt=D=>!!(D&&ART.MON[artId(D)]);
 const abMats=id=>AB.mats[id]||(AB.mats[id]=ART.ENG.materials(Object.assign({},ART.MON[id].look),ART.MON[id].mats));
 const abBrk=m=>m?{head:m.parts.head.broken,wings:m.parts.wings.broken,tail:m.parts.tail.broken}:{};
 const abBk=b=>(b.head?1:0)+''+(b.wings?1:0)+(b.tail?1:0);
@@ -2546,7 +2658,7 @@ function abClipFor(M,a){let c=AB_MAP[M.rig][a]||'idle';if(M.rig==='crab'&&M.D.st
 function abPeak(M,clip){const C=M.clips[clip];if(C.peak!=null)return C.peak;let best=0,bt=C.len*.5;for(const[t,v]of C.keys){let d=0;for(const k in v){if(k==='breath')continue;const r=M.rest[k];if(typeof v[k]==='number'&&typeof r==='number')d+=Math.abs(v[k]-r)*(k==='px'||k==='py'?.15:1);}if(d>best){best=d;bt=t;}}return C.peak=bt;}
 function abBreathSpan(M){const C=M.clips.breath;if(C.span)return C.span;let a=null,b=null;for(const[t,v]of C.keys){if(v.breath>0&&a==null)a=t;if(v.breath>=1)b=t;}return C.span=[a??C.len*.35,b??C.len*.7];}
 // what the monster shows right now: {clip, u, nb (no breath of its own: the game draws the spit)}
-function abState(){const m=S.m,D=S.def,M=ART.MON[D.id],t=m.t;
+function abState(){const m=S.m,D=S.def,M=ART.MON[artId(D)],t=m.t;
   if(m.state==='attack'){const a=aPose();if(ATTACKS[m.atk].sig)return sigState();const clip=abClipFor(M,a),C=M.clips[clip],hits=m.hits,h0=hits[0],last=hits[hits.length-1];let u;
     if(C.loop)u=t;
     else if(clip==='breath'){const[b0,b1]=abBreathSpan(M);u=t<h0?b0*t/h0:t<last+.2?b0+(t-h0)/Math.max(.05,last+.2-h0)*(b1-b0):b1+(t-last-.2);}
@@ -2564,15 +2676,16 @@ function abAnch(id){if(AB.anch[id])return AB.anch[id];const f=abFrame(id,'idle',
   for(let y=0;y<c.height;y++)for(let x=x1-6;x<=x1;x++)if(d[(y*c.width+x)*4+3]>0){ty+=y;tn++;}
   const mo=f.mouth||[x0+8,y0+16],body=[(x0+x1)/2+4,(y0+y1)/2+4];
   return AB.anch[id]={mouth:mo,head:[mo[0]+5,mo[1]-4],body,tail:[x1-5,tn?ty/tn:body[1]],wings:[body[0]+2,y0+(body[1]-y0)*.45],box:[x0,y0,x1,y1]};}
-const abPt=(v,p)=>({x:L.mx+AB_DX+v[0]+(p?p.ox:0),y:L.mFeet-AB_FEET+v[1]+(p?p.oy:0)});
+const abDx=()=>AB_DX+(S.def&&S.def.small?-15:0);   // the small Snapjaws stand closer in
+const abPt=(v,p)=>({x:L.mx+abDx()+v[0]+(p?p.ox:0),y:L.mFeet-AB_FEET+v[1]+(p?p.oy:0)});
 function abWhite(c){let w=AB.white.get(c);if(w)return w;w=document.createElement('canvas');w.width=c.width;w.height=c.height;const x=w.getContext('2d');x.drawImage(c,0,0);x.globalCompositeOperation='source-in';x.fillStyle='#ffffff';x.fillRect(0,0,w.width,w.height);AB.white.set(c,w);return w;}
 // bake what a hunt will need: the idle loop first, then the flinch and every attack this monster can use
-function abPrebake(D){if(!hasArt(D))return;const M=ART.MON[D.id],clips=new Set(['idle','flinch',AB_ROAR[M.rig]]);for(const id of new Set([].concat(...D.pools))){const A=ATTACKS[id];if(!A)continue;if(A.sig){const SM=ART.SIG.M[A.sig[0]][A.sig[1]];for(let u=0;u<=SM.len+1e-6;u+=1/AFPS)abEnqSig(A.sig[0],A.sig[1],Math.round(u*AFPS)/AFPS);}else clips.add(abClipFor(M,A.pose));}
-  for(const c of clips)if(M.clips[c])abBakeClip(D.id,c,{},c==='breath'&&D.moves.some(x=>ATTACKS[x]&&ATTACKS[x].pose==='spit'));if(M.clips.breath)abBakeClip(D.id,'breath',{},0);}
+function abPrebake(D){if(!hasArt(D))return;const M=ART.MON[artId(D)],clips=new Set(['idle','flinch',AB_ROAR[M.rig]]);for(const id of new Set([].concat(...D.pools))){const A=ATTACKS[id];if(!A)continue;if(A.sig){const SM=ART.SIG.M[A.sig[0]][A.sig[1]];for(let u=0;u<=SM.len+1e-6;u+=1/AFPS)abEnqSig(A.sig[0],A.sig[1],Math.round(u*AFPS)/AFPS);}else clips.add(abClipFor(M,A.pose));}
+  for(const c of clips)if(M.clips[c])abBakeClip(artId(D),c,{},c==='breath'&&(D.moves||[]).some(x=>ATTACKS[x]&&ATTACKS[x].pose==='spit'));if(M.clips.breath)abBakeClip(artId(D),'breath',{},0);}
 // portraits for the book, the prep screen and the title: the idle frame placed where the old sprites sat
-function abPortrait(D,v){const k=D.id+':'+(v|0);if(AB.port[k])return AB.port[k];const f=abFrame(D.id,'idle',v?.6:0,{},0),c=document.createElement('canvas');c.width=MS_W;c.height=MS_H;
+function abPortrait(D,v){const k=artId(D)+':'+(v|0);if(AB.port[k])return AB.port[k];const f=abFrame(artId(D),'idle',v?.6:0,{},0),c=document.createElement('canvas');c.width=MS_W;c.height=MS_H;
   c.getContext('2d').drawImage(f.c,-4,MS_OY+53-AB_FEET);return AB.port[k]=c;}
-const faceOf=D=>{if(!hasArt(D))return FACE[D.rig]||[12,14];const a=abAnch(D.id);return[a.head[0]-4-MS_OX,a.head[1]+MS_OY+53-AB_FEET-MS_OY];};
+const faceOf=D=>{if(!hasArt(D))return FACE[D.rig]||[12,14];const a=abAnch(artId(D));return[a.head[0]-4-MS_OX,a.head[1]+MS_OY+53-AB_FEET-MS_OY];};
 const mSprite=(D,p,flash)=>hasArt(D)?abPortrait(D,p&&p.hy):mSpriteOld(D,p,flash);
 // where to frame a monster's portrait, by body: the face, not the weak point
 const FACE={wyvern:[14,15],raptor:[19,12],serpent:[17,17],brute:[13,30],crab:[12,36],small:[10,10]};
@@ -2647,7 +2760,24 @@ function wpnIcon(id){if(id in WICON)return WICON[id];const G=GEAR[id];WICON[id]=
     if(G.wt==='ln')ART.WPN.shield(S,[7,15],'b',G.tier);
     ART.KIT.scale(S,0,0,.5);WICON[id]=ART.ENG.render(S,{a:{z:2,R:1,k:.5},b:{z:1,R:1.2,k:.6}},ART.WPN.mats(L),12,12);}catch(e){WICON[id]=null;}
   return WICON[id];}
+// an armour piece's icon (or an iron weapon's): the hunter's own model, built with only that piece's shapes, fitted to 12x12
+const AICON={},AQ={helm:'he',armor:'ch',arms:'ar',legs:'lg'};
+function fitShapes(S,box){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const ext=(x,y,r)=>{x0=Math.min(x0,x-r);y0=Math.min(y0,y-r);x1=Math.max(x1,x+r);y1=Math.max(y1,y+r);};
+  for(const q of S){if(q.t==='E')ext(q.x,q.y,Math.max(q.rx,q.ry));else for(const v of q.p)ext(v[0],v[1],q.t==='C'?v[2]:0);}
+  const k=Math.min(1,box/Math.max(x1-x0,y1-y0)),ox=(12-(x1-x0)*k)/2-x0*k,oy=(12-(y1-y0)*k)/2-y0*k,T=(x,y)=>[x*k+ox,y*k+oy];
+  for(const q of S){if(q.t==='E'){[q.x,q.y]=T(q.x,q.y);q.rx*=k;q.ry*=k;}else q.p=q.p.map(v=>q.t==='C'?T(v[0],v[1]).concat([v[2]*k]):T(v[0],v[1]));}return S;}
+function armorIcon(id){if(id in AICON)return AICON[id];AICON[id]=null;
+  try{const G=GEAR[id],H=ART.HUN,lk=H.LOOKS[G.tier]?G.tier:'leather',isW=G.slot==='weapon',q=AQ[G.slot];if(!isW&&!q)return null;
+    const gear=H.gearOf(lk,lk,lk,lk,null),C=H.clips(isW?G.wt:'gs').IDLE,p=ART.ENG.sample(C.keys,0);delete p.roll;
+    const r=H.build(p,isW?G.wt:'gs',gear,0),pick=isW?(x=>x.g==='wpn'||x.g==='wpnB'||x.g==='shield'):(x=>typeof x.m==='string'&&x.m.startsWith(q)||(q==='he'&&(x.m==='helm'||x.m==='plume'))||(q==='ch'&&(x.m==='armor'||x.m==='trim')));
+    let S=r.S.filter(pick);if(q==='ar'){const near=S.filter(x=>x.g==='armN');if(near.length)S=near;}if(!S.length)return null;S=JSON.parse(JSON.stringify(S));
+    if(isW){const rot=-Math.PI/4-({gs:-2.25,db:.5,hm:-2,ln:-.15}[G.wt]||0),c=Math.cos(rot),sn=Math.sin(rot),R=(x,y)=>[x*c-y*sn,x*sn+y*c];   // lay it on the same diagonal as the monster weapons
+      for(const z of S){if(z.t==='E'){[z.x,z.y]=R(z.x,z.y);z.a=(z.a||0)+rot;}else z.p=z.p.map(v=>R(v[0],v[1]).concat(v.length>2?[v[2]]:[]));}}
+    S=fitShapes(S,isW?12.5:10.5);
+    AICON[id]=ART.ENG.render(S,H.groups,H.mats(gear),12,12);}catch(e){AICON[id]=null;}
+  return AICON[id];}
 const gearSpr=id=>{const G=GEAR[id];if(G.slot==='weapon'&&MONSTERS[G.tier]&&typeof ART!=='undefined'){const c=wpnIcon(id);if(c)return c;}
+  if((isArmor(G.slot)||G.slot==='weapon')&&typeof ART!=='undefined'&&ART.HUN){const c=armorIcon(id);if(c)return c;}
   return gearSprOld(id);};
 const gearSprOld=id=>{const G=GEAR[id],col=isArmor(G.slot)?armorCol(id)[0]:G.slot==='parmor'?(MONSTERS[G.tier]?MONSTERS[G.tier].look.b:'#e2483d'):G.slot==='charm'?'#4cc9ff':weaponCol(id);
   return shapeSpr('gear:'+id,12,12,{1:col,2:'#6b4a2e',3:'#c8d0e8'},a=>{a.off(1,1);
@@ -3029,7 +3159,7 @@ function newHunt(id,o){
   S.fx=[];S.pt=[];S.nums=[];S.shake=0;S.stop=0;S.slow=0;S.endT=0;
   S.stats={dealt:0,taken:0,dodges:0,perfect:0,counters:0,stuns:0,evaded:0,qteHit:0,qteMiss:0};
   S.loot=null; S.fail=''; S.paused=false;
-  abPrebake(D);huPrebake();
+  S.abCur=null;abPrebake(D);huPrebake();
 }
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
@@ -3153,9 +3283,12 @@ function mPose(){
 }
 const PROJ_TIME=.4;                      // seconds a spat projectile is in the air
 const rigPt=(v,p)=>({x:L.mx+MS_OX+v[0]+p.ox,y:L.my+MS_OY+v[1]+p.oy});
-function mHeadPos(p){return hasArt(S.def)?abPt(abAnch(S.def.id).head,p):rigPt(RIGS[S.def.rig].head(p),p);}
-function partPos(part,p){if(hasArt(S.def)){const a=abAnch(S.def.id);return abPt(a[part]||a.body,p);}return rigPt((RIGS[S.def.rig].pos[part]||RIGS[S.def.rig].pos.body)(p),p);}
-function mMouth(p){return hasArt(S.def)?abPt(abAnch(S.def.id).mouth,p):rigPt(RIGS[S.def.rig].mouth(p),p);}
+function mHeadPos(p){return hasArt(S.def)?abPt(abAnch(artId(S.def)).head,p):rigPt(RIGS[S.def.rig].head(p),p);}
+function partPos(part,p){if(hasArt(S.def)){const a=abAnch(artId(S.def)),c=S.abCur,q=abPt(a[part]||a.body,p);if(!c)return q;
+    if(c.sig){q.x+=c.dx-(p?p.ox:0);q.y-=(p?p.oy:0);}                                                   // signature frames carry their own movement
+    if(part==='head'&&c.mouth){q.x+=c.mouth[0]-a.mouth[0];q.y+=c.mouth[1]-a.mouth[1];}   // the head circle follows the head as it moves
+    return q;}return rigPt((RIGS[S.def.rig].pos[part]||RIGS[S.def.rig].pos.body)(p),p);}
+function mMouth(p){return hasArt(S.def)?abPt(abAnch(artId(S.def)).mouth,p):rigPt(RIGS[S.def.rig].mouth(p),p);}
 // Which part a tap is aimed at: the head or tail if it lands near them
 function partAt(x,y){
   const p=mPose();for(const k of ['head','tail']){const q=partPos(k,p);if((x-q.x)**2+(y-q.y)**2<=22*22)return k;}
@@ -3809,10 +3942,10 @@ function drawWorld(){
   g.save();g.translate(sx,sy);
   // monster
   const air=clamp(-p.oy/60,0,1);
-  if(S.def.small)shadow(L.mx+MS_OX+29+p.ox,L.mFeet+2,13,3);else shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
+  if(S.def.small)shadow(L.mx+MS_OX+(hasArt(S.def)?20:29)+p.ox,L.mFeet+2,12,3);else shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
   const dead=m.state==='dead';
   if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)){
-    if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(S.def.id,st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+AB_DX+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:p.oy);S.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;
+    if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(artId(S.def),st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+abDx()+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:p.oy);S.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;S.abCur={mouth:st.sig?f.st&&f.st.mouth:f.mouth,sig:!!st.sig,dx:st.sig?-st.dx:p.ox,oy:st.sig?0:p.oy};
       if(S.sigSt&&S.sigSt.wash){for(const[c,a]of S.sigSt.wash){g.globalAlpha=a;g.fillStyle=c;g.fillRect(0,0,W,LH);}g.globalAlpha=1;}   // full-screen flash or darkness from a signature move
       if((p.oy>4&&m.state==='attack')||st.sink){g.save();g.beginPath();g.rect(-8,0,W+16,L.mFeet+3);g.clip();g.drawImage(img,x,y);g.restore();}else g.drawImage(img,x,y);}
     else{const ms=mSprite(S.def,{hx:p.hx,hy:p.hy,jaw:p.jaw,wing:p.wing,tail:p.tail&~1,horn:!m.parts.head.broken,spike:!m.parts.tail.broken,torn:m.parts.wings.broken,glow:p.glow,rage:m.phase>0?1:0},m.flash>0);
@@ -4672,7 +4805,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(!MH.manual)abTick(S.mode==='hunt'?5:3);if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{draw,abFrame,abTick,abState,AB,lootSpr,gearSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{draw,abFrame,abTick,abState,AB,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS:SCORE,SCORE,MOTIF,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

@@ -444,3 +444,9 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Renames to match the new looks:** Obsidwing to Trimaw, Stormwing to Stormpearl, Cinderhide to Cinderhoof, Icehide to Icetusk, Gloomtusk to Gloomfang, Magmaclaw to Magmastrider, Dusksting to Duskhorn, Bogmaw to Bogcrown, Sandeel to Sandmaw, Dustfang to Dustspur, Gustraptor to Gusthawk. Saves are unaffected (ids are the same).
 - **Part names** follow each body: Bogcrown CROWN and HOOD, Sandmaw TOOTH and SPIKE, the hydra's HEAD and LEAF, Magmastrider EYESTALK, VENT and CRUSHER, and so on.
 
+## v0.34.0: the last of the old art
+- **Snapjaws** (pack hunts) are drawn by the art engine now: a lean little dromaeosaur with a long toothy head, small clawed hands, long legs with a raised sickle claw and a stiff tail. One kind per biome, each with its own skin (feathered or scaled), crest, back, markings and tail tip: a striped forest runner, a spined volcano one with a glowing crest and tail club, a frilled desert one, a plumed tundra one, a storm one with bolt markings, a spotted swamp one, a fan-crested coast one and a horned ruins one. They have their own bite, leap, tail whip, hiss and flinch, and stand close enough that bites land.
+- **Pip** is redrawn in the same style: round and furry, with big ears, its vest in its armour colour and its fang.
+- **Armour icons** are the real pieces: the hunter's model built with only that piece (helm, chest, gauntlet, boots), fitted to the icon. **Iron weapons** are drawn the same way and laid on the same diagonal as the monster weapons.
+- **Weak points follow the body:** the head circle tracks the animated head (bites, lunges, signature moves) instead of sitting where the head is at rest, and every circle moves with a signature move's step in and out.
+

@@ -206,7 +206,7 @@ function sigFrame(id,mi,u,mats,opt){opt=opt||{};const M=MON[id],S=SIG.M[id][mi],
   if(spin){g.translate(cx,cy);g.rotate(spin);g.translate(-cx,-cy);}g.drawImage(img,Math.round(sh),Math.round(sink));g.restore();
   const mouth=r.mouth?[r.mouth[0]+sh,r.mouth[1]+sink]:[cx-20,cy];
   const F={mouth,cx:cx+sh,cy:cy+sink,img,ox:Math.round(sh),oy:Math.round(sink),eye:[mouth[0]-3,mouth[1]-4],lure:[mouth[0]+2,mouth[1]-13],claw:mouth,talon:[cx-3,bb[3]-2+sink],P:p};
-  const st=S.fx(g,u,F)||{};if(!opt.noHunter)SIG.hunter(g,st);g.setTransform(1,0,0,1,0,0);if(wash.length)st.wash=wash;o.st=st;return o;}
+  const st=S.fx(g,u,F)||{};if(!opt.noHunter)SIG.hunter(g,st);g.setTransform(1,0,0,1,0,0);if(wash.length)st.wash=wash;st.mouth=[F.mouth[0],F.mouth[1]];o.st=st;return o;}
 SIG.OX=OX;
 SIG.reach=id=>reach(id,MON[id]);
 SIG.frame=sigFrame;
