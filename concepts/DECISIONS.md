@@ -450,3 +450,11 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Armour icons** are the real pieces: the hunter's model built with only that piece (helm, chest, gauntlet, boots), fitted to the icon. **Iron weapons** are drawn the same way and laid on the same diagonal as the monster weapons.
 - **Weak points follow the body:** the head circle tracks the animated head (bites, lunges, signature moves) instead of sitting where the head is at rest, and every circle moves with a signature move's step in and out.
 
+## v0.35.0: expeditions
+- Gather runs and pack hunts are now one thing, an **Expedition**. Gather runs on their own were dull (20 seconds of tapping), and pack hunts gave little reason to go back.
+- An expedition is a biome's Snapjaw pack, three in a row. After each kill there's a 5-second **forage lull**: the ground turns up the biome's ingredients (tap them before they vanish; the scarcer one has a gold ring), and once per expedition a creature darts across in one of the lulls. The hunt timer pauses during a lull. The run ends after the third Snapjaw's lull.
+- The loot screen ("EXPEDITION DONE") lists the Snapjaw drops (common materials and meat), everything foraged, and the creature, marked NEW if it's a first catch. A perfect run gathers about ten things, as a gather run did.
+- Each biome on the EXPEDITIONS list has one EXPEDITION button, which opens the prep screen (meal and gear) like any hunt.
+- An expedition counts for both the old quest goals: "go on an expedition" (was gather run) and "beat a Snapjaw pack". Moss's first-lull tip, the story, the guides, the material sources and the terrarium now point to expeditions.
+- The separate gather screen and its results screen are gone. The Foraging music theme is no longer used.
+

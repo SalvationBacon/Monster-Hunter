@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.34.0';
+const VER='0.35.0';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -350,7 +350,7 @@ function bugBonus(){let hp=0,atk=0;CREATURES.forEach((c,i)=>{if(!SAVE.bugs[c.id]
 // ── Story: the main quest line. The first chapters are the tutorial. goal: [what, which or null, how many].
 const STORY=[
   {t:'THE SHY THIEF',     d:['WELCOME TO HOLLOWROOT CAMP.','A FERNWING IS IN THE HERB','GARDEN. ODD: THEY ARE SHY.'],goal:['hunt','fern',1],rw:{potion:2}},
-  {t:'STOCK THE PANTRY',  d:['MOSS WANTS HER HERBS BACK.','TRY A GATHER RUN: OPEN THE','HUNTS, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
+  {t:'STOCK THE PANTRY',  d:['MOSS WANTS HER HERBS BACK.','GO ON AN EXPEDITION: OPEN','THE HUNTS, THEN EXPEDITIONS.'],goal:['gather',null,1],rw:{herb:4}},
   {t:'A PROPER EDGE',     d:['BRAM SAYS THAT IRON WILL','NOT LAST. FORGE OR UPGRADE','SOMETHING AT THE FORGE.'],goal:['craft',null,1],rw:{scale:3}},
   {t:'WORD GETS AROUND',  d:['FOUR MORE BEASTS ARE ACTING','UP NEARBY. BEAT ANY THREE','IN RANK 1 TO EARN RANK 2.'],goal:['rank',2,1],rw:{meat:3}},
   {t:'EAT FIRST',         d:['NEVER HUNT HUNGRY. PICK A','DISH ON THE PREP SCREEN','BEFORE YOUR NEXT HUNT.'],goal:['meal',null,1],rw:{honey:2}},
@@ -399,7 +399,7 @@ const SCENES={
        ['oda','I\'LL KEEP A PAGE ON EVERY BEAST YOU HUNT IN MY BESTIARY. THE MORE YOU HUNT ONE, THE MORE I LEARN. IT\'S IN THE MENU.'],
        ['wren','AND CHECK THE QUEST BOARD. FINISHED JOBS PAY OUT THERE.']],
   ch1:[['moss','HUNTER! THAT FERNWING ATE EVERYTHING. COULD YOU GATHER ME SOME HERBS?'],
-       ['moss','OPEN THE HUNTS, TAP EXPEDITIONS, THEN GATHER. TAP WHATEVER POPS UP. CATCH A BUG IF YOU\'RE QUICK!'],
+       ['moss','OPEN THE HUNTS, TAP EXPEDITIONS AND PICK THE FOREST. BEAT THE SNAPJAWS, THEN GRAB WHATEVER TURNS UP. CATCH A BUG IF YOU\'RE QUICK!'],
        ['moss','HERBS MAKE POTIONS. POTIONS KEEP HUNTERS ALIVE. I KEEP POTIONS. YOU SEE HOW THIS WORKS.']],
   ch2:[['bram','OI! YOU! THAT IRON STICK WOULDN\'T SCRATCH A BEETLE.'],
        ['bram','NAME\'S BRAM. I TURN MONSTER BITS INTO GEAR. BRING ME SCALES, I\'LL BRING YOU A BLADE.'],
@@ -465,8 +465,8 @@ const SCENES={
   v_forge:[['bram','MY FORGE! WEAPONS AND ARMOR, ALL MADE FROM MONSTER PARTS. TAP A MATERIAL TO SEE WHERE IT DROPS.'],['bram','MATCH A WEAPON\'S ELEMENT TO WHAT A MONSTER IS WEAK TO. IT HITS MUCH HARDER.'],['bram','TAP THE LITTLE i ON ANY ITEM TO SEE ALL ITS SKILLS. TAP A SKILL TO READ WHAT IT DOES.']],
   v_cook:[['moss','MY KITCHEN! I BREW POTIONS HERE. YOU CAN TAKE A FEW ON EACH HUNT.'],['moss','MEALS ARE CHOSEN ON THE PREP SCREEN, RIGHT BEFORE YOU HEAD OUT.']],
   v_book:[['oda','MY BESTIARY! EVERY BEAST YOU MEET GETS A PAGE.'],['oda','HUNT ONE 1, 3, 5 AND 10 TIMES AND I\'LL LEARN ITS HABITS, ITS ATTACKS, AND WHAT IT DROPS.']],
-  v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON GATHER RUNS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
-  v_gather:[['moss','HERE WE GO! TAP THE HERBS AND HONEY AS THEY POP UP, BEFORE THEY VANISH.'],['moss','IF A BUG SHOWS UP, TAP IT WHILE THE RING IS AROUND IT. ONLY ONE PER RUN, SO DON\'T MISS!']],
+  v_bugs:[['oda','THE TERRARIUM! CATCH CRITTERS ON EXPEDITIONS AND I\'LL KEEP THEM HERE.'],['oda','EACH ONE MAKES YOU A TINY BIT STRONGER. DON\'T ASK ME HOW. I\'M STILL WRITING THE PAPER.']],
+  v_gather:[['moss','ONE DOWN! AFTER EACH SNAPJAW THE GROUND TURNS THINGS UP. TAP THEM BEFORE THEY VANISH.'],['moss','IF A BUG SHOWS UP, TAP IT WHILE THE RING IS AROUND IT. ONLY ONE PER EXPEDITION, SO DON\'T MISS!']],
   v_prep:[['wren','ALWAYS CHECK WHAT A BEAST IS WEAK TO BEFORE YOU GO. THE RIGHT ELEMENT HITS MUCH HARDER.'],['wren','WHEN YOU\'RE READY, START THE HUNT.']],
 };
 const TUT_KEYS=Object.keys(SCENES).filter(k=>!/^ch\d/.test(k));
@@ -480,9 +480,9 @@ const SIDES=[
 const DAILIES=[{goal:['hunt',null,2],rw:{potion:2}},{goal:['gather',null,2],rw:{honey:2}},{goal:['break',null,3],rw:{meat:3}},{goal:['perfect',null,5],rw:{potion:1}},
   {goal:['catch',null,2],rw:{herb:4}},{goal:['small',null,1],rw:{herb:3}},{goal:['meal',null,1],rw:{meat:2}},{goal:['fast',null,1],rw:{gem:1}}];
 const WEEKLIES=[{goal:['hunt',null,10],rw:{gem:2,potion:3}},{goal:['break',null,12],rw:{gem:2,potion:3}},{goal:['catch',null,8],rw:{gem:2,potion:3}},{goal:['perfect',null,25],rw:{gem:2,potion:3}}];
-function goalText(q){const [k,a,n]=q,s=n>1?'S':'';return{hunt:MONSTERS[a]?'HUNT THE '+MONSTERS[a].name:'WIN '+n+' HUNT'+s,gather:'GO ON '+n+' GATHER RUN'+s,craft:'FORGE OR UPGRADE GEAR',meal:'EAT '+n+' MEAL'+s,
+function goalText(q){const [k,a,n]=q,s=n>1?'S':'';return{hunt:MONSTERS[a]?'HUNT THE '+MONSTERS[a].name:'WIN '+n+' HUNT'+s,gather:'GO ON '+n+' EXPEDITION'+s,craft:'FORGE OR UPGRADE GEAR',meal:'EAT '+n+' MEAL'+s,
   pal:'HUNT WITH PIP',tail:'BREAK '+n+' TAIL'+s,break:'BREAK '+n+' PART'+s,weapon:'WIN '+n+' WITH '+(WTYPES[a]?WTYPES[a].name:''),perfect:n+' PERFECT DODGES',catch:'CATCH '+n+' CREATURE'+s,
-  small:'CLEAR '+n+' PACK HUNT'+s,fast:'WIN A HUNT IN 45S',allbreak:'BREAK ALL 3 PARTS',rank:'REACH '+rankName(a),apex:'BEAT THE 4 APEX MONSTERS',done:'THE END, FOR NOW'}[k];}
+  small:'BEAT '+n+' SNAPJAW PACK'+s,fast:'WIN A HUNT IN 45S',allbreak:'BREAK ALL 3 PARTS',rank:'REACH '+rankName(a),apex:'BEAT THE 4 APEX MONSTERS',done:'THE END, FOR NOW'}[k];}
 const OLD_IDS={iron:'iron_gs',fblade:'fern_gs',eblade:'ember_gs',fmail:'fern_ar',eplate:'ember_ar',keen:'fern_ch',breaker:'ember_ch'};   // ids from v0.6
 
 // ── Helpers ──
@@ -3017,7 +3017,6 @@ function mPlay(e,t){
 // Which track the screen wants
 function musicCtx(){
   if(S.mode==='title')return S.show?'mon:'+S.show:'title';
-  if(S.mode==='gather')return 'gather';
   if(S.mode==='hunt'&&S.def)return S.def.small?'pack':'mon:'+S.def.id;
   return 'camp';
 }
@@ -3136,7 +3135,7 @@ const rankName=r=>r===7?'APEX':r===8?'ELDER':'RANK '+r;
 function smallDef(mid){
   const B=MONSTERS[mid],bi=B.biome;
   return{id:'small',small:true,biome:bi,base:B,name:'SNAPJAW',rig:'small',kind:bi,look:{},inflict:null,trait:null,fxc:B.fxc,time:HUNT_TIME,tip2:'',elem:B.elem,weak:B.weak,weakSt:null,resSt:null,hp:Math.round(B.hp*.13),dmg:B.dmg*.7,
-    speed:[1,1,1],qteTime:0,evadeCd:[1e9,1e9,1e9],stunMax:60,blood:'#c8b890',tip:'A PACK OF THREE',pack:3,stars:0,
+    speed:[1,1,1],qteTime:0,evadeCd:[1e9,1e9,1e9],stunMax:60,blood:'#c8b890',tip:'THREE SNAPJAWS, THEN FORAGE',pack:3,stars:0,
     pools:[['bite','bite','dbl'],['bite','bite','dbl'],['bite','bite','dbl']],loot:{common:[[B.mat.scale,1,2],[B.mat.claw,1,1],['meat',2,3]],parts:{}},mat:B.mat};
 }
 function freshMonster(D,status){
@@ -3147,7 +3146,7 @@ function freshMonster(D,status){
 // o.meal: a meal eaten for this hunt. o.role: what the companion does. o.small: a biome, for a pack hunt.
 function newHunt(id,o){
   o=o||{}; const D=S.def=o.small!=null?smallDef(o.small):MONSTERS[id||(S.def&&!S.def.small&&S.def.id)||'fern'], gs=gearStats(o.meal), M=gs.meal; BG=bgFor(D.biome);
-  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0;
+  S.qteTime=D.qteTime*gs.qteSlow; S.qteHits=gs.qteHits; S.opts=o; S.pack=D.pack||1; S.respawn=0; S.forage=null; S.ex={n:0,got:{},caught:[],bugAt:(Math.random()*3)|0};
   S.mode='hunt'; S.t=0; S.timeLeft=D.time; S.clock=0; HUD_T=D.trait==='charge'?27:21;
   S.h={hp:gs.hp,max:gs.hp,atk:gs.atk,g:gs,fury:0,furyT:0,dn:0,st:100,stDelay:0,state:'idle',t:0,combo:0,comboT:0,buf:0,bufPart:'body',charge:0,lvl:0,inv:0,dir:-1,
        potions:Math.min(SAVE.potions,POT_CARRY+(lv(gs,'herbal')>=3?1:0)),buff:0,sharp:SHARP.max,poison:0,burn:0,dotT:0,frozen:0,freezeImm:0,wet:0,blight:0,bleed:0,still:0,stench:0,numb:0,numbImm:0,mud:0,counter:0,target:'body',hitDone:false,drank:false,
@@ -3164,9 +3163,34 @@ function newHunt(id,o){
 // The monster's health hit zero: the next of the pack steps in, or the hunt is won
 function mKill(){
   const m=S.m,h=S.h; m.hp=0;m.state='dead';m.t=0;S.shake=.7;S.qte=null;mv('death');
-  if(S.pack>1){S.pack--;S.respawn=1;return;}
-  S.slow=1.2;S.endT=0;h.state='win';h.t=0;
+  if(S.def.small){forageStart(S.pack===1);if(S.pack>1){S.pack--;S.respawn=FORAGE.time+.4;}return;}   // an expedition: forage, then the next Snapjaw
+  huntWon();
 }
+function huntWon(){const h=S.h;S.slow=1.2;S.endT=0;h.state='win';h.t=0;}
+// ── Expeditions: a biome's Snapjaw pack, and after each kill a short lull where the ground turns up that biome's
+// ingredients and, once a run, a creature darts past. Tap them before they're gone.
+const FORAGE={time:5,spawn:[.9,1.3],life:1.6,rareLife:1.1,rare:.15,r:11,bugTime:2.4,bugRare:.15};
+function forageStart(last){const X=S.ex;X.n++;S.forage={t:0,last,spawn:.25,nodes:[],bug:null,bugT:X.n-1===X.bugAt?rnd(.6,1.6):-1};}
+function forageUpdate(dt){const F=S.forage,X=S.ex;F.t+=dt;
+  if(F.t<FORAGE.time-.8&&(F.spawn-=dt)<=0){F.spawn=rnd(FORAGE.spawn[0],FORAGE.spawn[1]);const rare=Math.random()<FORAGE.rare;
+    F.nodes.push({x:rnd(34,W-12),y:rnd(L.ground+8,L.hFeet+4),id:BIOME_ING[S.def.biome][rare?1:0],rare,t:0,life:rare?FORAGE.rareLife:FORAGE.life});}
+  for(const n of F.nodes)n.t+=dt;F.nodes=F.nodes.filter(n=>n.t<n.life);
+  if(F.bugT>0&&(F.bugT-=dt)<=0){F.bugT=-1;const pool=CREATURES.map((c,i)=>i).filter(i=>CREATURES[i].biome===S.def.biome),rare=Math.random()<FORAGE.bugRare,i=rare?pool[3]:pool[(Math.random()*3)|0],dir=Math.random()<.5?1:-1;
+    F.bug={i,dir,x:dir>0?-8:W+8,y:rnd(L.ground-30,L.ground+20),t:0};}
+  if(F.bug){const b=F.bug;b.t+=dt;b.x+=b.dir*(W+16)/FORAGE.bugTime*dt;b.y+=Math.sin(b.t*9)*18*dt;if(b.t>=FORAGE.bugTime)F.bug=null;}
+  if(F.t>=FORAGE.time&&!F.bug){S.forage=null;if(F.last)huntWon();}}
+function forageTap(x,y){const F=S.forage;if(!F)return false;const b=F.bug;
+  if(b&&(x-b.x)**2+(y-b.y)**2<=14*14){S.ex.caught.push(b.i);F.bug=null;sfx('perfect');buzz(30);addNum(b.x,b.y-8,'CAUGHT!',CREATURES[b.i].col,.9);
+    for(let k=0;k<10;k++)S.pt.push({x:b.x,y:b.y,vx:rnd(-60,60),vy:rnd(-90,-10),life:.4,col:CREATURES[b.i].col,g:200});return true;}
+  let best=null,bd=FORAGE.r*FORAGE.r;for(const n of F.nodes){const d=(x-n.x)**2+(y-n.y)**2;if(d<=bd){bd=d;best=n;}}
+  if(!best)return false;F.nodes.splice(F.nodes.indexOf(best),1);S.ex.got[best.id]=(S.ex.got[best.id]||0)+1;sfx(best.rare?'loot':'hit');buzz(10);
+  addNum(best.x,best.y-10,'+1',best.rare?'#ffe14d':'#ffffff',.6);for(let k=0;k<6;k++)S.pt.push({x:best.x,y:best.y,vx:rnd(-50,50),vy:rnd(-80,-10),life:.3,col:ING[best.id][1],g:200});return true;}
+function drawForage(){const F=S.forage;if(!F)return;
+  for(const n of F.nodes){const u=n.t/n.life,pop=Math.min(1,n.t/.12),yy=Math.round(n.y-6-(1-pop)*4+Math.sin(n.t*8));if(u>.7&&Math.floor(n.t*16)%2)continue;   // blinks before it goes
+    if(n.rare)circ(n.x,n.y,8+Math.sin(n.t*14)*1.5,'#ffe14d');g.fillStyle='rgba(0,0,0,.3)';g.fillRect(Math.round(n.x)-4,Math.round(n.y)+5,8,2);g.drawImage(lootSpr(n.id),Math.round(n.x)-6,yy);}
+  if(F.bug){const b=F.bug,u=b.t/FORAGE.bugTime;g.drawImage(bugSpr(b.i,Math.floor(b.t*10)%2),Math.round(b.x)-6,Math.round(b.y)-5);circ(b.x,b.y,lerp(18,7,u)+1,OUTLINE);circ(b.x,b.y,lerp(18,7,u),CREATURES[b.i].rare?'#ffe14d':'#4cc9ff');}
+  const k=1-F.t/FORAGE.time;text(F.bug?'CATCH IT!':'FORAGE!',W/2,HUD_T+4,F.bug?'#4cc9ff':'#ffe14d',{al:1,out:OUTLINE});if(k>0)bar(W/2-20,HUD_T+12,40,2,k,'#4cd964','#2b2f45');
+  if(S.ex.n===1&&F.t<2.2)text('TAP WHAT TURNS UP',W/2,HUD_T+18,'#e8f0fc',{al:1,out:OUTLINE});}
 // ── Companion: Pip. One role per hunt.
 const PAL={every:3,dmg:20,healAt:.4,heal:.3,trapFirst:8,trapEvery:20,trap:2.5,scout:.5,scoutSee:1.4};
 const ROLES={fighter:['FIGHTER','JOINS THE ATTACK'],healer:['HEALER','HEALS ONCE WHEN LOW'],trapper:['TRAPPER','PINS IT DOWN AT TIMES'],
@@ -3617,13 +3641,13 @@ function press(x,y){
   if(S.mode==='title'){if(S.howto){S.howto=false;return;}tapBtns(x,y);return;}
   if(S.mode==='hunt'&&S.paused){tapBtns(x,y);return;}
   if(S.mode==='hunt'&&x>=W-16&&y<=13&&S.h.state!=='dead'&&S.h.state!=='win'){pauseHunt(true);return;}      // the pause button
-  if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres'){if(S.t>1.2)toCamp('home');return;}
+  if(S.mode==='loot'||S.mode==='fail'){if(S.t>1.2)toCamp('home');return;}
   if(S.mode==='camp'||S.mode==='prep'){const b=S.btns.find(b=>x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h);if(!guideGate(b,x,y))return;if(b)b.fn();return;}
-  if(S.mode==='gather'){gatherTap(x,y);return;}
   if(S.mode!=='hunt')return;
   const b=L.potion; if(x>=b.x-1&&x<=b.x+b.w+2&&y>=b.y-2){actPotion();return;}
   const sb=L.sharp; if(x>=sb.x-2&&x<b.x-1&&y>=sb.y-2){actSharpen();return;}
   const c=L.counter; if(S.h.counter>0&&x>=c.x-10&&x<=c.x+c.w+10&&y>=c.y-8&&y<=c.y+c.h+8&&actCounter())return;
+  if(forageTap(x,y))return;
   if(qteTap(x,y))return;
   IN.down=true;IN.downAt=S.clock;IN.x0=x;IN.y0=y;IN.swiped=false;IN.part=partAt(x,y);
   actTap(IN.part);return true;
@@ -3652,7 +3676,7 @@ addEventListener('keydown',e=>{
   if(e.repeat)return;
   if(S.talk){if(e.key===' '||e.key==='Enter'){e.preventDefault();talkTap(-1,-1);}else if(e.key==='Escape'){const T=S.talk;S.talk=null;if(T.after)T.after();}return;} const k=e.key.toLowerCase();
   if(k===' '||k==='j'||k==='k'||k==='enter'){e.preventDefault();audioInit();
-    if(S.mode!=='hunt'||S.paused){if(S.mode==='title'){if(!S.opts&&!S.howto)titleStart();else press(-99,-99);}else if(S.mode==='loot'||S.mode==='fail'||S.mode==='gres')press(-99,-99);return;}
+    if(S.mode!=='hunt'||S.paused){if(S.mode==='title'){if(!S.opts&&!S.howto)titleStart();else press(-99,-99);}else if(S.mode==='loot'||S.mode==='fail')press(-99,-99);return;}
     if(S.h.counter>0&&actCounter())return;
     if(S.qte){const pp=partPos(S.qte.part,mPose());if(qteTap(pp.x,pp.y))return;}   // keyboard: the attack key also hits an open weak point
     IN.down=true;IN.downAt=S.clock;IN.swiped=false;IN.part=k==='k'?'tail':'head';actTap(IN.part);}
@@ -3670,13 +3694,15 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k===' '||k==='j'||k=
 //  UPDATE
 // ═══════════════════════════════════════════════════
 function rollLoot(){
-  const m=S.m,D=S.def,h=S.h,out=[],add=(id,n)=>{if(n>0)out.push({id,n});};
+  const m=S.m,D=S.def,h=S.h,out=[],add=(id,n)=>{if(n<=0)return;const o=out.find(d=>d.id===id&&!d.rare);if(o)o.n+=n;else out.push({id,n});};let bugs=[],fresh=[];
   for(const [id,lo,hi] of D.loot.common)add(id,lo+((Math.random()*(hi-lo+1))|0));
   const fl=lv(h.g,'fortune'),luck=1+.33*fl, broke=PARTS.filter(k=>m.parts[k].broken), time=D.time-S.timeLeft;
   if(fl>=2)for(const d of out)d.n++;
   if(S.pal&&S.pal.role==='gatherer'){for(const d of out)d.n++;add(BIOME_ING[D.biome][0],Math.floor(2*S.pal.care));}
   let unlock='';
-  if(D.small){SAVE.packs++;qEvent('small');}
+  if(D.small){SAVE.packs++;qEvent('small');const X=S.ex;for(const [k,n] of Object.entries(X.got))add(k,n);   // what the expedition foraged and caught
+    bugs=[...new Set(X.caught)];fresh=bugs.filter(i=>!SAVE.bugs[CREATURES[i].id]);for(const i of X.caught)SAVE.bugs[CREATURES[i].id]=(SAVE.bugs[CREATURES[i].id]||0)+1;
+    qEvent('gather');if(X.caught.length)qEvent('catch',null,X.caught.length);}
   else{
     for(const k of PARTS)add(D.loot.parts[k],m.parts[k].broken?1:(Math.random()<.1*luck?1:0));
     add('gem',Math.random()<.08*luck?1:0);
@@ -3692,7 +3718,7 @@ function rollLoot(){
   if(S.pal)qEvent('pal');
   for(const d of out)SAVE.bag[d.id]=(SAVE.bag[d.id]||0)+d.n;
   save();
-  return{drops:out,bag:SAVE.bag,time,unlock};
+  return{drops:out,bag:SAVE.bag,time,unlock,bugs,fresh};
 }
 // ── Camp: pick a hunt, or forge and wear gear ──
 // Which list, if any, the camp is showing: it scrolls
@@ -3774,41 +3800,11 @@ function prepStart(){
 }
 // ── Gather run: tap what pops up before it goes, and catch creatures in their closing circle ──
 // A run: something pops up every 1.4 to 2.2s, so a perfect run gathers about ten things; one creature crosses once
-const GATHER={time:20,spawn:[1.4,2.2],life:1.6,rareLife:1,rare:.15,r:11,bugAt:[3,13],bugTime:2.4,bugRare:.15};
-function startGather(bi){S.mode='gather';S.t=0;S.toast=null;BG=bgFor(bi);S.g={bi,t:0,nodes:[],bug:null,bugT:rnd(GATHER.bugAt[0],GATHER.bugAt[1]),bugDone:false,spawn:.6,got:{},caught:[],pt:[]};}
-function gatherUpdate(dt){
-  const G=S.g; G.t+=dt;
-  if((G.spawn-=dt)<=0){G.spawn=rnd(GATHER.spawn[0],GATHER.spawn[1]);const rare=Math.random()<GATHER.rare;
-    G.nodes.push({x:rnd(12,W-12),y:rnd(L.ground+4,LH-26),id:BIOME_ING[G.bi][rare?1:0],rare,t:0,life:rare?GATHER.rareLife:GATHER.life});}
-  for(const n of G.nodes)n.t+=dt; G.nodes=G.nodes.filter(n=>n.t<n.life);
-  if(!G.bug&&!G.bugDone&&(G.bugT-=dt)<=0){G.bugDone=true;   /* the run's one creature */const pool=CREATURES.map((c,i)=>i).filter(i=>CREATURES[i].biome===G.bi),rare=Math.random()<GATHER.bugRare,i=rare?pool[3]:pool[(Math.random()*3)|0],dir=Math.random()<.5?1:-1;
-    G.bug={i,dir,x:dir>0?-8:W+8,y:rnd(40,L.ground+30),t:0};}
-  if(G.bug){const b=G.bug;b.t+=dt;b.x+=b.dir*(W+16)/GATHER.bugTime*dt;b.y+=Math.sin(b.t*9)*18*dt;if(b.t>=GATHER.bugTime)G.bug=null;}
-  for(const p of G.pt){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=200*dt;} G.pt=G.pt.filter(p=>p.life>0);
-  if(G.t>=GATHER.time)gatherEnd();
-}
-function gatherTap(x,y){
-  const G=S.g,b=G.bug; if(!G)return false;
-  if(b&&(x-b.x)**2+(y-b.y)**2<=14*14){G.caught.push(b.i);G.bug=null;sfx('perfect');buzz(30);
-    for(let k=0;k<10;k++)G.pt.push({x:b.x,y:b.y,vx:rnd(-60,60),vy:rnd(-90,-10),life:.4,col:CREATURES[b.i].col});return true;}
-  let best=null,bd=GATHER.r*GATHER.r;for(const n of G.nodes){const d=(x-n.x)**2+(y-n.y)**2;if(d<=bd){bd=d;best=n;}}
-  if(!best)return false;
-  G.nodes.splice(G.nodes.indexOf(best),1);G.got[best.id]=(G.got[best.id]||0)+1;sfx(best.rare?'loot':'hit');buzz(10);
-  for(let k=0;k<6;k++)G.pt.push({x:best.x,y:best.y,vx:rnd(-50,50),vy:rnd(-80,-10),life:.3,col:ING[best.id][1]});return true;
-}
-function gatherEnd(){
-  const G=S.g; G.fresh=[...new Set(G.caught)].filter(i=>!SAVE.bugs[CREATURES[i].id]);
-  for(const [k,n] of Object.entries(G.got))SAVE.bag[k]=(SAVE.bag[k]||0)+n;
-  for(const i of G.caught)SAVE.bugs[CREATURES[i].id]=(SAVE.bugs[CREATURES[i].id]||0)+1;
-  qEvent('gather');if(G.caught.length)qEvent('catch',null,G.caught.length);save();
-  S.mode='gres';S.t=0;sfx('win');
-}
 function update(dt){
   S.t+=dt; if(S.toast&&(S.toast.t+=dt)>1.6)S.toast=null;
   if(S.talk){talkUpdate(dt);return;}                                             // a scene pauses everything
   guideTick();
   if(S.mode==='camp'||S.mode==='prep')storyTick();
-  if(S.mode==='gather'){if(S.t>.4&&talk('v_gather'))return;gatherUpdate(dt);return;}
   if(S.hint&&(S.hint.t+=dt)>3.5)S.hint=null;
   if(S.mode!=='hunt'||S.paused)return;
   huntTutor();if(S.talk)return;
@@ -3817,13 +3813,14 @@ function update(dt){
   S.clock+=dt;
   if(S.shake>0)S.shake-=dt*1.6;
   const h=S.h,m=S.m, over=h.state==='dead'||m.state==='dead';
-  if(!over){S.timeLeft-=dt;if(S.timeLeft<=0){S.timeLeft=0;h.state='dead';S.fail='TIME UP';S.endT=0;sfx('lose');}}
+  if(S.forage){if(S.forage.t>.3&&talk('v_gather'))return;forageUpdate(dt);}
+  if(!over&&!S.forage){S.timeLeft-=dt;if(S.timeLeft<=0){S.timeLeft=0;h.state='dead';S.fail='TIME UP';S.endT=0;sfx('lose');}}
   hUpdate(dt); mUpdate(dt); qteUpdate(dt); palUpdate(dt);
   if(S.respawn>0&&(S.respawn-=dt)<=0){S.respawn=0;S.m=freshMonster(S.def,S.h.g.status);S.m.enter=.5;S.m.wait=1.2;}
   for(const f of S.fx)f.t+=dt; S.fx=S.fx.filter(f=>f.t<(f.life||.22));
   for(const p of S.pt){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.g*dt;} S.pt=S.pt.filter(p=>p.life>0);
   for(const n of S.nums){n.t+=dt;} S.nums=S.nums.filter(n=>n.t<n.life);
-  if(h.state==='dead'||(m.state==='dead'&&!S.respawn&&S.m===m)){
+  if(h.state==='dead'||(m.state==='dead'&&!S.respawn&&!S.forage&&S.m===m)){
     S.endT+=dt;
     if(m.state==='dead'&&S.endT>1.9){S.loot=rollLoot();S.mode='loot';S.t=0;sfx('win');}
     else if(h.state==='dead'&&S.endT>1.5){S.mode='fail';S.t=0;save();}
@@ -3944,7 +3941,7 @@ function drawWorld(){
   const air=clamp(-p.oy/60,0,1);
   if(S.def.small)shadow(L.mx+MS_OX+(hasArt(S.def)?20:29)+p.ox,L.mFeet+2,12,3);else shadow(L.mx+MS_OX+38+p.ox,L.mFeet+2,Math.round(30*(1-air*.6)),5);
   const dead=m.state==='dead';
-  if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)){
+  if(!(dead&&m.t>1.2&&Math.floor(m.t*12)%2)&&!(dead&&S.def.small&&m.t>2)){
     if(hasArt(S.def)){const st=abState(),f=st.sig?st.f:abFrame(artId(S.def),st.clip,st.u,abBrk(m),st.nb),img=m.flash>0?abWhite(f.c):f.c,x=L.mx+abDx()+(st.sig?-ART.SIG.OX-st.dx:p.ox),y=L.mFeet-AB_FEET+(st.sig?0:p.oy);S.sigSt=st.sig?f.st:null;S.sigDx=st.sig?st.dx:0;S.abCur={mouth:st.sig?f.st&&f.st.mouth:f.mouth,sig:!!st.sig,dx:st.sig?-st.dx:p.ox,oy:st.sig?0:p.oy};
       if(S.sigSt&&S.sigSt.wash){for(const[c,a]of S.sigSt.wash){g.globalAlpha=a;g.fillStyle=c;g.fillRect(0,0,W,LH);}g.globalAlpha=1;}   // full-screen flash or darkness from a signature move
       if((p.oy>4&&m.state==='attack')||st.sink){g.save();g.beginPath();g.rect(-8,0,W+16,L.mFeet+3);g.clip();g.drawImage(img,x,y);g.restore();}else g.drawImage(img,x,y);}
@@ -4014,6 +4011,7 @@ function drawWorld(){
     if(f.kind==='icicle'){g.fillStyle=u<.5?'#ffffff':'#bfeaff';g.fillRect(f.x-3,f.y-26,7,26);g.fillStyle='#6cc4f0';g.fillRect(f.x-1,f.y-22,3,22);for(let k=0;k<2;k++)S.pt.push({x:f.x,y:f.y-4,vx:rnd(-70,70),vy:rnd(-80,-10),life:.3,col:'#e8f8ff',g:240});continue;}
     if(f.kind==='bolt'){let x=f.x;for(let y=f.y;y>HUD_T;y-=4){const nx=x+((hash2(y,f.x|0,3)*7)|0)-3;g.fillStyle=u<.5?'#ffffff':f.col||'#ffe14d';g.fillRect(Math.min(x,nx)-1,y-4,Math.abs(nx-x)+3,4);x=nx;}continue;}
     for(let i=0;i<n;i++){const k=i/n-.5+u*.3;g.fillStyle=u<.5?'#fff':'#fff3a0';g.fillRect(Math.round(f.x+k*n*1.4),Math.round(f.y+d*k*n*1.6),f.big?3:2,1);}}
+  drawForage();
   for(const q of S.pt){g.fillStyle=q.col;g.fillRect(Math.round(q.x),Math.round(q.y),q.life>.25?2:1,q.life>.25?2:1);}
   for(const n of S.nums){const u=n.t/n.life;text(n.txt,clamp(n.x,n.txt.length*2+2,W-n.txt.length*2-2),n.y-u*12-(u<.15?(1-u/.15)*-3:0),n.col,{al:1,out:OUTLINE});}
   g.restore();
@@ -4164,17 +4162,19 @@ function drawOptions(){
   uToast(y+ph+5);
 }
 function drawLoot(){
-  const R=S.loot; g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);
-  const ph=48+R.drops.length*14+(R.unlock?10:0), y=Math.max(14,((LH-ph)/2)|0);
-  big('HUNT COMPLETE',W/2,y,UI.gold,1);text(fmtTime(R.time)+'   '+S.stats.perfect+' PERFECT DODGES',W/2,y+14,UI.dim,{al:1});
+  const R=S.loot,nb=(R.bugs||[]).length,rows=R.drops.length+nb; g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);
+  const ph=48+rows*14+(R.unlock?10:0), y=Math.max(14,((LH-ph)/2)|0);
+  big(S.def.small?'EXPEDITION DONE':'HUNT COMPLETE',W/2,y,UI.gold,1);text(fmtTime(R.time)+'   '+S.stats.perfect+' PERFECT DODGES',W/2,y+14,UI.dim,{al:1});
   R.drops.forEach((d,i)=>{const at=.5+i*.35;if(S.t<at)return;if(!d.snd){d.snd=1;sfx('loot');}
     if(d.rare&&!d.fan){d.fan=1;sfx('win');buzz(200);}
     const yy=y+26+i*14;rbox(8,yy-3,W-16,13,d.rare?(Math.floor(S.t*6)%2?'#5a4a14':'#3a3010'):UI.s1);
     g.drawImage(lootSpr(d.id),11,yy-3);text(LOOT[d.id].name,26,yy+1,d.rare?UI.gold:d.id==='gem'?'#4cd9c0':UI.tx);if(d.rare)text('RARE',W-30,yy+1,UI.gold,{al:2});
     text('+'+d.n,W-11,yy+1,UI.gold,{al:2});});
-  const ey=y+26+R.drops.length*14+2;
-  if(R.unlock&&S.t>.6+R.drops.length*.35)text(R.unlock,W/2,ey,'#ff9a4d',{al:1});
-  if(S.t>.8+R.drops.length*.35&&Math.floor(S.t*2)%2)text('TAP TO CONTINUE',W/2,ey+(R.unlock?12:4),UI.dim,{al:1});
+  (R.bugs||[]).forEach((i,j)=>{const at=.5+(R.drops.length+j)*.35;if(S.t<at)return;const yy=y+26+(R.drops.length+j)*14;rbox(8,yy-3,W-16,13,UI.s1);   // creatures caught
+    g.drawImage(bugSpr(i,Math.floor(S.t*5)%2),11,yy-2);text(CREATURES[i].name,26,yy+1,CREATURES[i].col);if(R.fresh.includes(i))text('NEW!',W-11,yy+1,Math.floor(S.t*5)%2?'#fff':UI.gold,{al:2});});
+  const ey=y+26+rows*14+2;
+  if(R.unlock&&S.t>.6+rows*.35)text(R.unlock,W/2,ey,'#ff9a4d',{al:1});
+  if(S.t>.8+rows*.35&&Math.floor(S.t*2)%2)text('TAP TO CONTINUE',W/2,ey+(R.unlock?12:4),UI.dim,{al:1});
 }
 function drawFail(){
   g.fillStyle='rgba(30,6,10,.82)';g.fillRect(0,0,W,LH);
@@ -4236,16 +4236,16 @@ function matSources(id){
   const L=[],t=(txt,col,ind,fn)=>L.push({txt,col:col||'#c8d0e8',ind:ind||0,fn});
   if(id==='potion'){t('BREW THEM IN THE KITCHEN');return L;}
   if(id==='gem'){t('ANY BIG MONSTER: '+GEM_CH*100+'%','#ffe14d');t('THE FORTUNE SKILL HELPS');t('SOME QUESTS GIVE GEMS');return L;}
-  if(id==='meat'){t('PACK HUNTS: 2-3 EACH','#ffe14d');t('OPEN EXPEDITIONS, THEN PACK HUNT',null,1);return L;}
+  if(id==='meat'){t('EXPEDITIONS: 2-3 EACH','#ffe14d');t('FROM THE SNAPJAW PACK',null,1);return L;}
   const bi=BIOME_ING.findIndex(p=>p.includes(id));
-  if(bi>=0){const scarce=BIOME_ING[bi][1]===id;t('GATHER RUNS: '+BIOME_NAME[bi],'#ffe14d');t(scarce?'THE SCARCER ONE THERE':'COMMON THERE',null,1);t('EXPEDITIONS > GATHER',null,1);if(!scarce&&SAVE.pal)t('PIP AS GATHERER BRINGS SOME');return L;}
+  if(bi>=0){const scarce=BIOME_ING[bi][1]===id;t('EXPEDITIONS: '+BIOME_NAME[bi],'#ffe14d');t(scarce?'THE SCARCER ONE THERE':'COMMON THERE',null,1);t('FORAGE AFTER EACH SNAPJAW',null,1);if(!scarce&&SAVE.pal)t('PIP AS GATHERER BRINGS SOME');return L;}
   for(const mid of HUNTS){const D=MONSTERS[mid],k=Object.keys(D.mat).find(k=>D.mat[k]===id);if(!k)continue;
     const kn=unlocked(mid),go=kn?()=>{S.mat=null;S.menu=false;S.tab='book';S.bpick=mid;S.scr.bdet=0;sfx('charge',1);}:null;
     t(kn?D.name+(go?' >':''):'AN UNKNOWN RANK '+D.rank+' MONSTER',kn?'#ffe14d':'#8a93b0',0,go);
     if(k==='scale')t('CARVED: 2-4 EVERY HUNT',null,1);else if(k==='claw')t('CARVED: 1-2 EVERY HUNT',null,1);
     else if(k==='rare'){t('RARE: '+RARE.base*100+'% +'+RARE.part*100+'% PER BREAK',null,1);t('LIKELIER AFTER EACH MISS',null,1);}
     else{t('BREAK ITS '+partWord(D,k)+': ALWAYS',null,1);t('NO BREAK: '+PART_CH*100+'% CHANCE',null,1);}
-    if(EXPED.includes(mid)&&(k==='scale'||k==='claw'))t('PACK HUNTS: '+(k==='scale'?'1-2':'1')+' EACH',null,1);}
+    if(EXPED.includes(mid)&&(k==='scale'||k==='claw'))t('EXPEDITIONS: '+(k==='scale'?'1-2':'1')+' EACH',null,1);}
   if(!L.length)t('NO KNOWN SOURCE');
   return L;}
 function drawMat(){
@@ -4372,7 +4372,7 @@ const GUIDES={
   g_hunt:[...gGo('hunt','HUNT'),{t:'PICK THE FERNWING',id:'hunt:fern',done:()=>S.mode!=='camp'},{t:'CHECK ITS WEAKNESS, THEN START THE HUNT',id:'prep:start',done:()=>S.mode!=='prep'}],
   g_claim:[{t:'GO BACK TO CAMP',id:'camp:menu',done:()=>S.mode!=='camp'||S.tab==='home'||S.tab==='quest'},{t:'THE JOB IS DONE. CLAIM YOUR REWARD',id:'claim:story',done:()=>SAVE.story.i>0}],
   g_book:[...gGo('book','BESTIARY'),{t:'TAP THE FERNWING TO SEE ITS PAGE',id:'book:fern',done:()=>S.bpick==='fern'||S.tab!=='book'}],
-  g_gather:[...gGo('hunt','HUNT'),{t:'SWITCH TO EXPEDITIONS',id:'exp:toggle',done:()=>S.mode!=='camp'||S.exp},{t:'TAP GATHER IN THE FOREST',id:'gather:fern',done:()=>S.mode!=='camp'}],
+  g_gather:[...gGo('hunt','HUNT'),{t:'SWITCH TO EXPEDITIONS',id:'exp:toggle',done:()=>S.mode!=='camp'||S.exp},{t:'TAP EXPEDITION IN THE FOREST',id:'exped:fern',done:()=>S.mode!=='camp'}],
   g_forge:[...gGo('forge','FORGE'),{t:'TAP AN ITEM TO SEE IT BELOW',find:b=>/^forge:/.test(b.id),tap:true},{t:'TAP A MATERIAL TO SEE WHERE IT DROPS',id:'mat:',done:()=>!!S.mat||S.mode!=='camp'},{t:'TAP ANYWHERE TO CLOSE',id:'mat:close',done:()=>!S.mat},
     {t:'PICK SOMETHING READY, THEN CRAFT IT',none:'HUNT FOR MORE MATERIALS, THEN COME BACK',free:true,find:b=>(/^craft:/.test(b.id)&&canAfford(b.id.slice(6)))||(/^up:/.test(b.id)&&affords(upCost(b.id.slice(3)))),done:()=>SAVE.story.i!==2||SAVE.story.p>0}],
   g_meal:[...gGo('hunt','HUNT'),gPickMon,{t:'PICK A MEAL WITH THE ARROWS',id:'prep:mnext',free:true,done:()=>S.mode!=='prep'||S.prep.meal>=0},{t:'START THE HUNT',id:'prep:start',free:true,done:()=>S.mode!=='prep'}],
@@ -4575,7 +4575,7 @@ function drawHunts(B,gs){
     EXPED.forEach(id=>{const D=MONSTERS[id],ok=unlocked(id),ing=BIOME_ING[D.biome],n=CREATURES.filter(c=>c.biome===D.biome&&SAVE.bugs[c.id]).length;
       if(ok){if(y+44>top&&y<bot){rbox(6,y,W-12,44,UI.s1);g.save();g.beginPath();g.rect(7,Math.max(top,y+1),36,Math.max(0,Math.min(bot,y+43)-Math.max(top,y+1)));g.clip();g.drawImage(bgFor(D.biome),20,L.ground-38,36,42,7,y+1,36,42);g.restore();
           text(BIOME_NAME[D.biome],48,y+5,UI.tx);g.drawImage(lootSpr(ing[0]),0,0,12,12,48,y+13,9,9);g.drawImage(lootSpr(ing[1]),0,0,12,12,59,y+13,9,9);text('BUGS '+n+'/4',W-9,y+15,n===4?UI.ok:UI.faint,{al:2});
-          uBtn(B,'gather:'+id,48,y+28,34,11,'GATHER','gold',()=>startGather(D.biome));uBtn(B,'pack:'+id,85,y+28,34,11,'PACK','plain',()=>toPrep(null,id));}
+          uBtn(B,'exped:'+id,48,y+28,W-57,11,'EXPEDITION','gold',()=>toPrep(null,id));}
         y+=47;total+=47;}
       else{if(y+16>top&&y<bot){rbox(6,y,W-12,16,UI.s1);text(BIOME_NAME[D.biome],10,y+6,UI.faint);icLock(W-14,y+5,UI.faint);B.push({id:'exp:'+id,x:6,y,w:W-12,h:16,fn:()=>{toast(D.rank===1?'BEAT THE '+D.name+' FIRST':lockText(id),UI.bad);sfx('miss');}});}y+=18;total+=18;}});
     g.restore();for(let k=B.length-1;k>=nb;k--)if(B[k].y<top-1||B[k].y+B[k].h>bot+3)B.splice(k,1);
@@ -4622,7 +4622,7 @@ function drawGear(B){
     else{g.fillStyle=UI.s1;g.fillRect(0,LH-sheetH,W,sheetH);uBtn(B,'equip:none',6,LH-21,W-12,16,SAVE.eq.charm?'TAKE OFF CHARM':'NO CHARM WORN',SAVE.eq.charm?'gold':'off',()=>{if(SAVE.eq.charm)equip('charm',null);},true);}
     return;}
   titleBar(B,'GEAR');
-  if(S.fromPrep){const D=S.fromPrep.small!=null?{short:'PACK'}:MONSTERS[S.fromPrep.id],lab='< '+(D.short||D.name)+' HUNT',w=textW(lab)+8;uBtn(B,'gear:toprep',W-22-w,5,w,11,lab,'gold',backToPrep);}
+  if(S.fromPrep){const D=S.fromPrep.small!=null?{short:'EXPEDITION'}:MONSTERS[S.fromPrep.id],lab='< '+(D.short||D.name)+(S.fromPrep.small!=null?'':' HUNT'),w=textW(lab)+8;uBtn(B,'gear:toprep',W-22-w,5,w,11,lab,'gold',backToPrep);}
   const py=24,ph=52;rbox(6,py,W-12,ph,UI.s1);g.save();g.beginPath();g.rect(7,py+1,52,ph-2);g.clip();g.drawImage(bgFor(0),20,L.ground-40,52,ph,7,py+1,52,ph-2);g.restore();
   shadow(26,py+ph-7,9,2);if(hasHu())huDraw(8,py+ph-48,'IDLE',S.t);else g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),8,py+ph-48);if(SAVE.pal)g.drawImage(palSpr(Math.floor(S.t*4)%2),40,py+ph-17);
   const gs=gearStats(),w=GEAR[SAVE.eq.weapon],wk=w.elem?ELEM[w.elem]:w.status?[STATUS[w.status].name,STATUS[w.status].col]:null;
@@ -4701,7 +4701,7 @@ function drawTerrarium(B){
   g.fillStyle='rgba(255,255,255,.1)';g.fillRect(9,ty+3,2,th-8);
   CREATURES.forEach((c,i)=>{if(!SAVE.bugs[c.id])return;const sp=.25+hash2(i,1,4)*.5,ph=hash2(i,2,4)*6.3,fly=c.type==='moth',x=60+48*Math.sin(S.t*sp+ph),f=Math.floor(S.t*(fly?8:3)+i)%2;
     const yy=fly?ty+10+(th-34)*(0.5+0.5*Math.sin(S.t*sp*1.7+ph*2)):ty+th-12-(c.type==='hopper'?Math.abs(Math.sin(S.t*3+ph))*8:0);g.drawImage(bugSpr(i,f),Math.round(x),Math.round(yy));});
-  if(!have)text('CATCH ONE ON A GATHER RUN',W/2,ty+th/2,UI.dim,{al:1});
+  if(!have)text('CATCH ONE ON AN EXPEDITION',W/2,ty+th/2,UI.dim,{al:1});
   let y=ty+th+5;text(have+' OF '+CREATURES.length+' CAUGHT',6,y,UI.tx);{const a='+'+(bb.atk*100).toFixed(1)+'%',h='+'+(bb.hp*100).toFixed(1)+'%';let x=W-6-textW(a);text(a,x,y,UI.ok);icSword(x-7,y,UI.ok);x-=11+textW(h);text(h,x,y,UI.ok);icHeart(x-7,y,UI.ok);}y+=10;
   for(let bi=0;bi<8;bi++){text(BIOME_NAME[bi].slice(0,6),6,y+3,UI.faint);CREATURES.forEach((c,i)=>{if(c.biome!==bi)return;const k=i%4,x=44+k*20,got=!!SAVE.bugs[c.id];
     rbox(x,y,18,11,c.rare?'#3a3010':UI.s1);if(got)g.drawImage(bugSpr(i,0),x+3,y+1);else text('?',x+8,y+3,UI.faint);
@@ -4726,7 +4726,7 @@ function drawPrep(){
   g.drawImage(mSprite(D,Object.assign({},POSE0,{hy:Math.sin(S.t*2.4)>.3?1:0,jaw:Math.sin(S.t*1.1)>.9?1:0})),(W-MS_W)/2+12,Math.min(8,bh-62));g.restore();
   for(let i=0;i<22;i++){g.fillStyle='rgba(17,20,31,'+(i/22).toFixed(2)+')';g.fillRect(0,bh-22+i,W,1);}
   rbox(4,4,13,12,'rgba(0,0,0,.55)');icChev(8,7,UI.tx,true);B.push({id:'prep:back',x:0,y:0,w:22,h:20,fn:()=>toCamp('hunt')});
-  text(D.small?'PACK HUNT . '+BIOME_NAME[D.biome]:rankName(D.rank)+' . '+BIOME_NAME[D.biome],7,bh-17,UI.dim);{const nm=D.small?'SNAPJAWS':D.name;if(bigW(nm)<=W-12)big(nm,7,bh-10,UI.tx);else text(nm,7,bh-7,UI.tx);}
+  text(D.small?'EXPEDITION . '+BIOME_NAME[D.biome]:rankName(D.rank)+' . '+BIOME_NAME[D.biome],7,bh-17,UI.dim);{const nm=D.small?'SNAPJAWS':D.name;if(bigW(nm)<=W-12)big(nm,7,bh-10,UI.tx);else text(nm,7,bh-7,UI.tx);}
   let y=bh+4,x=7;text('WEAK',x,y+2,UI.faint);x+=23;x+=echip(x,y,D.weak)+2;if(D.weakSt)schip(x,y,D.weakSt);
   y+=12;x=7;text('USES',x,y+2,UI.faint);x+=23;x+=echip(x,y,D.elem)+2;const rp=resPct(gs,D.elem);if(rp)chip(x,y,'-'+rp+'%',UI.ok);
   if(tip){y+=11;text(D.tip,7,y,UI.gold);}
@@ -4751,38 +4751,12 @@ function drawPrep(){
 }
 
 // ── Gather run ──
-function drawGather(){
-  const G=S.g; g.drawImage(BG,-4,0);
-  if(hasHu())huDraw(4,LH-52,'IDLE',S.t);else g.drawImage(hunterSpr({kind:'stand',a:-1.2,bob:Math.sin(S.t*4)>0?1:0,lean:0,glow:0,f:0}),4,LH-52);
-  for(const n of G.nodes){const u=n.t/n.life,pop=Math.min(1,n.t/.12),yy=Math.round(n.y-6-(1-pop)*4+Math.sin(n.t*8)*1);
-    if(u>.7&&Math.floor(n.t*16)%2)continue;                                        // blinks before it goes
-    if(n.rare){circ(n.x,n.y,8+Math.sin(n.t*14)*1.5,'#ffe14d');}
-    g.fillStyle='rgba(0,0,0,.3)';g.fillRect(Math.round(n.x)-4,Math.round(n.y)+5,8,2);g.drawImage(lootSpr(n.id),Math.round(n.x)-6,yy);}
-  if(G.bug){const b=G.bug,u=b.t/GATHER.bugTime;g.drawImage(bugSpr(b.i,Math.floor(b.t*10)%2),Math.round(b.x)-6,Math.round(b.y)-5);
-    circ(b.x,b.y,lerp(18,7,u)+1,OUTLINE);circ(b.x,b.y,lerp(18,7,u),CREATURES[b.i].rare?'#ffe14d':'#4cc9ff');}
-  for(const p of G.pt){g.fillStyle=p.col;g.fillRect(Math.round(p.x),Math.round(p.y),2,2);}
-  g.fillStyle=OUTLINE;g.fillRect(0,0,W,14);text('GATHER RUN',3,2,'#e8f0fc');text(BIOME_NAME[G.bi],W-3,2,'#ffe14d',{al:2});bar(3,10,W-6,2,1-G.t/GATHER.time,'#4cd964','#2b2f45');
-  g.fillStyle=OUTLINE;g.fillRect(0,LH-14,W,14);let x=4;for(const id of BIOME_ING[G.bi]){g.drawImage(lootSpr(id),0,0,12,12,x,LH-12,9,9);text('*'+(G.got[id]||0),x+10,LH-10,'#ffe14d');x+=34;}
-  g.drawImage(bugSpr(CREATURES.findIndex(c=>c.biome===G.bi),0),x,LH-12);text('*'+G.caught.length,x+13,LH-10,'#4cc9ff');
-  if(G.t<2.5){text('TAP WHAT POPS UP',W/2,24,'#ffe14d',{al:1,out:OUTLINE});text('CATCH BUGS IN THE CIRCLE',W/2,32,'#4cc9ff',{al:1,out:OUTLINE});}
-}
-function drawGres(){
-  const G=S.g; g.drawImage(BG,-4,0);g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);
-  const got=Object.entries(G.got),bugs=[...new Set(G.caught)],ph=40+got.length*14+bugs.length*14,y=Math.max(14,((LH-ph)/2)|0);
-  big('RUN COMPLETE',W/2,y,UI.gold,1);text(BIOME_NAME[G.bi],W/2,y+14,UI.dim,{al:1});let yy=y+26;
-  if(!got.length&&!bugs.length){text('NOTHING THIS TIME',W/2,yy,UI.dim,{al:1});yy+=14;}
-  for(const [k,n] of got){rbox(8,yy-3,W-16,13,UI.s1);g.drawImage(lootSpr(k),11,yy-3);text(LOOT[k].name,26,yy+1,UI.tx);text('+'+n,W-11,yy+1,UI.gold,{al:2});yy+=14;}
-  for(const i of bugs){rbox(8,yy-3,W-16,13,UI.s1);g.drawImage(bugSpr(i,Math.floor(S.t*5)%2),11,yy-2);text(CREATURES[i].name,26,yy+1,CREATURES[i].col);if(G.fresh.includes(i))text('NEW!',W-11,yy+1,Math.floor(S.t*5)%2?'#fff':UI.gold,{al:2});yy+=14;}
-  if(S.t>1.2&&Math.floor(S.t*2)%2)text('TAP TO CONTINUE',W/2,yy+4,UI.dim,{al:1});
-}
 function draw(){
   syncSearch();
   g.imageSmoothingEnabled=false;
   if(S.mode==='title'){drawTitle();return;}
   if(S.mode==='camp'){drawCamp();return;}
   if(S.mode==='prep'){drawPrep();return;}
-  if(S.mode==='gather'){drawGather();return;}
-  if(S.mode==='gres'){drawGres();return;}
   drawWorld();drawHud();if(S.mode==='hunt'&&S.paused)drawPause();
   if(S.mode==='loot')drawLoot();else if(S.mode==='fail')drawFail();
 }
@@ -4805,7 +4779,7 @@ function frame(now){
   try{if(!MH.manual)update(dt);draw();if(!MH.manual)abTick(S.mode==='hunt'?5:3);if(S.guide&&!S.talk&&(S.mode==='camp'||S.mode==='prep')&&!S.opts)drawGuide();if(S.hint&&!S.talk&&S.mode==='hunt'&&!S.paused)drawHint();if(S.talk)drawTalk();}catch(e){if(!MH.lastErr)console.error(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' '));MH.lastErr=e.message+' | mode='+S.mode;}
 }
 // test hooks
-Object.assign(MH,{draw,abFrame,abTick,abState,AB,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,startGather,gatherTap,gatherUpdate,gatherEnd,GATHER,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
+Object.assign(MH,{draw,abFrame,abTick,abState,AB,lootSpr,gearSpr,palSpr,MONSTERS,GEAR,SAVE_:()=>SAVE,huFrame,HB,titleStart,audioInit,mv,mStrike,voiceOf,noiseF,PARTS,GUIDES,guide,gTarget,guideTick,prepGear,backToPrep,SCENES,CAST,talk,storyTick,huntTutor,TUT_KEYS,RIGS,POSE0,matSources,know,KNOW_AT,ATTACKS,mStartAttack,update,newHunt,press,move,release,actTap,actDodge,actPotion,toPrep,prepStart,forageTap,FORAGE,quests,qEvent,claim,brew,bugBonus,goalText,CREATURES,MEALS,MEAL_IDS,STORY,SIDES,DAILIES,ING,dayKey,ensureQuests,
   actCounter,actSharpen,mKill,smallDef,palUpdate,PAL,qteTap,mPose,partPos,ATTACKS,STATUS,SHARP,RARE,rollLoot,applyStatus,mDischarge,MONSTERS,HUNTS,GEAR,WTYPES,PERKS,FORGE_PAGES,FURY,ASLOTS,THEMES,SETB,fullSet,setBonus,skillMax,secondWind,skillLevels,skillRaw,SK,armorRes,PREFS,setMusic,setSfx,pauseHunt,quitHunt,musicCtx,monsterTrack,compileSong,MTRACKS:SCORE,SCORE,MOTIF,music:_music,FCATS,forgeList,equip,SLOTS,EXPED,BIOME_ING,palStats,scoutBonus,procStatus,ROLES,ROLE_IDS,mSprite,POSE0,rankOpen,rankWins,unlocked,scrollSet,toCamp,upCost,upgradeTap,lvOf,forgeTap,canAfford,gearStats,
   IN,loadSave,setDev,deleteSave,devSave,
   get L(){return L;},get LH(){return LH;},dodgeIfr:DODGE_IFR,perfect:PERFECT_WIN});

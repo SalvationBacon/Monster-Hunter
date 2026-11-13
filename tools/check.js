@@ -52,8 +52,8 @@ const shots=process.argv[2];
     const t=MH.monsterTrack(MH.MONSTERS.fern),a=MH.compileSong(t,1),b=MH.compileSong(t,2),lead=s=>JSON.stringify(s.ev.filter(e=>e.i===t.lead).slice(0,6).map(e=>[+e.f.toFixed(1),+e.d.toFixed(3)]));
     const ok1=a.len>40&&a.len<100&&b.len<a.len;const a2=MH.compileSong(t,1);return ok1&&lead(a)===lead(a2)||[a.len,b.len].join(',');}),'every track compiles; a hunt loop runs about a minute, skips its intro when it repeats, and keeps its hook');
   ok(await ev(()=>{const S=MH.S,save=S.mode,out=[];S.mode='title';S.show=null;out.push(MH.musicCtx());S.show='ember';out.push(MH.musicCtx());S.mode='camp';out.push(MH.musicCtx());S.mode='prep';out.push(MH.musicCtx());
-    S.mode='gather';out.push(MH.musicCtx());MH.newHunt('tusk');out.push(MH.musicCtx());MH.newHunt(null,{small:'fern'});out.push(MH.musicCtx());S.mode='loot';out.push(MH.musicCtx());S.mode=save;S.show=null;
-    return out.join(',')==='title,mon:ember,camp,camp,gather,mon:tusk,pack,camp'||out.join(',');}),'the music follows the screen: title, camp and menus, gather runs, pack hunts, and each monster');
+    MH.newHunt('tusk');out.push(MH.musicCtx());MH.newHunt(null,{small:'fern'});out.push(MH.musicCtx());S.mode='loot';out.push(MH.musicCtx());S.mode=save;S.show=null;
+    return out.join(',')==='title,mon:ember,camp,camp,mon:tusk,pack,camp'||out.join(',');}),'the music follows the screen: title, camp and menus, expeditions, and each monster');
   // ── pause ──
   ok(await ev(()=>{EQ();MH.newHunt('fern');const S=MH.S;S.m.wait=0;RUN(30);const c0=S.clock,t0=S.timeLeft,m0=JSON.stringify([S.m.t,S.m.state]);MH.pauseHunt(true);RUN(300);
     const still=S.clock===c0&&S.timeLeft===t0&&JSON.stringify([S.m.t,S.m.state])===m0;MH.actTap('head');MH.update(1/60);const noAct=S.clock===c0;MH.pauseHunt(false);RUN(10);return S.paused===false&&still&&noAct&&S.clock>c0;}),
@@ -239,19 +239,23 @@ const shots=process.argv[2];
   ok(await ev(()=>{const E=MH.EXPED,bi=E.map(id=>MH.MONSTERS[id].biome).sort().join(',');return E.length===8&&bi==='0,1,2,3,4,5,6,7'&&E.every(id=>MH.BIOME_ING[MH.MONSTERS[id].biome].length===2)&&MH.CREATURES.length===32&&
     [0,1,2,3,4,5,6,7].every(b=>MH.CREATURES.filter(c=>c.biome===b).length===4&&MH.CREATURES.filter(c=>c.biome===b&&c.rare).length===1)&&new Set(MH.CREATURES.map(c=>c.name)).size===32;}),'eight biomes have expeditions, each with two ingredients and four creatures, one rare');
   ok(await ev(()=>{const S=MH.SAVE;S.wins={};const a=!MH.unlocked('mud')&&!MH.unlocked('shell')&&!MH.unlocked('dread');S.wins.fern=1;const c=MH.unlocked('mud')&&!MH.unlocked('shell');S.wins={};return a&&c;}),'the swamp opens with rank 1, before the coast and the ruins');
-  ok(await ev(()=>{const run=bi=>{MH.startGather(bi);const G=MH.S.g;const got=new Set(),bugs=new Set();for(let i=0;i<60*24;i++){MH.gatherUpdate(1/60);for(const n of [...G.nodes])if(n.t>.1){MH.gatherTap(n.x,n.y);got.add(n.id);}if(G.bug&&G.bug.t>.3){bugs.add(MH.CREATURES[G.bug.i].biome);MH.gatherTap(G.bug.x,G.bug.y);}}
-      return[[...got].sort().join(','),[...bugs].join(',')];};
-    const sw=run(5),co=run(6),ru=run(7);MH.toCamp('hunt');return sw[0].split(',').every(k=>['bogbean','lily'].includes(k))&&sw[0].includes('bogbean')&&sw[1]==='5'&&co[0].includes('kelp')&&co[1]==='6'&&ru[0].includes('fig')&&ru[1]==='7'||JSON.stringify([sw,co,ru]);}),
-    'a gather run in the swamp, coast or ruins turns up that biome\'s ingredients and creatures');
-  ok(await ev(()=>{const runs=[];for(let k=0;k<30;k++){MH.startGather(0);const G=MH.S.g;let seen=0,lastBug=null;for(let i=0;i<60*21;i++){MH.gatherUpdate(1/60);for(const n of [...G.nodes])if(n.t>.1)MH.gatherTap(n.x,n.y);
-      if(G.bug&&G.bug!==lastBug){seen++;lastBug=G.bug;}if(G.bug&&G.bug.t>.3)MH.gatherTap(G.bug.x,G.bug.y);}runs.push({items:Object.values(G.got).reduce((a,b)=>a+b,0),herb:G.got.herb||0,bugs:G.caught.length,seen});}MH.toCamp('hunt');
+  // an expedition played perfectly by a bot: it fights the pack and taps everything the lulls turn up
+  const EXPED_RUN=`(mon)=>{MH.newHunt(null,{small:mon});const S=MH.S;S.h.inv=1e9;let t=0,lulls=0,lastF=null,seen=0,lastBug=null;const got=new Set(),bugs=new Set();
+    while(S.mode==='hunt'&&t<120){const F=S.forage;if(F&&F!==lastF){lulls++;lastF=F;}
+      if(F){for(const n of [...F.nodes])if(n.t>.1){got.add(n.id);MH.forageTap(n.x,n.y);}if(F.bug&&F.bug!==lastBug){seen++;lastBug=F.bug;}if(F.bug&&F.bug.t>.3){bugs.add(MH.CREATURES[F.bug.i].biome);MH.forageTap(F.bug.x,F.bug.y);}}
+      else if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
+    return{mode:S.mode,t,lulls,seen,got:[...got].sort().join(','),bugs:[...bugs].join(','),items:Object.values(S.ex.got).reduce((a,b)=>a+b,0),herb:S.ex.got.herb||0,caught:S.ex.caught.length,loot:S.loot};}`;
+  ok(await ev(src=>{const run=eval(src);const sw=run('mud'),co=run('shell'),ru=run('dread');MH.toCamp('hunt');
+    return sw.got.split(',').every(k=>['bogbean','lily'].includes(k))&&sw.got.includes('bogbean')&&sw.bugs==='5'&&co.got.includes('kelp')&&co.bugs==='6'&&ru.got.includes('fig')&&ru.bugs==='7'||JSON.stringify([sw.got,sw.bugs,co.got,co.bugs,ru.got,ru.bugs]);},EXPED_RUN),
+    'an expedition in the swamp, coast or ruins turns up that biome\'s ingredients and creatures');
+  ok(await ev(src=>{const run=eval(src),runs=[];for(let k=0;k<12;k++)runs.push(run('fern'));MH.toCamp('hunt');
     const avg=runs.reduce((a,r)=>a+r.items,0)/runs.length,max=Math.max(...runs.map(r=>r.items)),herbs=runs.reduce((a,r)=>a+r.herb,0)/runs.length;
-    return avg>=8&&avg<=12&&max<=14&&herbs<=11&&runs.every(r=>r.bugs===1&&r.seen===1)||JSON.stringify({avg,max,herbs,b:runs.map(r=>r.bugs).join('')});}),
-    'a perfect gather run collects about ten things, three or so potions\' worth of herbs, and exactly one creature');
+    return avg>=8&&avg<=13&&max<=16&&herbs<=12&&runs.every(r=>r.mode==='loot'&&r.lulls===3&&r.caught===1&&r.seen===1&&r.t<60)||JSON.stringify({avg,max,herbs,r:runs.map(r=>r.mode+r.lulls+r.caught+r.seen+'/'+(r.t|0)).join(' ')});},EXPED_RUN),
+    'a perfect expedition: three Snapjaws with a forage lull after each, about ten things gathered, three or so potions\' worth of herbs, and exactly one creature');
   ok(await ev(()=>{EQ();const pr=(mon,st,meal)=>{const S=QUIET(mon,{meal});MH.applyStatus(st);return !(S.h[st]>0||S.h.state==='numb');};
     return pr('mud','mud','beanbroth')&&pr('mire','stench','beanbroth')&&pr('quill','bleed','lilytea')&&pr('shell','wet','kelpwrap')&&pr('dust','numb','chowder')&&pr('dread','blight','figpie')&&!pr('dread','blight','kelpwrap');}),
     'the new meals guard against mud, stench, bleeding, soaking, numbing and blight');
-  ok(await ev(()=>{MH.SAVE.potions=9;MH.newHunt(null,{small:'dread'});const S=MH.S;return S.def.small&&S.def.biome===7&&S.pack===3&&S.def.loot.common[0][0]===MH.MONSTERS.dread.mat.scale;}),'a pack hunt in the ruins is three Snapjaws that drop Dreadbeak materials');
+  ok(await ev(()=>{MH.SAVE.potions=9;MH.newHunt(null,{small:'dread'});const S=MH.S;return S.def.small&&S.def.biome===7&&S.pack===3&&S.def.loot.common[0][0]===MH.MONSTERS.dread.mat.scale;}),'an expedition in the ruins is three Snapjaws that drop Dreadbeak materials');
 
   // ── ranks ──
   ok(await ev(()=>{const S=MH.SAVE;S.wins={};const a=MH.unlocked('fern')&&!MH.unlocked('quill')&&!MH.unlocked('bog');S.wins.fern=1;const c=MH.unlocked('quill')&&MH.unlocked('tusk')&&!MH.unlocked('bog');S.wins.quill=1;const d=!MH.rankOpen(2);S.wins.mud=1;const e=MH.rankOpen(2)&&MH.unlocked('ember')&&!MH.unlocked('eel');
@@ -443,16 +447,19 @@ const shots=process.argv[2];
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);
   ok(await ev(()=>MH.S.mode==='camp'&&MH.S.tab==='home'&&MH.S.btns.some(b=>b.id==='claim:story')),'a tap on the loot screen returns to the camp home, with the reward ready to claim');await shot('c-home-claim');
   const pot0=await ev(()=>MH.SAVE.potions);await tapBtn('claim:story');ok(await ev(p0=>MH.SAVE.story.i===1&&MH.SAVE.potions===p0+2,pot0),'claiming the first chapter pays its reward and opens the next');
-  await tapBtn('tab:hunt');await tapBtn('exp:toggle');ok(await ev(()=>MH.S.exp&&MH.S.btns.some(b=>b.id==='gather:fern')&&MH.S.btns.some(b=>b.id==='gather:tusk')&&!MH.S.btns.some(b=>b.id==='gather:ember')),'expeditions open with the monsters that guard their biomes');await shot('c-expeditions');
-  ok(await ev(()=>MH.S.scrMax.exp>0&&MH.S.btns.some(b=>b.id==='gather:mud')),'the swamp opens with the rest of rank 1');
-  await tapBtn('gather:fern');ok(await ev(()=>MH.S.mode==='gather'),'GATHER starts a gather run');
-  await ev(()=>{MH.manual=true;const G=MH.S.g;G.nodes=[{x:40,y:MH.L.ground+30,id:'herb',rare:false,t:0,life:9},{x:90,y:MH.L.ground+50,id:'honey',rare:true,t:0,life:9}];G.bug={i:3,dir:1,x:64,y:60,t:.5};});await shot('c-gather');
-  const gp=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect(),G=MH.S.g,f=(x,y)=>({x:r.left+x/128*r.width,y:r.top+y/MH.LH*r.height});return[f(G.nodes[0].x,G.nodes[0].y),f(G.nodes[1].x,G.nodes[1].y),f(G.bug.x,G.bug.y),f(10,30)];});
+  await tapBtn('tab:hunt');await tapBtn('exp:toggle');ok(await ev(()=>MH.S.exp&&MH.S.btns.some(b=>b.id==='exped:fern')&&MH.S.btns.some(b=>b.id==='exped:tusk')&&!MH.S.btns.some(b=>b.id==='exped:ember')),'expeditions open with the monsters that guard their biomes');await shot('c-expeditions');
+  ok(await ev(()=>MH.S.scrMax.exp>0&&MH.S.btns.some(b=>b.id==='exped:mud')),'the swamp opens with the rest of rank 1');
+  await tapBtn('exped:fern');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.small==='fern'),'EXPEDITION opens the prep screen for the forest');await tapBtn('prep:start');
+  ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.small&&MH.S.pack===3),'and sets out against three Snapjaws');
+  await ev(()=>{MH.manual=true;const S=MH.S;S.h.inv=1e9;let t=0;while(!S.forage&&t<40){if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
+    const F=S.forage;F.spawn=1e9;F.bugT=-1;F.nodes=[{x:50,y:MH.L.ground+20,id:'herb',rare:false,t:0,life:9},{x:96,y:MH.L.ground+40,id:'honey',rare:true,t:0,life:9}];F.bug={i:3,dir:1,x:70,y:MH.L.ground-20,t:.5};S.h.state='idle';});await shot('c-forage');
+  const gp=await ev(()=>{const r=document.getElementById('c').getBoundingClientRect(),F=MH.S.forage,f=(x,y)=>({x:r.left+x/128*r.width,y:r.top+y/MH.LH*r.height});return[f(F.nodes[0].x,F.nodes[0].y),f(F.nodes[1].x,F.nodes[1].y),f(F.bug.x,F.bug.y)];});
   for(const q of gp)await p.touchscreen.tap(q.x,q.y);
-  ok(await ev(()=>{const G=MH.S.g;return G.got.herb===1&&G.got.honey===1&&G.caught.length===1&&G.nodes.length===0&&!G.bug;}),'tapping collects what popped up and catches the creature, and a miss does nothing');
+  ok(await ev(()=>{const S=MH.S,F=S.forage;return S.ex.got.herb===1&&S.ex.got.honey===1&&S.ex.caught.length===1&&F.nodes.length===0&&!F.bug;}),'after a kill, tapping collects what turned up and catches the creature');
   const bag0=await ev(()=>MH.SAVE.bag.herb||0);
-  await ev(()=>{const G=MH.S.g;G.spawn=1e9;G.bugT=1e9;for(let i=0;i<60*26&&MH.S.mode==='gather';i++)MH.update(1/60);MH.S.t=5;MH.manual=false;});
-  ok(await ev(b0=>MH.S.mode==='gres'&&MH.SAVE.bag.herb===b0+1&&MH.SAVE.bag.honey>=1&&MH.SAVE.bugs.c03===1&&MH.S.g.fresh.length===1&&MH.SAVE.story.p===1,bag0),'the run ends on its timer, banks the haul and the catch, and moves the story on');
+  await ev(()=>{const S=MH.S;let t=0;while(S.mode==='hunt'&&t<90){if(S.forage){S.forage.spawn=1e9;S.forage.bugT=-1;}else if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}MH.S.t=5;MH.manual=false;});
+  ok(await ev(b0=>MH.S.mode==='loot'&&MH.SAVE.bag.herb===b0+1&&MH.SAVE.bag.honey>=1&&MH.SAVE.bugs.c03===1&&MH.S.loot.fresh.length===1&&MH.S.loot.drops.some(d=>d.id==='meat')&&MH.SAVE.story.p===1&&MH.SAVE.packs===1,bag0),
+    'the expedition ends after the third Snapjaw and its lull, banks the meat, the haul and the catch, and moves the story on');await shot('c-expedition-loot');
   await p.touchscreen.tap(195,400);await p.waitForTimeout(150);await tapBtn('claim:story');
   await tapBtn('tab:bugs');ok(await ev(()=>MH.bugBonus().hp===.003&&MH.bugBonus().atk===.003&&Math.abs(MH.gearStats().atk/(MH.lvOf(MH.SAVE.eq.weapon)*.08+1)/MH.GEAR[MH.SAVE.eq.weapon].atk-1.003)<1e-3),'a rare creature in the terrarium adds a little health and attack');await shot('c-terrarium');
   await tapBtn('tab:cook');await ev(()=>{MH.SAVE.bag.herb=7;MH.SAVE.bag.meat=2;});await p.waitForTimeout(80);await shot('c-kitchen');const pk=await ev(()=>MH.SAVE.potions);await tapBtn('cook:brew');
@@ -460,10 +467,10 @@ const shots=process.argv[2];
   await tapBtn('tab:hunt');await tapBtn('hunt:fern');await tapBtn('prep:mnext');await p.waitForTimeout(80);await shot('c-prep-meal');await tapBtn('prep:start');
   ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.h.max===Math.round(100*1.25*1.003)&&MH.SAVE.bag.meat===0&&MH.SAVE.bag.herb===2),'Hearty Stew costs its ingredients and adds a quarter more health for the hunt');
   await ev(()=>{MH.toCamp('hunt');});await p.waitForTimeout(100);
-  await tapBtn('exp:toggle');await tapBtn('pack:fern');ok(await ev(()=>MH.S.mode==='prep'&&MH.S.prep.small==='fern'),'PACK HUNT opens prep for a pack');await tapBtn('prep:start');
-  ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.small&&MH.S.pack===3),'and starts a hunt against three Snapjaws');await ev(()=>{MH.manual=true;for(let i=0;i<40;i++)MH.update(1/60);});await shot('c-pack-hunt');
+  await tapBtn('exp:toggle');await tapBtn('exped:fern');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.small&&MH.S.pack===3),'a second expedition sets out');
+  await ev(()=>{MH.manual=true;for(let i=0;i<40;i++)MH.update(1/60);});await shot('c-pack-hunt');
   ok(await ev(()=>{const S=MH.S;S.h.inv=1e9;let t=0,seen=new Set();while(S.mode==='hunt'&&t<120){seen.add(S.pack);if(S.h.state==='idle')MH.actTap('head');MH.update(1/60);t+=1/60;}
-    return S.mode==='loot'&&seen.size===3&&!S.qte&&S.loot.drops.some(d=>d.id==='meat')&&S.loot.drops.every(d=>d.id)&&MH.SAVE.packs===1&&(MH.SAVE.wins.fern||0)===1&&t<60;}),'the pack falls one after another and pays in meat and common materials');
+    return S.mode==='loot'&&seen.size===3&&!S.qte&&S.loot.drops.some(d=>d.id==='meat')&&S.loot.drops.every(d=>d.id)&&MH.SAVE.packs===2&&(MH.SAVE.wins.fern||0)===1&&t<60;}),'the pack falls one after another and pays in meat and common materials');
   await ev(()=>{MH.S.t=5;MH.manual=false;});await p.touchscreen.tap(195,400);await p.waitForTimeout(150);await tapBtn('tab:hunt');await shot('c-hunt');
   await tapBtn('hunt:tusk');await tapBtn('prep:start');ok(await ev(()=>MH.S.mode==='hunt'&&MH.S.def.id==='tusk'&&MH.S.m.max===MH.MONSTERS.tusk.hp),'the Tuskhide, in rank 1, can now be hunted');
   await tapBtn('nothing');await ev(()=>{MH.toCamp('hunt');});await p.waitForTimeout(80);await tapBtn('hunt:bog');ok(await ev(()=>MH.S.mode==='camp'),'rank 2 stays locked until three rank 1 monsters are beaten');
@@ -477,7 +484,7 @@ const shots=process.argv[2];
   await ev(()=>{MH.SAVE.pal=true;MH.toCamp('gear');});await p.waitForTimeout(150);await shot('s-gear');
   ok(await ev(()=>MH.S.btns.filter(b=>b.id.startsWith('slot:')).length===(MH.SAVE.pal?8:6)&&MH.S.btns.every(b=>b.y>=0&&b.y+b.h<=MH.LH)),'the GEAR tab fits the shortest screen');
   await ev(()=>{MH.toCamp('hunt');MH.S.exp=true;MH.SAVE.wins={fern:1,quill:1,mud:1,dust:1,tusk:1,bog:1,ember:1,thorn:1};});await p.waitForTimeout(150);await shot('s-expeditions');
-  ok(await ev(()=>{const g=MH.S.btns.filter(b=>/^(gather|pack):/.test(b.id));const fit=g.every(b=>b.y>=12&&b.y+b.h<=MH.LH-19);MH.scrollSet(1e6);return fit&&MH.S.scrMax.exp>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='gather:shell')&&!MH.S.btns.some(b=>b.id==='gather:storm')))))),'the expedition list scrolls on the shortest screen, and only open biomes can be started');await shot('s-expeditions-end');
+  ok(await ev(()=>{const g=MH.S.btns.filter(b=>/^exped:/.test(b.id));const fit=g.every(b=>b.y>=12&&b.y+b.h<=MH.LH-19);MH.scrollSet(1e6);return fit&&MH.S.scrMax.exp>0;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.some(b=>b.id==='exped:shell')&&!MH.S.btns.some(b=>b.id==='exped:storm')))))),'the expedition list scrolls on the shortest screen, and only open biomes can be started');await shot('s-expeditions-end');
   for(const tab of ['hunt','cook','quest','bugs']){await ev(t=>{MH.SAVE.story={i:0,p:0};MH.toCamp(t);},tab);await p.waitForTimeout(120);await shot('s-'+tab);}
   ok(await ev(()=>{MH.SAVE.bugs={};for(const c of MH.CREATURES)MH.SAVE.bugs[c.id]=1;MH.toCamp('bugs');return 1;})&&await ev(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(MH.S.btns.filter(b=>b.id.startsWith('bug:')).length===32&&MH.S.btns.filter(b=>b.id.startsWith('bug:')).every(b=>b.y+b.h<=MH.LH-20)))))),'all 32 terrarium slots fit the shortest screen');await shot('s-bugs-full');
   await ev(()=>{MH.SAVE.bag={};for(const k in MH.ING)MH.SAVE.bag[k]=5;MH.toCamp('cook');});await p.waitForTimeout(120);await shot('s-cook-full');
@@ -503,7 +510,7 @@ const shots=process.argv[2];
   {const mid=await ev(()=>{const b=MH.S.btns.find(b=>b.id.startsWith('mat:'));return b&&b.id.slice(4);});ok(!!mid,'forge costs can be tapped');
     await tapBtn0('mat:'+mid);ok(await ev(()=>MH.S.mat&&MH.S.btns.some(b=>b.id==='mat:close')),'tapping a material shows where it comes from');await shot('c-material');}
   ok(await ev(()=>{const s=MH.matSources(MH.MONSTERS.ember.mat.head).map(r=>r.txt).join('|');const r=MH.matSources(MH.MONSTERS.ember.mat.rare).map(r=>r.txt).join('|');const h=MH.matSources('honey').map(r=>r.txt).join('|');
-    return s.includes('EMBERWING')&&s.includes('BREAK ITS')&&r.includes('RARE')&&h.includes('GATHER RUNS: FOREST')||[s,r,h].join(' / ');}),'it names the monster, the part to break, rare odds, and where to gather');
+    return s.includes('EMBERWING')&&s.includes('BREAK ITS')&&r.includes('RARE')&&h.includes('EXPEDITIONS: FOREST')||[s,r,h].join(' / ');}),'it names the monster, the part to break, rare odds, and where to gather');
   await ev(()=>{MH.S.mat=MH.MONSTERS.ember.mat.head;});await p.waitForTimeout(100);await tapBtn0('matgo:0');
   ok(await ev(()=>MH.S.tab==='book'&&MH.S.bpick==='ember'&&!MH.S.mat),'and its monster opens in the bestiary');await tapBtn0('book:back');
   await ev(()=>{MH.SAVE.wins.fern=10;MH.SAVE.wins.quill=1;delete MH.SAVE.wins.mud;MH.SAVE.wins.dust=3;MH.SAVE.wins.tusk=5;});
