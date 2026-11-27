@@ -3,7 +3,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#141826">
-<title>Fernwing Hunt · fight prototype</title>
+<title>Fernwing Hunt</title>
+<meta name="description" content="Hunt, carve, and forge in a free browser game. Thirty-five monsters, four weapons, and a camp with a forge, a kitchen, and Pip, your companion.">
+<link rel="canonical" href="https://salvationbacon.github.io/Monster-Hunter/">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SalvationBacon Games">
+<meta property="og:url" content="https://salvationbacon.github.io/Monster-Hunter/">
+<meta property="og:title" content="Fernwing Hunt">
+<meta property="og:description" content="Hunt, carve, and forge in a free browser game. Thirty-five monsters, four weapons, and a camp with a forge, a kitchen, and Pip, your companion.">
+<meta property="og:image" content="https://salvationbacon.github.io/Monster-Hunter/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Fernwing Hunt: the title screen beside a hunt against the Fernwing.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fernwing Hunt">
+<meta name="twitter:description" content="Hunt, carve, and forge in a free browser game. Thirty-five monsters, four weapons, and a camp with a forge, a kitchen, and Pip, your companion.">
+<meta name="twitter:image" content="https://salvationbacon.github.io/Monster-Hunter/preview.png">
+<meta name="twitter:image:alt" content="Fernwing Hunt: the title screen beside a hunt against the Fernwing.">
+<script data-goatcounter="https://salvationbacon.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <style>
 :root{color-scheme:dark}
 *{-webkit-tap-highlight-color:transparent}
@@ -4367,7 +4385,21 @@ function drawTitle(){
   {const cap=SC.cap,w=textW(cap)+10;rbox((W-w)/2,cy-15,w,11,'rgba(0,0,0,.6)');text(cap,W/2,cy-12,UI.gold,{al:1});}
   if(S.opts){drawOptions();return;}
 }
-function titleStart(){toCamp('home');sfx('charge',2);}
+// A play session began (Start, Continue, or New Game). GoatCounter counts it as an event, with no cookie.
+function trackGameStart(){
+  try{
+    if(MH.manual)return;
+    let n=0;
+    const send=()=>{
+      if(!window.goatcounter||typeof goatcounter.count!=='function')return false;
+      goatcounter.count({path:'fernwing-hunt-start',title:'Game started',event:true});
+      return true;
+    };
+    if(send())return;
+    const t=setInterval(()=>{if(send()||++n>20)clearInterval(t);},200);
+  }catch(e){}
+}
+function titleStart(){trackGameStart();toCamp('home');sfx('charge',2);}
 // The options panel: on the title screen and from the camp menu
 function drawOptions(){
   S.btns=[];const B=S.btns,ph=118,y=Math.max(30,((LH-ph)/2)|0);g.fillStyle='rgba(10,12,22,.85)';g.fillRect(0,0,W,LH);panel(8,y,W-16,ph);big('OPTIONS',W/2,y+7,UI.tx,1);

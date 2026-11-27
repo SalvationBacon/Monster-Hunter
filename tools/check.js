@@ -6,7 +6,8 @@ const shots=process.argv[2];
   const b=await chromium.launch();
   const p=await b.newPage({viewport:{width:390,height:780},hasTouch:true,isMobile:true});
   await p.addInitScript(()=>{window.MH_NOTALK=1;});   // scenes stay out of the way, except in the story checks
-  const errs=[];p.on('pageerror',e=>errs.push(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
+  const errs=[];p.on('pageerror',e=>errs.push(e.message+' @ '+(e.stack||'').split('\n').slice(1,3).join(' ')));
+  p.on('console',m=>{if(m.type()!=='error')return;const u=(m.location()&&m.location().url)||'';if(u.indexOf('gc.zgo.at')>=0)return;errs.push(m.text());});   // the visit counter uses a protocol-relative script; a file:// test cannot load it
   await p.goto('file://'+path.resolve(__dirname,'../index.html'));await p.waitForTimeout(200);
   let fail=0;const ok=(c,msg)=>{console.log((c===true?'ok   ':'FAIL ')+msg+(c===true||c===false?'':' -> '+c));if(c!==true)fail++;};
   const shot=async n=>{if(shots){await p.waitForTimeout(80);await p.screenshot({path:shots+'/'+n+'.png'});}};
