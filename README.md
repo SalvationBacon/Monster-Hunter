@@ -1,40 +1,52 @@
-# Monster-Hunter
+# Fernwing Hunt
 
-A mobile monster-hunting game: hunt, loot, craft, hunt something bigger. Pixel art drawn in code, the same way as 8-Bit Industry.
+A mobile monster-hunting game: hunt, carve, forge, hunt something bigger. Every monster, weapon and piece of armour is drawn in code by its own little art engine, and the music is composed in the browser as it plays.
 
-**Current state: prototype (v0.32.0).** 35 monsters (30 in six ranks, four apex monsters and an elder) on five body types, seven elements and four statuses, four weapon types, nineteen levelled skills on armor and charms, set bonuses, upgrades, music for every screen and monster, and a camp with gear, a forge, kitchen, quests, expeditions in eight biomes, a terrarium and Pip, a companion with its own gear.
+**The game is live (v0.39): play it at https://salvationbacon.github.io/Monster-Hunter/**
 
-## Play
-Open `index.html` in a browser. It is one file with no dependencies. Progress is saved on the device.
+It runs in any modern browser, on a phone or a computer. There's nothing to install, and progress is saved on the device.
 
+## What's in it
+- **35 monsters from myth**, each with its own body, animations and two signature moves: wyverns and Western dragons, a three-headed zmey, a sky lung with its pearl, a hydra, a basilisk king cobra, a tarasque, a griffin, a roc and more. Six ranks of five, four apex monsters and the Hollow Star at the end.
+- **Four weapons**, each with its own skill: the greatsword and hammer charge, the dual blades build fury for a Blade Dance, and the lance guards.
+- **Monsters that fight back:** combos, held wind-ups and feints, openings after their big moves, and rage in their last third of health.
+- **Rank Trials:** to move up a rank, beat three of its monsters back to back, with no break, one timer and five potions. The first clear gives that rank's Crest charm.
+- **Expeditions:** fight a biome's Snapjaw pack and forage in the lulls between kills, with the odd treasure cache, passing giant or alpha.
+- **Gear:** every monster gives a weapon of each type, four armour pieces that look like it, a charm, and gear for Pip. There are 19 levelled skills, set bonuses and upgrades.
+- **The camp:** quests and a story, the forge, a kitchen for potions and meals, a bestiary, a terrarium of 32 creatures, and Pip, a companion who fights, heals, traps, scouts or gathers for you.
+
+## How to play
 | Input | Action |
 |---|---|
-| Tap | Attack (three-hit combo) |
-| Tap a red circle | Weak-point hit. Three on the same part break it |
+| Tap | Attack (a three-hit combo). Every swing costs stamina |
+| Tap a red circle | Hit a weak point. Three hits on the same part break it, and broken parts drop extra materials (you keep them even if the hunt fails) |
 | Hold | The weapon's skill: charge (greatsword, hammer), Blade Dance from built-up fury (dual blades), guard (lance) |
-| Swipe left or right | Dodge roll. Dodge just as the ring closes for a PERFECT, then tap COUNTER |
+| Swipe left or right | Dodge roll. Roll just as the ring closes for a PERFECT, then tap COUNTER |
 | Swipe up, or the potion button | Drink a potion |
 | Swipe down, or the whetstone button | Sharpen the weapon |
 | Pause button (top right) | Pause: resume, music and sound on or off, or quit the hunt |
 
 Keyboard: `J` or `Space` attack (hold for the weapon skill), `A`/`D` dodge, `W` potion, `S` sharpen, `P` or `Esc` pause.
 
+**Stamina:** swings, charging and rolls all use it. Run it dry and you're **winded**: no swinging or rolling until you catch your breath. Keep enough in hand to roll; a perfect dodge gives some back.
+
 ## The loop
-1. **Quests** tell you what to do next. The main story is the tutorial.
+1. **Quests** tell you what to do next. The story's first chapters are the tutorial.
 2. **Hunt** a monster from the prep screen, where you see its weaknesses and pick a meal. Break its parts for their drops.
-3. **Expeditions:** gather runs give ingredients and creatures; pack hunts give meat and common materials.
-4. **Forge** materials into weapons, four-piece armor (chest, helm, gauntlets, boots), charms and Pip's gear, and upgrade them. Wear what you've made from the **GEAR** screen. The **camp home** shows what to do next and a tile for every screen; the ☰ button on any screen brings you back. Tap any material cost to see where it drops. The **Bestiary** fills in as you hunt each monster (1, 3, 5 and 10 hunts). The hunt list has a search bar. The story is told in scenes with the camp's cast (Wren, Bram, Moss, Oda and Pip), and the first hunt teaches the controls as you go. Replay a chapter's scene from the quest board. **Cook** potions; meals are chosen in prep.
-5. Three wins in a rank open the next rank. The four apex monsters open after rank 6, and the elder after all four apex monsters.
+3. **Forge** materials into weapons, armour, charms and Pip's gear, and upgrade them. Wear a weapon whose element the next monster is weak to.
+4. **Move up:** monsters open one at a time. Beat a rank's last monster to open its Rank Trial; clear the trial to open the next rank. The Apex Trial opens the Hollow Star.
+5. **Expeditions** fill the kitchen and the terrarium: ingredients, creatures, meat and common materials.
 
 ## Options
-OPTIONS on the title screen, or SETTINGS in the camp menu: music and sound on or off, **dev mode** (every monster and piece of gear unlocked, on its own save, so your real progress is safe), and **delete save** (tap twice to confirm).
+SETTINGS on the title screen or in the camp menu: music and sound on or off, **dev mode** (every monster and piece of gear unlocked, on its own save, so your real progress is safe), and **delete save** (tap twice to confirm).
 
 ## Music
-Composed in the browser as it plays, the same way as 8-Bit Industry: each track is a recipe that becomes notes on the fly, keeping its hook while the accompaniment changes each time. The title, the camp and menus, gather runs and pack hunts have their own tracks, and every monster has its own, built from its element (key and scale), rank (tempo), body (lead voice) and trait (drums). The Hollow Star has a hand-made track.
+An original score, composed in the browser as it plays: each track is a recipe that becomes notes on the fly, keeping its hook while the accompaniment changes each time. The title, the camp, expeditions (with their own foraging theme in the lulls) and the Snapjaw packs have their own tracks. Every monster's theme is a variation on its element's motif, moved to its own key and tempo, with a lead voice from its body and drums from its trait. The Hollow Star has a hand-made track.
 
 ## Files
 | File | Purpose |
 |---|---|
-| `index.html` | The whole game |
+| `index.html` | The whole game, in one file |
+| `art/*.js` | The art engine and every monster, the hunter, weapons, icons and signature moves. Run `python3 tools/build-art.py` after editing them to inline them into `index.html` |
 | `tools/check.js` | Headless test: bots play full hunts with every weapon type and up the whole monster ladder, then every system and the real touch flows are checked. `node tools/check.js` (needs Playwright) |
-| `concepts/` | Tone mockups, the design decisions so far (`DECISIONS.md`) and the to-do list (`TODO.md`) |
+| `concepts/` | The design decisions (`DECISIONS.md`), the to-do list (`TODO.md`) and the signature move list (`MOVES.md`) |

@@ -520,3 +520,7 @@ Built from the approved mockups (https://claude.ai/artifact/DoQapo9itL3b3qs7dzzG
 - **Fangs** are little daggers in the monster's colours: the blade in its horn colour, shaped by its weapon's blade (curved for horns, tusks, fangs, beaks, pincers and stingers; straight for crystal, leaf, feather, quill and fin; jagged for bolts; broad for axes, clouds and the void), with a guard in its body colour and an element gem. The starting twig has a leaf.
 - Both show on Pip and as their gear icons.
 
+## v0.39.3: live
+- Play-tested and called good. **The game is live** at https://salvationbacon.github.io/Monster-Hunter/ and the README now says so, and describes the game as it is: the 35 monsters from myth, stamina, Rank Trials, expeditions, the original score, and the `art/` sources.
+- **First-time tips** from Wren for the new mechanics, once each: stamina running low, being winded, a monster wide open, a feint, and a monster enraging.
+

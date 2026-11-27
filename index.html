@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:#0b0d14;overflow:hidden;position:relat
 //  Art pipeline is the same as 8-Bit Industry: every sprite is drawn in code
 //  into a tiny canvas and scaled up with smoothing off. No image files.
 // ═══════════════════════════════════════════════════
-const VER='0.39.2';
+const VER='0.39.3';
 const W=128; let LH=208;                 // logical size: fixed width, height follows the screen
 const cv=document.getElementById('c'), g=cv.getContext('2d');
 
@@ -469,6 +469,12 @@ const SCENES={
   h_counter:[['wren','PERFECT DODGE! TAP COUNTER, QUICK!']],
   h_potion:[['wren','YOU\'RE HURT. SWIPE UP TO DRINK A POTION. DON\'T BE A HERO, HEROES GET EATEN.']],
   h_sharp:[['wren','YOUR BLADE IS GOING DULL. SWIPE DOWN TO SHARPEN IT. DULL BLADES BOUNCE OFF.']],
+  // the new tricks, taught the first time they come up
+  h_stamina:[['wren','EVERY SWING TIRES YOU. WATCH THE YELLOW BAR, AND ALWAYS KEEP ENOUGH TO ROLL.']],
+  h_winded:[['wren','YOU\'RE WINDED! NO SWINGING OR ROLLING TILL YOU GET YOUR BREATH BACK. DON\'T EMPTY THE BAR UP CLOSE.']],
+  h_open:[['wren','IT\'S WIDE OPEN AFTER THAT BIG MOVE! HIT IT NOW, IT TAKES EXTRA DAMAGE.']],
+  h_feint:[['wren','A FEINT! SOME BEASTS FAKE THEIR WIND-UP. WATCH THEM, DON\'T JUST ROLL ON A RHYTHM.']],
+  h_rage:[['wren','IT\'S ENRAGED: RED AND STEAMING. IT HITS HARDER NOW, SO FINISH IT!']],
   // the first visit to each part of camp
   v_quest:[['wren','THE QUEST BOARD. STORY JOBS COME FROM ME. DAILY AND WEEKLY JOBS COME FROM WHOEVER YELLS LOUDEST.'],['wren','WHEN A JOB IS DONE, CLAIM ITS REWARD HERE.']],
   v_gear:[['wren','YOUR KIT. SWAP WEAPONS AND ARMOR HERE. TAP YOUR STATS TO SEE YOUR SKILLS.'],['wren','WEAR ALL FOUR ARMOR PIECES FROM ONE MONSTER FOR A SET BONUS.']],
@@ -4656,6 +4662,11 @@ function huntTutor(){
   if(h.counter>0&&talk('h_counter'))return;
   if(h.hp<h.max*.5&&SAVE.potions>0&&talk('h_potion'))return;
   if(h.sharp<=SHARP.lo+5&&talk('h_sharp'))return;
+  if(h.winded>0&&talk('h_winded'))return;
+  if(h.st<40&&h.state==='idle'&&talk('h_stamina'))return;
+  if(m.state==='recover'&&m.open>0&&talk('h_open'))return;
+  if(m.state==='recover'&&m.feintU!=null&&m.t<.15&&talk('h_feint'))return;
+  if(m.phase===2&&m.state!=='roar'&&talk('h_rage'))return;
 }
 // ── UI kit: two text sizes, one gold for "do this next", chips and icons instead of words, space instead of boxes ──
 const UI={bg:'#11141f',s1:'#1a1f30',s2:'#242b45',line:'#2e3654',tx:'#eef2fa',dim:'#8a93b0',faint:'#4d5574',gold:'#ffd34d',goldD:'#c99a1e',ink:'#2a2008',ok:'#4cd964',bad:'#ff6a4d'};
